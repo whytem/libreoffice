@@ -10,6 +10,7 @@
 #pragma once
 
 #include <interpre.hxx>
+#include <spreadsheetengine/compat/libreoffice/TextServices.hxx>
 
 namespace spreadsheetengine::compat::libreoffice::interpretercompatdispatch
 {
@@ -101,6 +102,354 @@ struct Dispatcher
             false);
     }
 #define mrDoc SEIC.mrDoc
+
+    static void textInfoIsBlank(ScInterpreter& rCalc)
+    {
+        short nRes = 0;
+        nFuncFmtType = SvNumFormatType::LOGICAL;
+        switch (SEIC.GetRawStackType())
+        {
+            case svEmptyCell:
+            {
+                FormulaConstTokenRef p = PopToken();
+                if (!static_cast<const ScEmptyCellToken*>(p.get())->IsInherited())
+                    nRes = 1;
+            }
+            break;
+            case svDoubleRef:
+            case svSingleRef:
+            {
+                ScAddress aAdr;
+                if (!SEIC.PopDoubleRefOrSingleRef(aAdr))
+                    break;
+                ScRefCellValue aCell(mrDoc, aAdr);
+                if (aCell.getType() == CELLTYPE_NONE)
+                    nRes = 1;
+            }
+            break;
+            case svExternalSingleRef:
+            case svExternalDoubleRef:
+            case svMatrix:
+            {
+                ScMatrixRef pMat = GetMatrix();
+                if (!pMat)
+                    break;
+                if (!SEIC.pJumpMatrix)
+                    nRes = pMat->IsEmptyCell(0, 0) ? 1 : 0;
+                else
+                {
+                    SCSIZE nCols, nRows, nC, nR;
+                    pMat->GetDimensions(nCols, nRows);
+                    SEIC.pJumpMatrix->GetPos(nC, nR);
+                    if (nC < nCols && nR < nRows)
+                        nRes = pMat->IsEmptyCell(nC, nR) ? 1 : 0;
+                }
+            }
+            break;
+            default:
+                Pop();
+        }
+        nGlobalError = FormulaError::NONE;
+        SEIC.PushInt(nRes);
+    }
+
+    static void textInfoIsText(ScInterpreter& rCalc) { SEIC.PushInt(int(SEIC.IsString())); }
+
+    static void textInfoIsNonText(ScInterpreter& rCalc)
+    {
+        SEIC.PushInt(int(!SEIC.IsString()));
+    }
+
+    static void textInfoIsNumber(ScInterpreter& rCalc)
+    {
+        nFuncFmtType = SvNumFormatType::LOGICAL;
+        bool bRes = false;
+        switch (SEIC.GetRawStackType())
+        {
+            case svDouble:
+                Pop();
+                bRes = true;
+                break;
+            case svDoubleRef:
+            case svSingleRef:
+            {
+                ScAddress aAdr;
+                if (!SEIC.PopDoubleRefOrSingleRef(aAdr))
+                    break;
+                ScRefCellValue aCell(mrDoc, aAdr);
+                if (GetCellErrCode(aCell) == FormulaError::NONE)
+                {
+                    switch (aCell.getType())
+                    {
+                        case CELLTYPE_VALUE:
+                            bRes = true;
+                            break;
+                        case CELLTYPE_FORMULA:
+                            bRes = (aCell.getFormula()->IsValue()
+                                    && !aCell.getFormula()->IsEmpty());
+                            break;
+                        default:
+                            break;
+                    }
+                }
+            }
+            break;
+            case svExternalSingleRef:
+            {
+                ScExternalRefCache::TokenRef pToken;
+                SEIC.PopExternalSingleRef(pToken);
+                if (nGlobalError == FormulaError::NONE && pToken->GetType() == svDouble)
+                    bRes = true;
+            }
+            break;
+            case svExternalDoubleRef:
+            case svMatrix:
+            {
+                ScMatrixRef pMat = GetMatrix();
+                if (!pMat)
+                    break;
+                if (!SEIC.pJumpMatrix)
+                {
+                    if (pMat->GetErrorIfNotString(0, 0) == FormulaError::NONE)
+                        bRes = pMat->IsValue(0, 0);
+                }
+                else
+                {
+                    SCSIZE nCols, nRows, nC, nR;
+                    pMat->GetDimensions(nCols, nRows);
+                    SEIC.pJumpMatrix->GetPos(nC, nR);
+                    if (nC < nCols && nR < nRows
+                        && pMat->GetErrorIfNotString(nC, nR) == FormulaError::NONE)
+                    {
+                        bRes = pMat->IsValue(nC, nR);
+                    }
+                }
+            }
+            break;
+            default:
+                Pop();
+        }
+        nGlobalError = FormulaError::NONE;
+        SEIC.PushInt(int(bRes));
+    }
+
+    static void textInfoIsNA(ScInterpreter& rCalc)
+    {
+        nFuncFmtType = SvNumFormatType::LOGICAL;
+        bool bRes = false;
+        switch (GetStackType())
+        {
+            case svDoubleRef:
+            case svSingleRef:
+            {
+                ScAddress aAdr;
+                const bool bOk = SEIC.PopDoubleRefOrSingleRef(aAdr);
+                if (nGlobalError == FormulaError::NotAvailable)
+                    bRes = true;
+                else if (bOk)
+                {
+                    ScRefCellValue aCell(mrDoc, aAdr);
+                    bRes = (GetCellErrCode(aCell) == FormulaError::NotAvailable);
+                }
+            }
+            break;
+            case svExternalSingleRef:
+            {
+                ScExternalRefCache::TokenRef pToken;
+                SEIC.PopExternalSingleRef(pToken);
+                if (nGlobalError == FormulaError::NotAvailable
+                    || (pToken && pToken->GetType() == svError
+                        && pToken->GetError() == FormulaError::NotAvailable))
+                {
+                    bRes = true;
+                }
+            }
+            break;
+            case svExternalDoubleRef:
+            case svMatrix:
+            {
+                ScMatrixRef pMat = GetMatrix();
+                if (!pMat)
+                    break;
+                if (!SEIC.pJumpMatrix)
+                    bRes = (pMat->GetErrorIfNotString(0, 0) == FormulaError::NotAvailable);
+                else
+                {
+                    SCSIZE nCols, nRows, nC, nR;
+                    pMat->GetDimensions(nCols, nRows);
+                    SEIC.pJumpMatrix->GetPos(nC, nR);
+                    if (nC < nCols && nR < nRows)
+                        bRes = (pMat->GetErrorIfNotString(nC, nR)
+                                == FormulaError::NotAvailable);
+                }
+            }
+            break;
+            default:
+                PopError();
+                if (nGlobalError == FormulaError::NotAvailable)
+                    bRes = true;
+        }
+        nGlobalError = FormulaError::NONE;
+        SEIC.PushInt(int(bRes));
+    }
+
+    static void textInfoIsErrLike(ScInterpreter& rCalc, bool bTreatNAAsError)
+    {
+        nFuncFmtType = SvNumFormatType::LOGICAL;
+        bool bRes = false;
+        switch (GetStackType())
+        {
+            case svDoubleRef:
+            case svSingleRef:
+            {
+                ScAddress aAdr;
+                const bool bOk = SEIC.PopDoubleRefOrSingleRef(aAdr);
+                if (!bOk || (nGlobalError != FormulaError::NONE
+                             && (bTreatNAAsError
+                                     || nGlobalError != FormulaError::NotAvailable)))
+                {
+                    bRes = true;
+                }
+                else
+                {
+                    ScRefCellValue aCell(mrDoc, aAdr);
+                    const FormulaError nErr = GetCellErrCode(aCell);
+                    bRes = bTreatNAAsError ? (nErr != FormulaError::NONE)
+                                           : (nErr != FormulaError::NONE
+                                              && nErr != FormulaError::NotAvailable);
+                }
+            }
+            break;
+            case svExternalSingleRef:
+                {
+                    ScExternalRefCache::TokenRef pToken;
+                    SEIC.PopExternalSingleRef(pToken);
+                    if (bTreatNAAsError)
+                    {
+                        bRes = (nGlobalError != FormulaError::NONE
+                                || (pToken && pToken->GetType() == svError));
+                    }
+                    else if ((nGlobalError != FormulaError::NONE
+                              && nGlobalError != FormulaError::NotAvailable)
+                         || !pToken
+                         || (pToken->GetType() == svError
+                             && pToken->GetError() != FormulaError::NotAvailable))
+                {
+                    bRes = true;
+                }
+            }
+            break;
+            case svExternalDoubleRef:
+            case svMatrix:
+            {
+                ScMatrixRef pMat = GetMatrix();
+                if (nGlobalError != FormulaError::NONE || !pMat)
+                {
+                    bRes = bTreatNAAsError
+                               ? (nGlobalError != FormulaError::NONE || !pMat)
+                               : ((nGlobalError != FormulaError::NONE
+                                   && nGlobalError != FormulaError::NotAvailable)
+                                  || !pMat);
+                }
+                else
+                {
+                    const auto getErr = [&](SCSIZE nC, SCSIZE nR) {
+                        return pMat->GetErrorIfNotString(nC, nR);
+                    };
+                    FormulaError nErr = FormulaError::NONE;
+                    if (!SEIC.pJumpMatrix)
+                        nErr = getErr(0, 0);
+                    else
+                    {
+                        SCSIZE nCols, nRows, nC, nR;
+                        pMat->GetDimensions(nCols, nRows);
+                        SEIC.pJumpMatrix->GetPos(nC, nR);
+                        if (nC < nCols && nR < nRows)
+                            nErr = getErr(nC, nR);
+                    }
+                    bRes = bTreatNAAsError ? (nErr != FormulaError::NONE)
+                                           : (nErr != FormulaError::NONE
+                                              && nErr != FormulaError::NotAvailable);
+                }
+            }
+            break;
+            default:
+                PopError();
+                if (bTreatNAAsError)
+                    bRes = (nGlobalError != FormulaError::NONE);
+                else if (nGlobalError != FormulaError::NONE
+                         && nGlobalError != FormulaError::NotAvailable)
+                {
+                    bRes = true;
+                }
+        }
+        nGlobalError = FormulaError::NONE;
+        SEIC.PushInt(int(bRes));
+    }
+
+    static void textInfoCode(ScInterpreter& rCalc)
+    {
+        SEIC.PushInt(selibreoffice::codeFromText(SEIC.GetString().getString()));
+    }
+
+    static void textInfoTrim(ScInterpreter& rCalc)
+    {
+        SEIC.PushString(selibreoffice::trimRepeatedSpaces(SEIC.GetString().getString()));
+    }
+
+    static void textInfoLen(ScInterpreter& rCalc)
+    {
+        PushDouble(selibreoffice::countCodePoints(SEIC.GetString().getString()));
+    }
+
+    static void textInfoClean(ScInterpreter& rCalc)
+    {
+        SEIC.PushString(selibreoffice::cleanPrintable(SEIC.GetString().getString()));
+    }
+
+    static void textInfoChar(ScInterpreter& rCalc)
+    {
+        if (auto aStr = selibreoffice::charFromValue(CalcGetDouble()))
+            SEIC.PushString(*aStr);
+        else
+            PushIllegalArgument();
+    }
+
+    static void textInfoJis(ScInterpreter& rCalc)
+    {
+        if (MustHaveParamCount(GetByte(), 1))
+            SEIC.PushString(selibreoffice::convertIntoFullWidth(SEIC.GetString().getString()));
+    }
+
+    static void textInfoAsc(ScInterpreter& rCalc)
+    {
+        if (MustHaveParamCount(GetByte(), 1))
+            SEIC.PushString(selibreoffice::convertIntoHalfWidth(SEIC.GetString().getString()));
+    }
+
+    static void textInfoUnicode(ScInterpreter& rCalc)
+    {
+        if (!MustHaveParamCount(GetByte(), 1))
+            return;
+        if (std::optional<double> fValue
+            = selibreoffice::unicodeFromText(SEIC.GetString().getString()))
+            PushDouble(*fValue);
+        else
+            PushIllegalParameter();
+    }
+
+    static void textInfoUnichar(ScInterpreter& rCalc)
+    {
+        if (!MustHaveParamCount(GetByte(), 1))
+            return;
+        sal_uInt32 nCodePoint = SEIC.GetUInt32();
+        if (nGlobalError != FormulaError::NONE)
+            PushIllegalArgument();
+        else if (auto aStr = selibreoffice::unicharFromCodePoint(nCodePoint))
+            SEIC.PushString(*aStr);
+        else
+            PushIllegalArgument();
+    }
 
     static void statisticalKurt(ScInterpreter& rCalc)
     {

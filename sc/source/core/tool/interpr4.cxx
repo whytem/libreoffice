@@ -4922,7 +4922,26 @@ StackVar ScInterpreter::Interpret()
                                 return makeErrorResult(nGlobalError);
 
                             ScAddress aAddress;
-                            if (!DoubleRefToPosSingleRef(aRange, aAddress))
+                            if (pJumpMatrix)
+                            {
+                                const SCCOL nCols
+                                    = aRange.aEnd.Col() - aRange.aStart.Col() + 1;
+                                const SCROW nRows
+                                    = aRange.aEnd.Row() - aRange.aStart.Row() + 1;
+                                SCSIZE nC = 0;
+                                SCSIZE nR = 0;
+                                pJumpMatrix->GetPos(nC, nR);
+                                if ((nC >= static_cast<SCSIZE>(nCols) && nCols != 1)
+                                    || (nR >= static_cast<SCSIZE>(nRows) && nRows != 1))
+                                {
+                                    return makeErrorResult(FormulaError::NoValue);
+                                }
+
+                                aAddress = ScAddress(aRange.aStart.Col() + (nCols == 1 ? 0 : nC),
+                                    aRange.aStart.Row() + (nRows == 1 ? 0 : nR),
+                                    aRange.aStart.Tab());
+                            }
+                            else if (!DoubleRefToPosSingleRef(aRange, aAddress))
                             {
                                 restoreInterpreterState();
                                 return std::nullopt;
@@ -5175,6 +5194,18 @@ StackVar ScInterpreter::Interpret()
                     {
                         addDispatchRuntimeStat(rDispatchStats.mnTextInfoEngineDeclinedCount);
                         return false;
+                    }
+
+                    if (rFunctionName == u"ISBLANK" && pArgument->GetType() == svEmptyCell)
+                    {
+                        const bool bResult
+                            = !static_cast<const ScEmptyCellToken*>(pArgument)->IsInherited();
+                        sp -= 1;
+                        nGlobalError = FormulaError::NONE;
+                        addDispatchRuntimeStat(rDispatchStats.mnTextInfoEngineSucceededCount);
+                        nFuncFmtType = SvNumFormatType::LOGICAL;
+                        PushInt(int(bResult));
+                        return true;
                     }
 
                     const auto oValue = tryBuildEngineTextInfoOperand(*pArgument);
@@ -6839,100 +6870,6 @@ StackVar ScInterpreter::Interpret()
                               "family-local default-on information predicate reached "
                               "ScInterpreter");
                       };
-                const auto pushLegacyIsErrLike = [&](std::u16string_view rFunctionName,
-                                                     bool bTreatNAAsError) {
-                    warnInformationPredicateDispatch(rFunctionName);
-                    nFuncFmtType = SvNumFormatType::LOGICAL;
-                    bool bRes = false;
-                    switch (GetStackType())
-                    {
-                        case svDoubleRef:
-                        case svSingleRef:
-                        {
-                            ScAddress aAdr;
-                            const bool bOk = PopDoubleRefOrSingleRef(aAdr);
-                            if (!bOk || (nGlobalError != FormulaError::NONE
-                                         && (bTreatNAAsError
-                                                 || nGlobalError != FormulaError::NotAvailable)))
-                            {
-                                bRes = true;
-                            }
-                            else
-                            {
-                                ScRefCellValue aCell(mrDoc, aAdr);
-                                const FormulaError nErr = GetCellErrCode(aCell);
-                                bRes = bTreatNAAsError ? (nErr != FormulaError::NONE)
-                                                       : (nErr != FormulaError::NONE
-                                                          && nErr != FormulaError::NotAvailable);
-                            }
-                        }
-                        break;
-                        case svExternalSingleRef:
-                        {
-                            ScExternalRefCache::TokenRef pToken;
-                            PopExternalSingleRef(pToken);
-                            if (bTreatNAAsError)
-                            {
-                                bRes = (nGlobalError != FormulaError::NONE
-                                        || pToken->GetType() == svError);
-                            }
-                            else if ((nGlobalError != FormulaError::NONE
-                                      && nGlobalError != FormulaError::NotAvailable)
-                                     || !pToken
-                                     || (pToken->GetType() == svError
-                                         && pToken->GetError() != FormulaError::NotAvailable))
-                            {
-                                bRes = true;
-                            }
-                        }
-                        break;
-                        case svExternalDoubleRef:
-                        case svMatrix:
-                        {
-                            ScMatrixRef pMat = GetMatrix();
-                            if (nGlobalError != FormulaError::NONE || !pMat)
-                            {
-                                bRes = bTreatNAAsError
-                                           ? (nGlobalError != FormulaError::NONE || !pMat)
-                                           : ((nGlobalError != FormulaError::NONE
-                                               && nGlobalError != FormulaError::NotAvailable)
-                                              || !pMat);
-                            }
-                            else
-                            {
-                                const auto getErr = [&](SCSIZE nC, SCSIZE nR) {
-                                    return pMat->GetErrorIfNotString(nC, nR);
-                                };
-                                FormulaError nErr = FormulaError::NONE;
-                                if (!pJumpMatrix)
-                                    nErr = getErr(0, 0);
-                                else
-                                {
-                                    SCSIZE nCols, nRows, nC, nR;
-                                    pMat->GetDimensions(nCols, nRows);
-                                    pJumpMatrix->GetPos(nC, nR);
-                                    if (nC < nCols && nR < nRows)
-                                        nErr = getErr(nC, nR);
-                                }
-                                bRes = bTreatNAAsError ? (nErr != FormulaError::NONE)
-                                                       : (nErr != FormulaError::NONE
-                                                          && nErr != FormulaError::NotAvailable);
-                            }
-                        }
-                        break;
-                        default:
-                            PopError();
-                            if (bTreatNAAsError)
-                                bRes = (nGlobalError != FormulaError::NONE);
-                            else if (nGlobalError != FormulaError::NONE
-                                     && nGlobalError != FormulaError::NotAvailable)
-                            {
-                                bRes = true;
-                            }
-                    }
-                    nGlobalError = FormulaError::NONE;
-                    PushInt(int(bRes));
-                };
                 const auto warnLogicalDispatch = [&](std::u16string_view rFunctionName) {
                     warnIfLegacyDispatchReached(
                         "family-local default-on", rFunctionName,
@@ -14292,52 +14229,8 @@ StackVar ScInterpreter::Interpret()
                         if (!tryPushEngineInformationPredicate(u"ISBLANK"))
                         {
                             warnInformationPredicateDispatch(u"ISBLANK");
-                            short nRes = 0;
-                            nFuncFmtType = SvNumFormatType::LOGICAL;
-                            switch (GetRawStackType())
-                            {
-                                case svEmptyCell:
-                                {
-                                    FormulaConstTokenRef p = PopToken();
-                                    if (!static_cast<const ScEmptyCellToken*>(p.get())->IsInherited())
-                                        nRes = 1;
-                                }
-                                break;
-                                case svDoubleRef:
-                                case svSingleRef:
-                                {
-                                    ScAddress aAdr;
-                                    if (!PopDoubleRefOrSingleRef(aAdr))
-                                        break;
-                                    ScRefCellValue aCell(mrDoc, aAdr);
-                                    if (aCell.getType() == CELLTYPE_NONE)
-                                        nRes = 1;
-                                }
-                                break;
-                                case svExternalSingleRef:
-                                case svExternalDoubleRef:
-                                case svMatrix:
-                                {
-                                    ScMatrixRef pMat = GetMatrix();
-                                    if (!pMat)
-                                        break;
-                                    if (!pJumpMatrix)
-                                        nRes = pMat->IsEmptyCell(0, 0) ? 1 : 0;
-                                    else
-                                    {
-                                        SCSIZE nCols, nRows, nC, nR;
-                                        pMat->GetDimensions(nCols, nRows);
-                                        pJumpMatrix->GetPos(nC, nR);
-                                        if (nC < nCols && nR < nRows)
-                                            nRes = pMat->IsEmptyCell(nC, nR) ? 1 : 0;
-                                    }
-                                }
-                                break;
-                                default:
-                                    Pop();
-                            }
-                            nGlobalError = FormulaError::NONE;
-                            PushInt(nRes);
+                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                                textInfoIsBlank(*this);
                         }
                     }
                     break;
@@ -14345,14 +14238,16 @@ StackVar ScInterpreter::Interpret()
                         if (!tryPushEngineInformationPredicate(u"ISTEXT"))
                         {
                             warnInformationPredicateDispatch(u"ISTEXT");
-                            PushInt(int(IsString()));
+                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                                textInfoIsText(*this);
                         }
                         break;
                     case ocIsNonString      :
                         if (!tryPushEngineInformationPredicate(u"ISNONTEXT"))
                         {
                             warnInformationPredicateDispatch(u"ISNONTEXT");
-                            PushInt(int(!IsString()));
+                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                                textInfoIsNonText(*this);
                         }
                         break;
                     case ocIsLogical        :
@@ -14454,79 +14349,8 @@ StackVar ScInterpreter::Interpret()
                         if (!tryPushEngineInformationPredicate(u"ISNUMBER"))
                         {
                             warnInformationPredicateDispatch(u"ISNUMBER");
-                            nFuncFmtType = SvNumFormatType::LOGICAL;
-                            bool bRes = false;
-                            switch (GetRawStackType())
-                            {
-                                case svDouble:
-                                    Pop();
-                                    bRes = true;
-                                    break;
-                                case svDoubleRef:
-                                case svSingleRef:
-                                {
-                                    ScAddress aAdr;
-                                    if (!PopDoubleRefOrSingleRef(aAdr))
-                                        break;
-                                    ScRefCellValue aCell(mrDoc, aAdr);
-                                    if (GetCellErrCode(aCell) == FormulaError::NONE)
-                                    {
-                                        switch (aCell.getType())
-                                        {
-                                            case CELLTYPE_VALUE:
-                                                bRes = true;
-                                                break;
-                                            case CELLTYPE_FORMULA:
-                                                bRes = (aCell.getFormula()->IsValue()
-                                                        && !aCell.getFormula()->IsEmpty());
-                                                break;
-                                            default:
-                                                break;
-                                        }
-                                    }
-                                }
-                                break;
-                                case svExternalSingleRef:
-                                {
-                                    ScExternalRefCache::TokenRef pToken;
-                                    PopExternalSingleRef(pToken);
-                                    if (nGlobalError == FormulaError::NONE
-                                        && pToken->GetType() == svDouble)
-                                    {
-                                        bRes = true;
-                                    }
-                                }
-                                break;
-                                case svExternalDoubleRef:
-                                case svMatrix:
-                                {
-                                    ScMatrixRef pMat = GetMatrix();
-                                    if (!pMat)
-                                        break;
-                                    if (!pJumpMatrix)
-                                    {
-                                        if (pMat->GetErrorIfNotString(0, 0) == FormulaError::NONE)
-                                            bRes = pMat->IsValue(0, 0);
-                                    }
-                                    else
-                                    {
-                                        SCSIZE nCols, nRows, nC, nR;
-                                        pMat->GetDimensions(nCols, nRows);
-                                        pJumpMatrix->GetPos(nC, nR);
-                                        if (nC < nCols && nR < nRows
-                                            && pMat->GetErrorIfNotString(nC, nR)
-                                                   == FormulaError::NONE)
-                                        {
-                                            bRes = pMat->IsValue(nC, nR);
-                                        }
-                                    }
-                                }
-                                break;
-                                default:
-                                    Pop();
-                            }
-                            nGlobalError = FormulaError::NONE;
-                            PushInt(int(bRes));
+                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                                textInfoIsNumber(*this);
                         }
                     }
                     break;
@@ -14673,77 +14497,26 @@ StackVar ScInterpreter::Interpret()
                         if (!tryPushEngineInformationPredicate(u"ISNA"))
                         {
                             warnInformationPredicateDispatch(u"ISNA");
-                            nFuncFmtType = SvNumFormatType::LOGICAL;
-                            bool bRes = false;
-                            switch (GetStackType())
-                            {
-                                case svDoubleRef:
-                                case svSingleRef:
-                                {
-                                    ScAddress aAdr;
-                                    const bool bOk = PopDoubleRefOrSingleRef(aAdr);
-                                    if (nGlobalError == FormulaError::NotAvailable)
-                                        bRes = true;
-                                    else if (bOk)
-                                    {
-                                        ScRefCellValue aCell(mrDoc, aAdr);
-                                        bRes = (GetCellErrCode(aCell)
-                                                == FormulaError::NotAvailable);
-                                    }
-                                }
-                                break;
-                                case svExternalSingleRef:
-                                {
-                                    ScExternalRefCache::TokenRef pToken;
-                                    PopExternalSingleRef(pToken);
-                                    if (nGlobalError == FormulaError::NotAvailable
-                                        || (pToken && pToken->GetType() == svError
-                                            && pToken->GetError()
-                                                   == FormulaError::NotAvailable))
-                                    {
-                                        bRes = true;
-                                    }
-                                }
-                                break;
-                                case svExternalDoubleRef:
-                                case svMatrix:
-                                {
-                                    ScMatrixRef pMat = GetMatrix();
-                                    if (!pMat)
-                                        break;
-                                    if (!pJumpMatrix)
-                                        bRes = (pMat->GetErrorIfNotString(0, 0)
-                                                == FormulaError::NotAvailable);
-                                    else
-                                    {
-                                        SCSIZE nCols, nRows, nC, nR;
-                                        pMat->GetDimensions(nCols, nRows);
-                                        pJumpMatrix->GetPos(nC, nR);
-                                        if (nC < nCols && nR < nRows)
-                                        {
-                                            bRes = (pMat->GetErrorIfNotString(nC, nR)
-                                                    == FormulaError::NotAvailable);
-                                        }
-                                    }
-                                }
-                                break;
-                                default:
-                                    PopError();
-                                    if (nGlobalError == FormulaError::NotAvailable)
-                                        bRes = true;
-                            }
-                            nGlobalError = FormulaError::NONE;
-                            PushInt(int(bRes));
+                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                                textInfoIsNA(*this);
                         }
                     }
                     break;
                     case ocIsErr            :
                         if (!tryPushEngineInformationPredicate(u"ISERR"))
-                            pushLegacyIsErrLike(u"ISERR", false);
+                        {
+                            warnInformationPredicateDispatch(u"ISERR");
+                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                                textInfoIsErrLike(*this, false);
+                        }
                         break;
                     case ocIsError          :
                         if (!tryPushEngineInformationPredicate(u"ISERROR"))
-                            pushLegacyIsErrLike(u"ISERROR", true);
+                        {
+                            warnInformationPredicateDispatch(u"ISERROR");
+                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                                textInfoIsErrLike(*this, true);
+                        }
                         break;
                     case ocIsEven           :
                         warnInformationPredicateDispatch(u"ISEVEN");
@@ -14774,15 +14547,16 @@ StackVar ScInterpreter::Interpret()
                         if (!tryPushEngineTextUtility(u"CODE"))
                         {
                             warnTextUtilityDispatch(u"CODE");
-                            PushInt(selibreoffice::codeFromText(GetString().getString()));
+                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                                textInfoCode(*this);
                         }
                         break;
                     case ocTrim             :
                         if (!tryPushEngineTextUtility(u"TRIM"))
                         {
                             warnTextUtilityDispatch(u"TRIM");
-                            PushString(
-                                selibreoffice::trimRepeatedSpaces(GetString().getString()));
+                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                                textInfoTrim(*this);
                         }
                         break;
                     case ocUpper            :
@@ -14810,7 +14584,8 @@ StackVar ScInterpreter::Interpret()
                         if (!tryPushEngineTextUtility(u"LEN"))
                         {
                             warnTextUtilityDispatch(u"LEN");
-                            PushDouble(selibreoffice::countCodePoints(GetString().getString()));
+                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                                textInfoLen(*this);
                         }
                         break;
                     case ocT                :
@@ -14883,7 +14658,8 @@ StackVar ScInterpreter::Interpret()
                         if (!tryPushEngineTextUtility(u"CLEAN"))
                         {
                             warnTextUtilityDispatch(u"CLEAN");
-                            PushString(selibreoffice::cleanPrintable(GetString().getString()));
+                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                                textInfoClean(*this);
                         }
                         break;
                     case ocValue            : pushLegacyValue();        break;
@@ -14892,10 +14668,8 @@ StackVar ScInterpreter::Interpret()
                         if (!tryPushEngineTextUtility(u"CHAR"))
                         {
                             warnTextUtilityDispatch(u"CHAR");
-                            if (auto aStr = selibreoffice::charFromValue(GetDouble()))
-                                PushString(*aStr);
-                            else
-                                PushIllegalArgument();
+                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                                textInfoChar(*this);
                         }
                         break;
                     case ocArcTan2          :
@@ -17536,21 +17310,19 @@ StackVar ScInterpreter::Interpret()
                     case ocBahtText         : pushLegacyBahtText();     break;
                     case ocGetPivotData     : ScGetPivotData();             break;
                     case ocJis              :
-                        if (MustHaveParamCount(GetByte(), 1)
-                            && !tryPushEngineTextUtility(u"JIS"))
+                        if (!tryPushEngineTextUtility(u"JIS"))
                         {
                             warnTextUtilityDispatch(u"JIS");
-                            PushString(selibreoffice::convertIntoFullWidth(
-                                GetString().getString()));
+                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                                textInfoJis(*this);
                         }
                         break;
                     case ocAsc              :
-                        if (MustHaveParamCount(GetByte(), 1)
-                            && !tryPushEngineTextUtility(u"ASC"))
+                        if (!tryPushEngineTextUtility(u"ASC"))
                         {
                             warnTextUtilityDispatch(u"ASC");
-                            PushString(selibreoffice::convertIntoHalfWidth(
-                                GetString().getString()));
+                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                                textInfoAsc(*this);
                         }
                         break;
                     case ocLenB             :
@@ -17564,31 +17336,19 @@ StackVar ScInterpreter::Interpret()
                     case ocFindB            : pushLegacyFindB();        break;
                     case ocSearchB          : pushLegacySearchB();      break;
                     case ocUnicode          :
-                        if (MustHaveParamCount(GetByte(), 1)
-                            && !tryPushEngineTextUtility(u"UNICODE"))
+                        if (!tryPushEngineTextUtility(u"UNICODE"))
                         {
                             warnTextUtilityDispatch(u"UNICODE");
-                            if (std::optional<double> fValue
-                                = selibreoffice::unicodeFromText(GetString().getString()))
-                            {
-                                PushDouble(*fValue);
-                            }
-                            else
-                                PushIllegalParameter();
+                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                                textInfoUnicode(*this);
                         }
                         break;
                     case ocUnichar          :
-                        if (MustHaveParamCount(GetByte(), 1)
-                            && !tryPushEngineTextUtility(u"UNICHAR"))
+                        if (!tryPushEngineTextUtility(u"UNICHAR"))
                         {
                             warnTextUtilityDispatch(u"UNICHAR");
-                            sal_uInt32 nCodePoint = GetUInt32();
-                            if (nGlobalError != FormulaError::NONE)
-                                PushIllegalArgument();
-                            else if (auto aStr = selibreoffice::unicharFromCodePoint(nCodePoint))
-                                PushString(*aStr);
-                            else
-                                PushIllegalArgument();
+                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                                textInfoUnichar(*this);
                         }
                         break;
                     case ocBitAnd           :

@@ -534,10 +534,24 @@ Phase 1 is now underway:
 - that Phase-1 surface now includes non-jump scalar matrix and
   external-matrix-backed operands in addition to direct scalars and
   scalarized single-cell references
+- `ISBLANK` now preserves the inherited-empty distinction on the engine-first
+  path instead of flattening all direct `svEmptyCell` tokens to blank
 - the same focused lane also proves deliberate decline on a matrix shape, so
   the classic fallback boundary remains explicit instead of accidental
 - no fallback deletion is claimed yet, so `interp4_dispatch_legacy_lambda_count`
   remains the honest retirement gate for the next step
+
+The first Phase-2 retirement slice is now banked:
+
+- the Wave-A fallback bodies for `ISBLANK`, `ISTEXT`, `ISNONTEXT`,
+  `ISNUMBER`, `ISNA`, `ISERR`, `ISERROR`, `CODE`, `TRIM`, `CLEAN`, `LEN`,
+  `CHAR`, `UNICODE`, `UNICHAR`, `ASC`, and `JIS` no longer live inline in
+  [interpr4.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr4.cxx)
+- the Calc switch now does engine-first dispatch plus standalone compat
+  fallback through
+  [InterpreterCompatDispatch.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/InterpreterCompatDispatch.hxx)
+- `pushLegacyIsErrLike` is gone from Calc source, which is the first real
+  text/info legacy-lambda reduction in this wave
 
 Updated next routing policy:
 

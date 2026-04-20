@@ -239,7 +239,9 @@ Status:
   - direct scalar tokens are admitted
   - scalarized single-cell references are admitted
   - non-jump scalar matrix and external-matrix-backed shapes are admitted
-  - jump-matrix and table-op shapes still decline to legacy
+- inherited empty-cell tokens remain explicitly distinguished for `ISBLANK`,
+  so the engine-first path does not flatten blank and inherited-empty direct
+  tokens to the same result
 - the focused Calc runtime gate is now
   [testSharedInterpreterTextInfoDispatch](/home/ubuntu/repos/libreoffice/sc/qa/unit/ucalc_formula2.cxx),
   which proves both:
@@ -257,6 +259,20 @@ Status:
 - delete `pushLegacyIsErrLike`
 - remove any remaining Calc-only direct execution for the admitted pure text
   utility cases
+
+Status:
+
+- complete for the Calc-source surface on the current tree
+- the remaining Wave-A fallback bodies no longer live inline in
+  [interpr4.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr4.cxx)
+- `ISBLANK`, `ISTEXT`, `ISNONTEXT`, `ISNUMBER`, `ISNA`, `ISERR`, `ISERROR`,
+  `CODE`, `TRIM`, `CLEAN`, `LEN`, `CHAR`, `UNICODE`, `UNICHAR`, `ASC`, and
+  `JIS` now use:
+  - engine-first dispatch in Calc
+  - standalone compat fallback in
+    [InterpreterCompatDispatch.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/InterpreterCompatDispatch.hxx)
+- `pushLegacyIsErrLike` is gone from Calc, and the switch cases no longer
+  embed the old fallback bodies directly
 
 ### Phase 3: Parsing/Inspection Admission Tightening
 
