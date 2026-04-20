@@ -677,7 +677,6 @@ private:
         spreadsheetengine::compat::libreoffice::interpreterdispatch::UnaryMatrixScalarMode eMode);
     void ScSyntheticBinaryOp(OpCode eOpCode, void (ScInterpreter::*pOperation)());
     void ScMatchOp(bool bExtended);
-    void ScToColOrRow(bool bCol);
     void ScWrapColsOrRows(bool bCols);
 
 public:
