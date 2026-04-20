@@ -7576,25 +7576,19 @@ StackVar ScInterpreter::Interpret()
                         return false;
                     }
 
-                    // Matrix-frame fence: when an outer JumpMatrix sits
-                    // immediately below the condition on the stack, the
-                    // legacy `ScIfJump` -> `MatrixJumpConditionToMatrix`
-                    // path converts the scalar condition to a 1x1 matrix
-                    // and creates a nested JumpMatrix so the outer
-                    // iteration can collect per-cell results. The engine's
-                    // scalar-only fast path skips that conversion and
-                    // emits a plain `aCode.Jump`, which leaves the outer
-                    // JumpMatrix without a matrix-shaped result for the
-                    // current cell (e.g. the inner `IF(1;23)` of
-                    // `=IF({1;0};IF(1;23);42)` lost row 0). Decline to
-                    // legacy whenever the JumpMatrix protocol is in play.
-                    if (GetStackType(2) == svJumpMatrix)
-                    {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnControlFlowEngineDeclinedCount);
-                        return false;
-                    }
+                    // Matrix-frame protocol: when an outer JumpMatrix sits
+                    // immediately below the condition on the stack, or the
+                    // current condition is a `svDoubleRef`, legacy `ScIfJump`
+                    // runs `MatrixJumpConditionToMatrix` to convert the
+                    // condition into an svMatrix (1x1 for scalars, range
+                    // shape for refs) so the outer iteration can collect
+                    // per-cell results. Do the same here so `IF(...)` inside
+                    // a JumpMatrix frame (e.g. the inner `IF(1;23)` of
+                    // `=IF({1;0};IF(1;23);42)`) produces a matrix-shaped
+                    // result. The helper is a no-op when we are not inside a
+                    // matrix / JumpMatrix context, so the scalar fast path
+                    // below is still hit for regular `=IF(a>b;...)`.
+                    MatrixJumpConditionToMatrix();
 
                     const FormulaToken* pConditionToken = pStack[sp - 1];
                     if (!pConditionToken)
@@ -7605,30 +7599,93 @@ StackVar ScInterpreter::Interpret()
                         return false;
                     }
 
-                    std::optional<serpn::RpnValue> oCondition;
-                    switch (pConditionToken->GetType())
+                    // Batch 4B matrix widening: an svMatrix condition enters
+                    // the matrix-frame protocol through a per-cell JumpMatrix.
+                    // Mirrors legacy `ScIfJump`'s svMatrix branch with
+                    // `initializeIfJumpMatrix` in place of `ScMatrix::IfJump`.
+                    if (pConditionToken->GetType() == svMatrix)
                     {
-                        case svDouble:
-                            oCondition = serpn::RpnValue::number(pConditionToken->GetDouble());
-                            break;
-                        case svError:
-                            oCondition = serpn::RpnValue::error(
-                                selibreoffice::toApiError(pConditionToken->GetError()));
-                            break;
-                        case svEmptyCell:
-                        case svMissing:
-                            oCondition = serpn::RpnValue::empty();
-                            break;
-                        default:
-                            // Reference, matrix, external-ref, string,
-                            // jump-matrix tokens all defer to legacy so we
-                            // do not guess at coercion or matrix-broadcast
-                            // semantics here.
+                        ScMatrixRef pMat = PopMatrix();
+                        if (!pMat)
+                        {
+                            PushIllegalParameter();
                             addDispatchRuntimeStat(
                                 interpreterDispatchRuntimeStatsStore()
-                                    .mnControlFlowEngineDeclinedCount);
-                            return false;
+                                    .mnControlFlowEngineSucceededCount);
+                            return true;
+                        }
+                        // DoubleError handled by JumpMatrix.
+                        pMat->SetErrorInterpreter(nullptr);
+                        SCSIZE nCols = 0;
+                        SCSIZE nRows = 0;
+                        pMat->GetDimensions(nCols, nRows);
+                        if (nCols == 0 || nRows == 0)
+                        {
+                            PushIllegalArgument();
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnControlFlowEngineSucceededCount);
+                            return true;
+                        }
+
+                        FormulaConstTokenRef xNew;
+                        ScTokenMatrixMap::const_iterator aMapIter;
+                        if ((aMapIter = maTokenMatrixMap.find(pCur))
+                            != maTokenMatrixMap.end())
+                        {
+                            xNew = (*aMapIter).second;
+                        }
+                        else
+                        {
+                            std::shared_ptr<ScJumpMatrix> pJumpMat(
+                                std::make_shared<ScJumpMatrix>(
+                                    pCur->GetOpCode(), nCols, nRows));
+                            sejumpexec::initializeIfJumpMatrix(
+                                *pMat, *pJumpMat, pJump, nJumpCount);
+                            xNew = new ScJumpMatrixToken(std::move(pJumpMat));
+                            GetTokenMatrixMap().emplace(pCur, xNew);
+                        }
+                        if (!xNew)
+                        {
+                            PushIllegalArgument();
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnControlFlowEngineSucceededCount);
+                            return true;
+                        }
+                        PushTokenRef(xNew);
+                        aCode.Jump(pJump[nJumpCount], pJump[nJumpCount]);
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnControlFlowEngineSucceededCount);
+                        return true;
                     }
+
+                    // Legacy `ScIfJumpNotMatrix` reads the condition via
+                    // `GetBool()`, which pops the top of stack and
+                    // transparently handles numeric / error / empty tokens
+                    // as well as svSingleRef, svDoubleRef,
+                    // svExternalSingleRef, and svString (number-like parse
+                    // with NoValue on failure). Mirror that surface here so
+                    // the engine owns every non-svMatrix shape legacy
+                    // `ScIfJump` did. `MatrixJumpConditionToMatrix` above
+                    // already widened svDoubleRef to svMatrix when in array
+                    // context (handled by the svMatrix branch); any
+                    // residual svDoubleRef here is a scalar-context range
+                    // which `GetBool` reduces to a single-cell value via
+                    // implicit intersection semantics.
+                    const FormulaError nPreBoolError = nGlobalError;
+                    nGlobalError = FormulaError::NONE;
+                    const bool bCondition = GetBool();
+                    const FormulaError nPostBoolError = nGlobalError;
+                    nGlobalError = nPreBoolError;
+
+                    std::optional<serpn::RpnValue> oCondition;
+                    if (nPostBoolError == FormulaError::NONE)
+                        oCondition = serpn::RpnValue::number(bCondition ? 1.0 : 0.0);
+                    else
+                        oCondition = serpn::RpnValue::error(
+                            selibreoffice::toApiError(nPostBoolError));
 
                     const std::optional<std::size_t> oThenSlot
                         = nJumpCount >= 2 ? std::optional<std::size_t>(0) : std::nullopt;
@@ -7651,7 +7708,8 @@ StackVar ScInterpreter::Interpret()
                         return false;
                     }
 
-                    Pop();
+                    // GetBool() above already popped the condition token; no
+                    // further Pop() needed here. nGlobalError was restored.
                     nGlobalError = FormulaError::NONE;
 
                     switch (aPlan.maValue.meDirective)
@@ -7878,10 +7936,35 @@ StackVar ScInterpreter::Interpret()
                 const auto buildCriteriaRangeInput
                     = [&](const FormulaToken* pRangeTok,
                           sequery::CriteriaAggregateInput& rInput) -> bool {
-                    if (!pRangeTok || pRangeTok->GetType() != svDoubleRef)
+                    if (!pRangeTok)
                         return false;
-                    const ScComplexRefData& rRef = *pRangeTok->GetDoubleRef();
-                    const ScRange aAbs = rRef.toAbs(mrDoc, aPos);
+                    ScRange aAbs;
+                    switch (pRangeTok->GetType())
+                    {
+                        case svDoubleRef:
+                        {
+                            const ScComplexRefData& rRef = *pRangeTok->GetDoubleRef();
+                            aAbs = rRef.toAbs(mrDoc, aPos);
+                            break;
+                        }
+                        case svSingleRef:
+                        {
+                            // Widen to single-cell 1x1 range. COUNTIF /
+                            // SUMIF / AVERAGEIF and the Ifs family allow
+                            // a single-cell criteria (or target) range;
+                            // the legacy body maps this to a 1x1 iteration
+                            // via PopSingleRef, and the engine substrate
+                            // handles 1x1 ranges through the same
+                            // CriteriaAggregateInput contract.
+                            const ScSingleRefData& rRef
+                                = *pRangeTok->GetSingleRef();
+                            const ScAddress aCell = rRef.toAbs(mrDoc, aPos);
+                            aAbs = ScRange(aCell);
+                            break;
+                        }
+                        default:
+                            return false;
+                    }
                     if (aAbs.aStart.Tab() != aAbs.aEnd.Tab())
                         return false;
                     rInput.mbScalar = false;
@@ -7934,10 +8017,15 @@ StackVar ScInterpreter::Interpret()
                     const FormulaToken* pCriteriaRangeTok
                         = pStack[sp - nParamCount];
 
-                    if (!pCriterionTok || !pCriteriaRangeTok
-                        || pCriteriaRangeTok->GetType() != svDoubleRef
-                        || (bHasTargetArg && pTargetTok
-                            && pTargetTok->GetType() != svDoubleRef))
+                    const auto isAcceptedRangeTokenType
+                        = [](const FormulaToken* pTok) -> bool {
+                        if (!pTok)
+                            return false;
+                        const StackVar eType = pTok->GetType();
+                        return eType == svDoubleRef || eType == svSingleRef;
+                    };
+                    if (!pCriterionTok || !isAcceptedRangeTokenType(pCriteriaRangeTok)
+                        || (bHasTargetArg && !isAcceptedRangeTokenType(pTargetTok)))
                     {
                         addDispatchRuntimeStat(
                             interpreterDispatchRuntimeStatsStore()
@@ -12982,6 +13070,15 @@ StackVar ScInterpreter::Interpret()
                         return false;
                     }
 
+                    // Matrix-frame protocol: CHOOSE inside a JumpMatrix
+                    // frame converts the selector to a 1x1 matrix (or a
+                    // range-shape matrix when svDoubleRef) so the outer
+                    // iteration collects per-cell jump decisions. Legacy
+                    // ScChooseJump runs MatrixJumpConditionToMatrix before
+                    // dispatching; mirror that here, then fall through to
+                    // the svMatrix branch below when applicable.
+                    MatrixJumpConditionToMatrix();
+
                     const FormulaToken* pSelectorToken = pStack[sp - 1];
                     if (!pSelectorToken)
                     {
@@ -12991,61 +13088,105 @@ StackVar ScInterpreter::Interpret()
                         return false;
                     }
 
-                    std::optional<serpn::RpnValue> oSelector;
-                    switch (pSelectorToken->GetType())
+                    // Batch 4B matrix widening: an svMatrix selector enters
+                    // the matrix-frame protocol through a per-cell JumpMatrix
+                    // built by `initializeChooseJumpMatrix`.
+                    if (pSelectorToken->GetType() == svMatrix)
                     {
-                        case svDouble:
-                            oSelector = serpn::RpnValue::number(
-                                pSelectorToken->GetDouble());
-                            break;
-                        case svError:
-                            oSelector = serpn::RpnValue::error(
-                                selibreoffice::toApiError(pSelectorToken->GetError()));
-                            break;
-                        default:
+                        ScMatrixRef pMat = PopMatrix();
+                        if (!pMat)
+                        {
+                            PushIllegalParameter();
+                            aCode.Jump(pJump[nJumpCount], pJump[nJumpCount]);
                             addDispatchRuntimeStat(
                                 interpreterDispatchRuntimeStatsStore()
-                                    .mnControlFlowEngineDeclinedCount);
-                            return false;
-                    }
+                                    .mnControlFlowEngineSucceededCount);
+                            return true;
+                        }
+                        pMat->SetErrorInterpreter(nullptr);
+                        SCSIZE nCols = 0;
+                        SCSIZE nRows = 0;
+                        pMat->GetDimensions(nCols, nRows);
+                        if (nCols == 0 || nRows == 0)
+                        {
+                            PushIllegalParameter();
+                            aCode.Jump(pJump[nJumpCount], pJump[nJumpCount]);
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnControlFlowEngineSucceededCount);
+                            return true;
+                        }
 
-                    // planChooseBranch wants the count of branch slots,
-                    // which is nJumpCount - 1 (since pJump[nJumpCount] is
-                    // the endpoint, not a branch).
-                    const auto aPlan = serpn::planChooseBranch(
-                        *oSelector,
-                        static_cast<std::int16_t>(nJumpCount - 1));
-                    if (aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready
-                        || !aPlan)
-                    {
+                        FormulaConstTokenRef xNew;
+                        ScTokenMatrixMap::const_iterator aMapIter;
+                        if ((aMapIter = maTokenMatrixMap.find(pCur))
+                            != maTokenMatrixMap.end())
+                        {
+                            xNew = (*aMapIter).second;
+                        }
+                        else
+                        {
+                            std::shared_ptr<ScJumpMatrix> pJumpMat(
+                                std::make_shared<ScJumpMatrix>(
+                                    pCur->GetOpCode(), nCols, nRows));
+                            sejumpexec::initializeChooseJumpMatrix(
+                                *pMat, *pJumpMat, pJump, nJumpCount);
+                            xNew = new ScJumpMatrixToken(std::move(pJumpMat));
+                            GetTokenMatrixMap().emplace(pCur, xNew);
+                        }
+                        if (!xNew)
+                        {
+                            PushIllegalArgument();
+                            aCode.Jump(pJump[nJumpCount], pJump[nJumpCount]);
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnControlFlowEngineSucceededCount);
+                            return true;
+                        }
+                        PushTokenRef(xNew);
+                        aCode.Jump(pJump[nJumpCount], pJump[nJumpCount]);
                         addDispatchRuntimeStat(
                             interpreterDispatchRuntimeStatsStore()
-                                .mnControlFlowEngineDeclinedCount);
-                        return false;
+                                .mnControlFlowEngineSucceededCount);
+                        return true;
                     }
 
-                    Pop();
+                    // Legacy ScChooseJump's default branch reads the
+                    // selector via GetInt16() — which transparently handles
+                    // svSingleRef / svDoubleRef / svExternalSingleRef /
+                    // svString / svError / svEmpty as well as svDouble — and
+                    // feeds selogic::chooseJumpIndex(nJumpIndex, nJumpCount).
+                    // Mirror that exactly so the engine owns every non-
+                    // matrix shape and we can drop the legacy body. When
+                    // nGlobalError becomes non-NONE (e.g. svString that
+                    // failed to parse) we emit PushIllegalArgument +
+                    // aCode.Jump(endpoint, endpoint), matching the legacy
+                    // `else PushIllegalArgument()` + final
+                    // `aCode.Jump(endpoint, endpoint)` fall-through.
+                    const FormulaError nPreInt16Error = nGlobalError;
                     nGlobalError = FormulaError::NONE;
+                    const sal_Int16 nJumpIndex = GetInt16();
+                    const bool bPopError = (nGlobalError != FormulaError::NONE);
+                    if (!bPopError && nPreInt16Error != FormulaError::NONE)
+                        nGlobalError = nPreInt16Error;
 
-                    switch (aPlan.maValue.meDirective)
+                    const auto aJumpDecision
+                        = selogic::chooseJumpIndex(nJumpIndex, nJumpCount);
+                    if (!bPopError && aJumpDecision)
                     {
-                        case serpn::BranchDirective::TakeSlot:
-                            // planChooseBranch slot is 1-based (matches
-                            // CHOOSE semantics), and pJump[slot] is the
-                            // target for branch `slot`.
-                            aCode.Jump(
-                                pJump[aPlan.maValue.mnSlot], pJump[nJumpCount]);
-                            break;
-                        case serpn::BranchDirective::PropagateError:
-                            PushError(selibreoffice::toFormulaError(
-                                aPlan.maValue.meError));
-                            aCode.Jump(pJump[nJumpCount], pJump[nJumpCount]);
-                            break;
-                        default:
-                            addDispatchRuntimeStat(
-                                interpreterDispatchRuntimeStatsStore()
-                                    .mnControlFlowEngineDeclinedCount);
-                            return false;
+                        aCode.Jump(
+                            pJump[static_cast<short>(aJumpDecision.maValue)],
+                            pJump[nJumpCount]);
+                    }
+                    else
+                    {
+                        // selogic::chooseJumpIndex failed, or GetInt16 raised
+                        // a global error; legacy ScChooseJump pushes
+                        // IllegalArgument and then jumps to the endpoint at
+                        // the `if (!bHaveJump)` tail.
+                        nGlobalError = FormulaError::NONE;
+                        PushIllegalArgument();
+                        aCode.Jump(pJump[nJumpCount], pJump[nJumpCount]);
                     }
 
                     addDispatchRuntimeStat(
@@ -13068,25 +13209,22 @@ StackVar ScInterpreter::Interpret()
                         return false;
                     }
 
-                    // Matrix-frame fence: see tryPlanEngineIfJump for the
-                    // rationale. When an outer JumpMatrix sits below the
-                    // primary on the stack, the legacy IFERROR/IFNA path
-                    // routes through `MatrixJumpConditionToMatrix` to
-                    // emit a matrix-shaped result for the outer
-                    // iteration; the engine's scalar fast path would
-                    // skip that and corrupt the outer JumpMatrix.
-                    if (GetStackType(2) == svJumpMatrix)
-                    {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnControlFlowEngineDeclinedCount);
-                        return false;
-                    }
+                    // Matrix-frame protocol: IFERROR/IFNA inside a JumpMatrix
+                    // frame (outer JumpMatrix on stack below the primary)
+                    // needs per-cell JumpMatrix results so the outer
+                    // iteration carries a matrix-shape answer. Legacy
+                    // `pushLegacyIfError` runs `MatrixJumpConditionToMatrix`
+                    // before dispatching; do the same here so svDoubleRef
+                    // primaries and scalar-in-JumpMatrix-frame cases widen
+                    // into the svMatrix path handled below. The helper is a
+                    // no-op outside array context, so regular scalar
+                    // `=IFERROR(A/B;0)` still hits the scalar fast path.
+                    MatrixJumpConditionToMatrix();
 
-                    // Scope fence: only admit when the primary is a simple
-                    // scalar token (svDouble / svString / svError / svEmpty
-                    // / svMissing). Reference, matrix, external-ref, and
-                    // jump-matrix shapes still need the legacy MatrixJump
+                    // Scope fence: admit simple scalar tokens directly, and
+                    // widen svMatrix into the JumpMatrix protocol via
+                    // `initializeIfErrorJumpMatrix`. Reference, external-ref,
+                    // and jump-matrix shapes still need the legacy MatrixJump
                     // protocol and defer.
                     const FormulaToken* pPrimary = pStack[sp - 1];
                     if (!pPrimary)
@@ -13096,8 +13234,103 @@ StackVar ScInterpreter::Interpret()
                                 .mnControlFlowEngineDeclinedCount);
                         return false;
                     }
+
+                    // Batch 4B matrix widening: svMatrix primary with at
+                    // least one IFERROR/IFNA-matching cell drives the
+                    // outer iteration through a JumpMatrix. Otherwise the
+                    // matrix is kept intact on the stack.
+                    if (pPrimary->GetType() == svMatrix
+                        && nGlobalError == FormulaError::NONE)
+                    {
+                        ScMatrixRef pMat = PopMatrix();
+                        if (!pMat)
+                        {
+                            PushError(FormulaError::IllegalArgument);
+                            aCode.Jump(pJump[nJumpCount], pJump[nJumpCount]);
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnControlFlowEngineSucceededCount);
+                            return true;
+                        }
+                        SCSIZE nCols = 0;
+                        SCSIZE nRows = 0;
+                        pMat->GetDimensions(nCols, nRows);
+                        if (nCols == 0 || nRows == 0)
+                        {
+                            PushError(FormulaError::IllegalArgument);
+                            aCode.Jump(pJump[nJumpCount], pJump[nJumpCount]);
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnControlFlowEngineSucceededCount);
+                            return true;
+                        }
+
+                        const auto oFirstError
+                            = sejumpexec::findFirstIfErrorCoordinate(*pMat, bNAonly);
+                        if (!oFirstError)
+                        {
+                            // No matching error anywhere — re-push the matrix
+                            // unchanged and jump to the endpoint so the outer
+                            // frame consumes it as-is.
+                            PushMatrix(pMat);
+                            aCode.Jump(pJump[nJumpCount], pJump[nJumpCount]);
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnControlFlowEngineSucceededCount);
+                            return true;
+                        }
+
+                        FormulaConstTokenRef xNew;
+                        ScTokenMatrixMap::const_iterator aMapIter;
+                        if ((aMapIter = maTokenMatrixMap.find(pCur))
+                            != maTokenMatrixMap.end())
+                        {
+                            xNew = (*aMapIter).second;
+                        }
+                        else
+                        {
+                            std::shared_ptr<ScJumpMatrix> pJumpMat(
+                                std::make_shared<ScJumpMatrix>(
+                                    pCur->GetOpCode(), nCols, nRows));
+                            const double fFlagResult
+                                = CreateDoubleError(FormulaError::JumpMatHasResult);
+                            pJumpMat->SetAllJumps(
+                                fFlagResult, pJump[nJumpCount], pJump[nJumpCount]);
+                            sejumpexec::initializeIfErrorJumpMatrix(
+                                *pMat, *pJumpMat, pJump, nJumpCount, bNAonly,
+                                { oFirstError->mnColumn, oFirstError->mnRow });
+                            xNew = new ScJumpMatrixToken(std::move(pJumpMat));
+                            GetTokenMatrixMap().emplace(pCur, xNew);
+                        }
+                        if (!xNew)
+                        {
+                            PushError(FormulaError::IllegalArgument);
+                            aCode.Jump(pJump[nJumpCount], pJump[nJumpCount]);
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnControlFlowEngineSucceededCount);
+                            return true;
+                        }
+                        PushTokenRef(xNew);
+                        aCode.Jump(pJump[nJumpCount], pJump[nJumpCount]);
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnControlFlowEngineSucceededCount);
+                        return true;
+                    }
+
+                    // Pre-existing global error from a prior popped operand
+                    // should propagate; legacy `pushLegacyIfError` saved and
+                    // restored it around its resolution logic so the final
+                    // `selectIfErrorAction` sees whichever error the
+                    // resolution produced.
+                    const FormulaError nOldGlobalError = nGlobalError;
+                    nGlobalError = FormulaError::NONE;
+
                     spreadsheetengine::api::Error ePrimaryError
                         = spreadsheetengine::api::Error::None;
+                    FormulaConstTokenRef xPrimary(pPrimary);
+                    bool bPrimaryConsumed = false;
                     switch (pPrimary->GetType())
                     {
                         case svDouble:
@@ -13109,28 +13342,62 @@ StackVar ScInterpreter::Interpret()
                         case svError:
                             ePrimaryError = selibreoffice::toApiError(pPrimary->GetError());
                             break;
+                        case svSingleRef:
+                        case svDoubleRef:
+                        {
+                            // Legacy `pushLegacyIfError` reads the cell
+                            // error code via `PopDoubleRefOrSingleRef` +
+                            // `GetCellErrCode`. Mirror that so IFERROR /
+                            // IFNA can read a cell reference directly.
+                            ScAddress aAdr;
+                            if (!PopDoubleRefOrSingleRef(aAdr))
+                            {
+                                ePrimaryError = spreadsheetengine::api::Error::IllegalArgument;
+                            }
+                            else
+                            {
+                                ScRefCellValue aCell(mrDoc, aAdr);
+                                const FormulaError eCellError = GetCellErrCode(aCell);
+                                if (eCellError != FormulaError::NONE)
+                                    ePrimaryError = selibreoffice::toApiError(eCellError);
+                            }
+                            bPrimaryConsumed = true;
+                            break;
+                        }
+                        case svExternalSingleRef:
+                        case svExternalDoubleRef:
+                        {
+                            // Legacy `pushLegacyIfError` calls
+                            // `GetDoubleOrStringFromMatrix` which materializes
+                            // the external ref as a matrix+propagates errors
+                            // via `nGlobalError`. Drop the ref without
+                            // re-pushing and carry any global error through
+                            // `ePrimaryError`.
+                            double fVal = 0.0;
+                            svl::SharedString aStr;
+                            GetDoubleOrStringFromMatrix(fVal, aStr);
+                            if (nGlobalError != FormulaError::NONE)
+                            {
+                                ePrimaryError
+                                    = selibreoffice::toApiError(nGlobalError);
+                                nGlobalError = FormulaError::NONE;
+                            }
+                            bPrimaryConsumed = true;
+                            break;
+                        }
                         default:
                             addDispatchRuntimeStat(
                                 interpreterDispatchRuntimeStatsStore()
                                     .mnControlFlowEngineDeclinedCount);
+                            nGlobalError = nOldGlobalError;
                             return false;
-                    }
-                    // Pre-existing global error from a prior popped operand
-                    // also matters; only admit when it is None so the engine's
-                    // single-error decision matches the legacy path.
-                    if (nGlobalError != FormulaError::NONE)
-                    {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnControlFlowEngineDeclinedCount);
-                        return false;
                     }
 
                     const auto aPlan
                         = serpn::planIfErrorBranch(ePrimaryError, bNAonly,
                                                    /*nAlternateSlot=*/1);
-                    FormulaConstTokenRef xPrimary(pPrimary);
-                    Pop();
+                    if (!bPrimaryConsumed)
+                        Pop();
                     nGlobalError = FormulaError::NONE;
 
                     switch (aPlan.meDirective)
@@ -13162,140 +13429,6 @@ StackVar ScInterpreter::Interpret()
                         interpreterDispatchRuntimeStatsStore()
                             .mnControlFlowEngineSucceededCount);
                     return true;
-                };
-                const auto pushLegacyIfError = [&](bool bNAonly) {
-                    warnConditionalDispatch(bNAonly ? u"IFNA" : u"IFERROR");
-
-                    const short* pJump = pCur->GetJump();
-                    short nJumpCount = pJump[0];
-                    if (!sp || nJumpCount != 2)
-                    {
-                        nGlobalError = (sp ? FormulaError::ParameterExpected
-                                           : FormulaError::UnknownStackVariable);
-                        PushError(nGlobalError);
-                        aCode.Jump(pJump[nJumpCount], pJump[nJumpCount]);
-                        return;
-                    }
-
-                    FormulaConstTokenRef xToken(pStack[sp - 1]);
-                    bool bError = false;
-                    FormulaError nOldGlobalError = nGlobalError;
-                    nGlobalError = FormulaError::NONE;
-
-                    MatrixJumpConditionToMatrix();
-                    switch (GetStackType())
-                    {
-                        default:
-                            Pop();
-                            if (nOldGlobalError != FormulaError::NONE)
-                                nGlobalError = nOldGlobalError;
-                            if (nGlobalError != FormulaError::NONE)
-                                bError = true;
-                            break;
-                        case svError:
-                            PopError();
-                            bError = true;
-                            break;
-                        case svDoubleRef:
-                        case svSingleRef:
-                        {
-                            ScAddress aAdr;
-                            if (!PopDoubleRefOrSingleRef(aAdr))
-                                bError = true;
-                            else
-                            {
-                                ScRefCellValue aCell(mrDoc, aAdr);
-                                nGlobalError = GetCellErrCode(aCell);
-                                if (sejumpexec::matchesIfErrorPolicy(nGlobalError, bNAonly))
-                                    bError = true;
-                            }
-                        }
-                        break;
-                        case svExternalSingleRef:
-                        case svExternalDoubleRef:
-                        {
-                            double fVal;
-                            svl::SharedString aStr;
-                            GetDoubleOrStringFromMatrix(fVal, aStr);
-                            if (nGlobalError != FormulaError::NONE)
-                                bError = true;
-                        }
-                        break;
-                        case svMatrix:
-                        {
-                            const ScMatrixRef pMat = PopMatrix();
-                            if (!pMat
-                                || (nGlobalError != FormulaError::NONE
-                                    && (!bNAonly || nGlobalError == FormulaError::NotAvailable)))
-                            {
-                                bError = true;
-                                break;
-                            }
-
-                            SCSIZE nErrorCol = ::std::numeric_limits<SCSIZE>::max();
-                            SCSIZE nErrorRow = ::std::numeric_limits<SCSIZE>::max();
-                            SCSIZE nCols, nRows;
-                            pMat->GetDimensions(nCols, nRows);
-                            if (nCols == 0 || nRows == 0)
-                            {
-                                bError = true;
-                                break;
-                            }
-                            if (const auto oFirstError
-                                = sejumpexec::findFirstIfErrorCoordinate(*pMat, bNAonly))
-                            {
-                                bError = true;
-                                nErrorCol = oFirstError->mnColumn;
-                                nErrorRow = oFirstError->mnRow;
-                            }
-                            if (!bError)
-                                break;
-
-                            FormulaConstTokenRef xNew;
-                            ScTokenMatrixMap::const_iterator aMapIter;
-                            if ((aMapIter = maTokenMatrixMap.find(pCur))
-                                != maTokenMatrixMap.end())
-                            {
-                                xNew = (*aMapIter).second;
-                            }
-                            else
-                            {
-                                std::shared_ptr<ScJumpMatrix> pJumpMat(
-                                    std::make_shared<ScJumpMatrix>(pCur->GetOpCode(), nCols, nRows));
-                                const double fFlagResult
-                                    = CreateDoubleError(FormulaError::JumpMatHasResult);
-                                pJumpMat->SetAllJumps(
-                                    fFlagResult, pJump[nJumpCount], pJump[nJumpCount]);
-                                sejumpexec::initializeIfErrorJumpMatrix(
-                                    *pMat, *pJumpMat, pJump, nJumpCount, bNAonly,
-                                    { nErrorCol, nErrorRow });
-                                xNew = new ScJumpMatrixToken(std::move(pJumpMat));
-                                GetTokenMatrixMap().emplace(pCur, xNew);
-                            }
-                            nGlobalError = nOldGlobalError;
-                            PushTokenRef(xNew);
-                            aCode.Jump(pJump[nJumpCount], pJump[nJumpCount]);
-                            return;
-                        }
-                    }
-
-                    const auto eIfErrorAction = selogic::selectIfErrorAction(
-                        nGlobalError == FormulaError::NotAvailable
-                            ? spreadsheetengine::api::Error::NotAvailable
-                            : (bError ? spreadsheetengine::api::Error::IllegalArgument
-                                      : spreadsheetengine::api::Error::None),
-                        bNAonly);
-                    if (bError && eIfErrorAction == selogic::IfErrorAction::EvaluateAlternate)
-                    {
-                        nGlobalError = FormulaError::NONE;
-                        aCode.Jump(pJump[1], pJump[nJumpCount]);
-                    }
-                    else
-                    {
-                        nGlobalError = nOldGlobalError;
-                        PushTokenRef(xToken);
-                        aCode.Jump(pJump[nJumpCount], pJump[nJumpCount]);
-                    }
                 };
                 const auto tryPlanEngineIfs = [&]() -> bool {
                     addDispatchRuntimeStat(
@@ -13767,21 +13900,30 @@ StackVar ScInterpreter::Interpret()
                     case ocIf               :
                         if (!tryPlanEngineIfJump())
                         {
-                            warnConditionalDispatch(u"IF");
-                            ScIfJump();
+                            OSL_FAIL("engine-backed IF declined ocIf");
+                            PushIllegalParameter();
                         }
                         break;
                     case ocIfError          :
                         if (!tryPlanEngineIfError(false))
-                            pushLegacyIfError(false);
+                        {
+                            OSL_FAIL("engine-backed IFERROR declined ocIfError");
+                            PushIllegalParameter();
+                        }
                         break;
                     case ocIfNA             :
                         if (!tryPlanEngineIfError(true))
-                            pushLegacyIfError(true);
+                        {
+                            OSL_FAIL("engine-backed IFNA declined ocIfNA");
+                            PushIllegalParameter();
+                        }
                         break;
                     case ocChoose           :
                         if (!tryPlanEngineChooseJump())
-                            ScChooseJump();
+                        {
+                            OSL_FAIL("engine-backed CHOOSE declined ocChoose");
+                            PushIllegalParameter();
+                        }
                         break;
                     case ocChooseCols       :
                         if (!tryPlanEngineSpillChooseColsOrRows(/*bCols*/ true))

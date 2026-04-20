@@ -720,7 +720,9 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterControlFlowIfDispatch)
     m_pDoc->SetString(ScAddress(0, 5, 0), u"=IF(FALSE();42)"_ustr);
     CPPUNIT_ASSERT_EQUAL(false, static_cast<bool>(m_pDoc->GetValue(ScAddress(0, 5, 0))));
 
-    // Reference condition — engine declines, legacy handles it.
+    // Reference condition — engine now owns svDoubleRef / svSingleRef via
+    // `GetBool()` in the scalar fall-through path, and svMatrix (through
+    // MatrixJumpConditionToMatrix-widened input) via initializeIfJumpMatrix.
     m_pDoc->SetValue(ScAddress(1, 0, 0), 1.0);
     m_pDoc->SetValue(ScAddress(1, 1, 0), 0.0);
     m_pDoc->SetString(ScAddress(2, 0, 0), u"=IF(B1;\"yes\";\"no\")"_ustr);
@@ -728,7 +730,8 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterControlFlowIfDispatch)
     m_pDoc->SetString(ScAddress(2, 1, 0), u"=IF(B2;\"yes\";\"no\")"_ustr);
     CPPUNIT_ASSERT_EQUAL(u"no"_ustr, m_pDoc->GetString(ScAddress(2, 1, 0)));
 
-    // Matrix condition stays on legacy ScIfJump matrix path.
+    // Matrix condition now routes through the engine-side
+    // initializeIfJumpMatrix path instead of the retired ScIfJump.
     ScMarkData aMark(m_pDoc->GetSheetLimits());
     aMark.SelectOneTable(0);
     m_pDoc->InsertMatrixFormula(3, 0, 3, 1, aMark, u"=IF(B1:B2;10;20)"_ustr);
@@ -745,11 +748,8 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterControlFlowIfDispatch)
           + std::to_string(aDispatchStats.mnControlFlowEngineDeclinedCount);
     CPPUNIT_ASSERT_MESSAGE("IF dispatch should attempt engine evaluation: " + aLabel,
                            aDispatchStats.mnControlFlowEngineAttemptedCount > 0);
-    CPPUNIT_ASSERT_MESSAGE("IF scalar conditions should succeed through engine: " + aLabel,
+    CPPUNIT_ASSERT_MESSAGE("IF should succeed through engine across every shape: " + aLabel,
                            aDispatchStats.mnControlFlowEngineSucceededCount > 0);
-    CPPUNIT_ASSERT_MESSAGE(
-        "IF reference and matrix conditions should produce engine declines: " + aLabel,
-        aDispatchStats.mnControlFlowEngineDeclinedCount > 0);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("control-flow dispatch accounting should stay balanced: " + aLabel,
                                  aDispatchStats.mnControlFlowEngineAttemptedCount,
                                  aDispatchStats.mnControlFlowEngineSucceededCount

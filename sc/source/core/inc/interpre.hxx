@@ -604,9 +604,6 @@ private:
 
     // Set error according to rVal, and set rVal to 0.0 if there was an error.
     inline void TreatDoubleError( double& rVal );
-    void ScIfJump();
-    void ScIfJumpNotMatrix( const short* pJump, short nJumpCount );
-    void ScChooseJump();
 
     // Be sure to only call this if pStack[sp-nStackLevel] really contains a
     // ScJumpMatrixToken, no further checks are applied!

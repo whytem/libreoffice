@@ -108,6 +108,90 @@ inline void initializeIfErrorJumpMatrix(const ScMatrix& rMatrix, ScJumpMatrix& r
     }
 }
 
+// Populate a per-cell JumpMatrix for `IF(matrix-condition, ...)`. Mirrors
+// `ScMatrixImpl::IfJump`: boolean and numeric cells become TRUE when
+// finite-nonzero, strings become FALSE with a `NoValue` marker that the
+// matrix-frame iteration keeps as a double error, empty cells are FALSE-zero.
+// The caller is responsible for constructing the ScJumpMatrix with the matrix
+// dimensions beforehand.
+inline void initializeIfJumpMatrix(
+    const ScMatrix& rMatrix, ScJumpMatrix& rJumpMatrix, const short* pJump, short nJumpCount)
+{
+    SCSIZE nColumns = 0;
+    SCSIZE nRows = 0;
+    rMatrix.GetDimensions(nColumns, nRows);
+
+    for (SCSIZE nColumn = 0; nColumn < nColumns; ++nColumn)
+    {
+        for (SCSIZE nRow = 0; nRow < nRows; ++nRow)
+        {
+            bool bIsValue;
+            bool bTrue;
+            double fVal;
+            if (rMatrix.IsBoolean(nColumn, nRow))
+            {
+                fVal = rMatrix.GetDouble(nColumn, nRow) != 0.0 ? 1.0 : 0.0;
+                bIsValue = std::isfinite(fVal);
+                bTrue = bIsValue && (fVal != 0.0);
+                if (bTrue)
+                    fVal = 1.0;
+            }
+            else if (rMatrix.IsValue(nColumn, nRow))
+            {
+                fVal = rMatrix.GetDouble(nColumn, nRow);
+                bIsValue = std::isfinite(fVal);
+                bTrue = bIsValue && (fVal != 0.0);
+                if (bTrue)
+                    fVal = 1.0;
+            }
+            else if (rMatrix.IsEmpty(nColumn, nRow)
+                     || rMatrix.IsEmptyPath(nColumn, nRow))
+            {
+                // Legacy ScMatrixImpl::IfJump dispatches on the mdds-level
+                // `element_empty` type, which covers both `empty` /
+                // `empty cell` / `empty result` (ScMatrix::IsEmpty) and
+                // `empty path` (ScMatrix::IsEmptyPath). In either case the
+                // cell is treated as a 0-valued FALSE, so the matrix-frame
+                // iteration carries a plain 0 up to the outer consumer.
+                bIsValue = true;
+                bTrue = false;
+                fVal = 0.0;
+            }
+            else
+            {
+                // String: treated as error by legacy ScMatrixImpl::IfJump.
+                bIsValue = false;
+                bTrue = false;
+                fVal = CreateDoubleError(FormulaError::NoValue);
+            }
+
+            if (bTrue)
+            {
+                // THEN path if the condition is truthy; fall through to
+                // the endpoint if the opcode has no THEN slot.
+                if (nJumpCount >= 2)
+                    rJumpMatrix.SetJump(
+                        nColumn, nRow, fVal, pJump[1], pJump[nJumpCount]);
+                else
+                    rJumpMatrix.SetJump(
+                        nColumn, nRow, fVal, pJump[nJumpCount], pJump[nJumpCount]);
+            }
+            else
+            {
+                // ELSE path only taken when the cell is a well-defined
+                // value; string/error cells route directly to the endpoint
+                // so the per-cell result carries the DoubleError marker.
+                if (nJumpCount == 3 && bIsValue)
+                    rJumpMatrix.SetJump(
+                        nColumn, nRow, fVal, pJump[2], pJump[nJumpCount]);
+                else
+                    rJumpMatrix.SetJump(
+                        nColumn, nRow, fVal, pJump[nJumpCount], pJump[nJumpCount]);
+            }
+        }
+    }
+}
+
 inline void initializeChooseJumpMatrix(
     const ScMatrix& rMatrix, ScJumpMatrix& rJumpMatrix, const short* pJump, short nJumpCount)
 {
