@@ -5125,46 +5125,6 @@ StackVar ScInterpreter::Interpret()
                         PushDouble(aResult.maValue);
                     }
                 };
-                const auto pushLegacyColor = [&]() {
-                    warnIfLegacyDefaultOnReached(
-                        u"COLOR", "family-local default-on math scalar reached ScInterpreter");
-                    sal_uInt8 nParamCount = GetByte();
-                    if (!MustHaveParamCount(nParamCount, 3, 4))
-                        return;
-
-                    double nAlpha = 0;
-                    if (nParamCount == 4)
-                        nAlpha = rtl::math::approxFloor(GetDouble());
-                    if (nAlpha < 0 || nAlpha > 255)
-                    {
-                        PushIllegalArgument();
-                        return;
-                    }
-
-                    double nBlue = rtl::math::approxFloor(GetDouble());
-                    if (nBlue < 0 || nBlue > 255)
-                    {
-                        PushIllegalArgument();
-                        return;
-                    }
-
-                    double nGreen = rtl::math::approxFloor(GetDouble());
-                    if (nGreen < 0 || nGreen > 255)
-                    {
-                        PushIllegalArgument();
-                        return;
-                    }
-
-                    double nRed = rtl::math::approxFloor(GetDouble());
-                    if (nRed < 0 || nRed > 255)
-                    {
-                        PushIllegalArgument();
-                        return;
-                    }
-
-                    PushDouble(256 * 256 * 256 * nAlpha + 256 * 256 * nRed + 256 * nGreen
-                               + nBlue);
-                };
                 const auto pushLegacyDateOrTimeValue =
                     [&](const char* pFunctionName, SvNumFormatType eFormatType,
                         auto aEvaluator) {
@@ -15328,7 +15288,48 @@ StackVar ScInterpreter::Interpret()
                     case ocFilterXML        : ScFilterXML();            break;
                     case ocWebservice       : ScWebservice();           break;
                     case ocEncodeURL        : pushLegacyEncodeUrl();    break;
-                    case ocColor            : pushLegacyColor();            break;
+                    case ocColor            :
+                    {
+                        warnIfLegacyDefaultOnReached(
+                            u"COLOR", "family-local default-on math scalar reached ScInterpreter");
+                        sal_uInt8 nParamCount = GetByte();
+                        if (!MustHaveParamCount(nParamCount, 3, 4))
+                            break;
+
+                        double nAlpha = 0;
+                        if (nParamCount == 4)
+                            nAlpha = rtl::math::approxFloor(GetDouble());
+                        if (nAlpha < 0 || nAlpha > 255)
+                        {
+                            PushIllegalArgument();
+                            break;
+                        }
+
+                        double nBlue = rtl::math::approxFloor(GetDouble());
+                        if (nBlue < 0 || nBlue > 255)
+                        {
+                            PushIllegalArgument();
+                            break;
+                        }
+
+                        double nGreen = rtl::math::approxFloor(GetDouble());
+                        if (nGreen < 0 || nGreen > 255)
+                        {
+                            PushIllegalArgument();
+                            break;
+                        }
+
+                        double nRed = rtl::math::approxFloor(GetDouble());
+                        if (nRed < 0 || nRed > 255)
+                        {
+                            PushIllegalArgument();
+                            break;
+                        }
+
+                        PushDouble(256 * 256 * 256 * nAlpha + 256 * 256 * nRed + 256 * nGreen
+                                   + nBlue);
+                    }
+                    break;
                     case ocErf_MS           :
                         if (MustHaveParamCount(GetByte(), 1))
                         {
