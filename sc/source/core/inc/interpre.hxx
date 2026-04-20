@@ -666,7 +666,6 @@ private:
     void ScSortBy();
     void ScExpand();
     void ScTextSplit();
-    void ScUnique();
     void ScLet();
     void ScSubTotal();
 
