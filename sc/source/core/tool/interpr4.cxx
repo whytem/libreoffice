@@ -11009,6 +11009,22 @@ StackVar ScInterpreter::Interpret()
                     return true;
                 };
 
+                // Legacy fallback for the DB variance family
+                // (DSTDEV / DSTDEVP / DVAR / DVARP). Each leg of the
+                // retired ScDBStdDev / ScDBStdDevP / ScDBVar / ScDBVarP
+                // wrappers was identical up to the (bSample, bStdDev)
+                // flags passed into `evaluateVarianceNumbers`, so the
+                // four Sc*() bodies collapse into this single helper.
+                const auto evaluateLegacyDBStVar
+                    = [&](bool bSample, bool bStdDev) {
+                    std::vector<double> aValues;
+                    GetDBStVarParams(aValues);
+                    if (nGlobalError != FormulaError::NONE)
+                        return;
+                    pushValueResult(semath::evaluateVarianceNumbers(
+                        aValues, bSample, bStdDev));
+                };
+
                 // Batch 3 tail ocDBGet admission. 3-arg shape shared
                 // with DB aggregate / variance helpers: iterates the
                 // criteria grid, enforces uniqueness, and pushes the
@@ -14872,22 +14888,22 @@ StackVar ScInterpreter::Interpret()
                     case ocDBStdDev         :
                         if (!tryPlanEngineDatabaseVariance(
                                 serpn::VarianceKind::SampleStandardDeviation))
-                            ScDBStdDev();
+                            evaluateLegacyDBStVar(/*bSample*/true, /*bStdDev*/true);
                         break;
                     case ocDBStdDevP        :
                         if (!tryPlanEngineDatabaseVariance(
                                 serpn::VarianceKind::PopulationStandardDeviation))
-                            ScDBStdDevP();
+                            evaluateLegacyDBStVar(/*bSample*/false, /*bStdDev*/true);
                         break;
                     case ocDBVar            :
                         if (!tryPlanEngineDatabaseVariance(
                                 serpn::VarianceKind::SampleVariance))
-                            ScDBVar();
+                            evaluateLegacyDBStVar(/*bSample*/true, /*bStdDev*/false);
                         break;
                     case ocDBVarP           :
                         if (!tryPlanEngineDatabaseVariance(
                                 serpn::VarianceKind::PopulationVariance))
-                            ScDBVarP();
+                            evaluateLegacyDBStVar(/*bSample*/false, /*bStdDev*/false);
                         break;
                     case ocIndirect         :
                         if (!tryPlanEngineIndirect())
