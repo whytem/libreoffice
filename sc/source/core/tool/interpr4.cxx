@@ -14464,7 +14464,7 @@ StackVar ScInterpreter::Interpret()
                     case ocIntercept        : CalculateSlopeIntercept(false); break;
                     case ocTrend:
                         if (!tryPlanEngineTrend())
-                            ScTrend();
+                            CalculateTrendGrowth(false);
                         break;
                     case ocGrowth:
                         if (!tryPlanEngineGrowth())
@@ -14475,11 +14475,11 @@ StackVar ScInterpreter::Interpret()
                         break;
                     case ocLinest:
                         if (!tryPlanEngineLinest())
-                            ScLinest();
+                            CalculateRGPRKP(false);
                         break;
                     case ocLogest:
                         if (!tryPlanEngineLogest())
-                            ScLogest();
+                            CalculateRGPRKP(true);
                         break;
                     case ocForecast_LIN:
                     case ocForecast:

@@ -1995,17 +1995,8 @@ bool ScInterpreter::CheckMatrix(bool _bLOG, sal_uInt8& nCase, SCSIZE& nCX,
     return true;
 }
 
-// LINEST
-void ScInterpreter::ScLinest()
-{
-    CalculateRGPRKP(false);
-}
-
-// LOGEST
-void ScInterpreter::ScLogest()
-{
-    CalculateRGPRKP(true);
-}
+// LINEST / LOGEST: dispatched directly from Interpret() to
+// CalculateRGPRKP(bool) after the engine admission decline.
 
 void ScInterpreter::CalculateRGPRKP(bool _bRKP)
 {
@@ -2521,10 +2512,6 @@ void ScInterpreter::CalculateRGPRKP(bool _bRKP)
     }
 }
 
-void ScInterpreter::ScTrend()
-{
-    CalculateTrendGrowth(false);
-}
 
 void ScInterpreter::CalculateTrendGrowth(bool _bGrowth)
 {
