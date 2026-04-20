@@ -5706,12 +5706,6 @@ StackVar ScInterpreter::Interpret()
                             PushError(FormulaError::UnknownOpCode);
                     }
                 };
-                const auto pushLegacyJisAsc = [&](std::u16string_view rFunctionName,
-                                                  auto aTransform) {
-                    warnTextUtilityDispatch(rFunctionName);
-                    if (MustHaveParamCount(GetByte(), 1))
-                        PushString(aTransform(GetString().getString()));
-                };
                 const auto pushLegacyTextBeforeAfter = [&](bool bBefore) {
                     warnTextUtilityDispatch(bBefore ? u"TEXTBEFORE" : u"TEXTAFTER");
                     sal_uInt8 nParamCount = GetByte();
@@ -13906,14 +13900,16 @@ StackVar ScInterpreter::Interpret()
                     case ocBahtText         : pushLegacyBahtText();     break;
                     case ocGetPivotData     : ScGetPivotData();             break;
                     case ocJis              :
-                        pushLegacyJisAsc(u"JIS", [&](const OUString& rText) {
-                            return selibreoffice::convertIntoFullWidth(rText);
-                        });
+                        warnTextUtilityDispatch(u"JIS");
+                        if (MustHaveParamCount(GetByte(), 1))
+                            PushString(selibreoffice::convertIntoFullWidth(
+                                GetString().getString()));
                         break;
                     case ocAsc              :
-                        pushLegacyJisAsc(u"ASC", [&](const OUString& rText) {
-                            return selibreoffice::convertIntoHalfWidth(rText);
-                        });
+                        warnTextUtilityDispatch(u"ASC");
+                        if (MustHaveParamCount(GetByte(), 1))
+                            PushString(selibreoffice::convertIntoHalfWidth(
+                                GetString().getString()));
                         break;
                     case ocLenB             :
                         warnTextUtilityDispatch(u"LENB");
