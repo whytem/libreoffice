@@ -11,12 +11,10 @@ The goal is to define the minimal host contract required by the remaining
 Calc evaluator subsystem so that `spreadsheet_engine/` can own the execution
 model without re-absorbing broad Calc runtime state.
 
-Current honest baseline:
-
-- `legacy_interpreter_subroutine_count=100`
-- `interp4_dispatch_legacy_lambda_count=62`
-- `interp4_dispatch_legacy_dispatch_target_count=62`
-- `interp4_dispatch_legacy_call_count=80`
+Canonical current metrics now live in
+[../PROJECT_STATUS.md](../PROJECT_STATUS.md). This audit document keeps the
+host-service classification and ownership boundaries, not the moving
+dashboard snapshot.
 
 ## Audit Scope
 

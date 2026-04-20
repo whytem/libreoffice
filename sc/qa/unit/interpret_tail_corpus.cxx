@@ -271,20 +271,16 @@ bool envEnabled(const char* pName)
     return !aValue.empty() && aValue != "0" && aValue != "off" && aValue != "false";
 }
 
+std::filesystem::path repoRootPath();
+std::string readRepoTextFile(const std::filesystem::path& rRelativePath);
+
 std::size_t countLegacyInterpreterSubroutines()
 {
-    const std::filesystem::path aRepoRoot
-        = std::filesystem::path(SPREADSHEETENGINE_TEST_ROOT).parent_path();
-    const std::filesystem::path aHeaderPath
-        = aRepoRoot / "sc" / "source" / "core" / "inc" / "interpre.hxx";
-
-    std::ifstream aStream(aHeaderPath);
-    if (!aStream.is_open())
+    const std::string aText
+        = readRepoTextFile(std::filesystem::path("sc") / "source" / "core" / "inc"
+                           / "interpre.hxx");
+    if (aText.empty())
         return 0;
-
-    std::ostringstream aBuffer;
-    aBuffer << aStream.rdbuf();
-    const std::string aText = aBuffer.str();
     static const std::regex aPattern(R"(\bvoid\s+(Sc[A-Za-z0-9_]+)\s*\()");
 
     return static_cast<std::size_t>(
@@ -308,6 +304,22 @@ struct Interp4EngineDispatchInventory
 {
     std::size_t mnAttemptCaseCount = 0;
 };
+
+std::filesystem::path repoRootPath()
+{
+    return std::filesystem::path(SPREADSHEETENGINE_TEST_ROOT).parent_path();
+}
+
+std::string readRepoTextFile(const std::filesystem::path& rRelativePath)
+{
+    std::ifstream aStream(repoRootPath() / rRelativePath);
+    if (!aStream.is_open())
+        return {};
+
+    std::ostringstream aBuffer;
+    aBuffer << aStream.rdbuf();
+    return aBuffer.str();
+}
 
 void accumulateDispatchRuntimeStats(ScInterpreterDispatchRuntimeStatsSnapshot& rAccumulator,
                                     const ScInterpreterDispatchRuntimeStatsSnapshot& rDelta)
@@ -359,12 +371,7 @@ void accumulateClassicOpcodeRuntimeStats(
 
 Interp4LegacyLambdaInventory countInterp4LegacyLambdas()
 {
-    const std::filesystem::path aRepoRoot
-        = std::filesystem::path(SPREADSHEETENGINE_TEST_ROOT).parent_path();
-    const std::filesystem::path aSourcePath
-        = aRepoRoot / "sc" / "source" / "core" / "tool" / "interpr4.cxx";
-
-    std::ifstream aStream(aSourcePath);
+    std::ifstream aStream(repoRootPath() / "sc" / "source" / "core" / "tool" / "interpr4.cxx");
     if (!aStream.is_open())
         return {};
 
@@ -550,6 +557,60 @@ void resetProbeDiagnosticSamples()
 void resetReplayEligibilityDiagnosticSamples()
 {
     replayEligibilityDiagnosticSamples().clear();
+}
+
+void assertProjectStatusCanonicalDashboard()
+{
+    const std::string aStatusText
+        = readRepoTextFile(std::filesystem::path("spreadsheet_engine") / "docs"
+                           / "PROJECT_STATUS.md");
+    CPPUNIT_ASSERT_MESSAGE("PROJECT_STATUS.md should be readable", !aStatusText.empty());
+
+    static const std::array<std::regex, 4> aCanonicalPatterns = {
+        std::regex(R"(`legacy_interpreter_subroutine_count=)"),
+        std::regex(R"(`interp4_dispatch_legacy_lambda_count=)"),
+        std::regex(R"(`interp4_dispatch_engine_attempted_total=)"),
+        std::regex(R"(`interpret_tail_live_authoritative_match_total=)"),
+    };
+
+    for (const auto& rPattern : aCanonicalPatterns)
+        CPPUNIT_ASSERT(std::regex_search(aStatusText, rPattern));
+
+    const std::array<std::filesystem::path, 6> aActiveDocs = {
+        std::filesystem::path("spreadsheet_engine") / "docs" / "architecture"
+            / "CLOSE_OUT_PLAN.md",
+        std::filesystem::path("spreadsheet_engine") / "docs" / "architecture"
+            / "COMPUTATIONAL_SUBSTRATE_RPN_EVALUATOR_INITIATIVE.md",
+        std::filesystem::path("spreadsheet_engine") / "docs" / "architecture"
+            / "COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md",
+        std::filesystem::path("spreadsheet_engine") / "docs" / "architecture"
+            / "COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md",
+        std::filesystem::path("spreadsheet_engine") / "docs" / "architecture"
+            / "COMPUTATIONAL_SUBSTRATE_TEXT_INFO_RETIREMENT_PLAN.md",
+        std::filesystem::path("spreadsheet_engine") / "docs" / "architecture"
+            / "COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md",
+    };
+
+    for (const auto& rDocPath : aActiveDocs)
+    {
+        const std::string aDocText = readRepoTextFile(rDocPath);
+        const OUString aReadableMessage
+            = u"expected doc to be readable: "_ustr
+              + OUString::fromUtf8(rDocPath.generic_string());
+        CPPUNIT_ASSERT_MESSAGE(
+            OUStringToOString(aReadableMessage, RTL_TEXTENCODING_UTF8).getStr(),
+            !aDocText.empty());
+
+        for (const auto& rPattern : aCanonicalPatterns)
+        {
+            const OUString aCanonicalMessage
+                = u"canonical dashboard metrics should live only in PROJECT_STATUS.md: "_ustr
+                  + OUString::fromUtf8(rDocPath.generic_string());
+            CPPUNIT_ASSERT_MESSAGE(
+                OUStringToOString(aCanonicalMessage, RTL_TEXTENCODING_UTF8).getStr(),
+                !std::regex_search(aDocText, rPattern));
+        }
+    }
 }
 
 bool probeDiagnosticsTrackLiveAuthoritativeSurface()
@@ -5047,6 +5108,11 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedDateValueReferencedFor
         CPPUNIT_ASSERT_MESSAGE(
             OUStringToOString(aMessage, RTL_TEXTENCODING_UTF8).getStr(), rCase.mbSeen);
     }
+}
+
+CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testProjectStatusOwnsCanonicalDashboardMetrics)
+{
+    assertProjectStatusCanonicalDashboard();
 }
 
 CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)

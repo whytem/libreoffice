@@ -10,24 +10,11 @@ Detailed execution of the current strategic pivot is tracked in
 The remaining Calc migration work is no longer well-described as "the next
 hundred functions."
 
-After the current honest baseline of:
-
-- `legacy_interpreter_subroutine_count=51`
-- `interp4_dispatch_legacy_lambda_count=21`
-- `interp4_dispatch_engine_attempt_count=14`
-- `interp4_dispatch_engine_attempted_total=0`
-- `interp4_dispatch_engine_succeeded_total=0`
-- `interp4_dispatch_engine_declined_total=0`
-- `interp4_dispatch_engine_attempted_total_core_forced_full_legacy=606`
-- `interp4_dispatch_engine_succeeded_total_core_forced_full_legacy=602`
-- `interp4_dispatch_engine_declined_total_core_forced_full_legacy=4`
-- `sc_formula_executor_classic_interpret_total_live=0`
-- `sc_formula_executor_classic_interpret_total_core_forced_full_legacy=606`
-- `interpret_tail_live_unique_unseen_formula_cells=21`
-- `interpret_tail_live_unique_fallback_formula_cells=0`
-- `interpret_tail_live_unique_unsupported_function_formula_cells=0`
-
-the hard part is the RPN evaluator subsystem itself:
+After the current honest baseline in
+[../PROJECT_STATUS.md](../PROJECT_STATUS.md) — especially the combination of
+strong replay parity, zero live lower-seam runtime attempts, and non-zero
+forced-legacy audit traffic — the hard part is the RPN evaluator subsystem
+itself:
 
 - operator semantics over polymorphic stack values
 - control-flow opcodes and jump execution
@@ -199,14 +186,14 @@ Checkpoint:
   `spreadsheetengine/runtime/RpnOperators.hxx`
 - Calc now has a first engine-opcode pilot for scalar binary operators in
   `ScInterpreter::Interpret()`, but the broad replay corpus still reports
-  `interp4_dispatch_engine_attempted_total=0`
+  zero live lower-seam runtime attempts in
+  [../PROJECT_STATUS.md](../PROJECT_STATUS.md)
 - the new core-forced full-legacy replay lane now proves that classic
-  `ScInterpreter::Interpret()` is reachable again (`606` executions on the
-  standing corpus), and it now reports
-  `interp4_dispatch_engine_attempted_total_core_forced_full_legacy=606` with
-  `602` successes and `4` declines, so engine-first dispatch is carrying real
-  load inside the residual classic tail but still has a narrow decline pocket
-  to close before broad retirement claims are justified
+  `ScInterpreter::Interpret()` is reachable again and reports non-zero
+  forced-legacy engine-first traffic in
+  [../PROJECT_STATUS.md](../PROJECT_STATUS.md), so engine-first dispatch is
+  carrying real load inside the residual classic tail but still has a narrow
+  decline pocket to close before broad retirement claims are justified
 - that movement now comes from both the `ocBad` root-error-literal slice and
   the follow-up `ocRange` audit/fix; the classic opcode census still shows
   `Bad=506` and `Range=96` because it records opcode entry before the switch

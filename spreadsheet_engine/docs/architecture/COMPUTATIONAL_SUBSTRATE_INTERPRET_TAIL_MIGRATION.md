@@ -248,34 +248,11 @@ The admitted live input surface includes:
 
 ## Live Metrics
 
-Two different denominators matter, and both are now reported.
+Canonical current metrics now live in
+[../PROJECT_STATUS.md](../PROJECT_STATUS.md). This document keeps the migration
+story and diagnostic interpretation, not the moving dashboard snapshot.
 
-### North-Star Live Authoritative Match
-
-This is the deletion-gating number for the standing replay corpus:
-
-- `interpret_tail_live_authoritative_corpus_formula_cells=50661`
-- `interpret_tail_live_authoritative_probe_formula_cells=50386`
-- `interpret_tail_live_authoritative_match_total=50382`
-- `interpret_tail_live_authoritative_fallback_total=4`
-- `legacy_interpreter_subroutine_count=99`
-- `interp4_dispatch_legacy_lambda_count=62`
-- `interp4_dispatch_legacy_dispatch_target_count=62`
-- `interp4_dispatch_legacy_call_count=80`
-- `interp4_dispatch_engine_attempt_count=14`
-- `interp4_dispatch_engine_attempted_total=0`
-- `interp4_dispatch_engine_succeeded_total=0`
-- `interp4_dispatch_engine_declined_total=0`
-- `interp4_dispatch_engine_attempted_total_core_forced_full_legacy=602`
-- `interp4_dispatch_engine_succeeded_total_core_forced_full_legacy=602`
-- `interp4_dispatch_engine_declined_total_core_forced_full_legacy=0`
-- `sc_formula_executor_classic_interpret_total_live=0`
-- `sc_formula_executor_classic_interpret_total_core_forced_full_legacy=602`
-- `interp4_dispatch_legacy_quarantine_missing_dispatch_target_count=0`
-- live authoritative-match rate over the corpus: `99.4493%`
-- live authoritative-match rate over the current promoted probe: `99.9921%`
-
-Everything below is diagnostic context for improving that number.
+Everything below is still diagnostic context for improving that number.
 
 The north-star measures live authority transfer. `legacy_interpreter_subroutine_count`
 is the blunt retirement-progress companion metric, derived from the remaining

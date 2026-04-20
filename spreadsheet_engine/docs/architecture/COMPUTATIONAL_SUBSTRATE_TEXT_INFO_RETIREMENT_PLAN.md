@@ -11,15 +11,9 @@ highest-leverage non-batch cluster left in
 - pure text/info subset
 - parsing/inspection subset
 
-This is the next practical step after the recent Batch-5 sweep. The honest
-baseline on the current tree is:
-
-- `legacy_interpreter_subroutine_count=51`
-- `interp4_dispatch_legacy_lambda_count=21`
-- `interpret_tail_live_authoritative_match_rate=99.4690%`
-- `interpret_tail_live_unique_unseen_formula_cells=21`
-- `interpret_tail_live_unique_fallback_formula_cells=0`
-- `interpret_tail_live_unique_unsupported_function_formula_cells=0`
+This is the next practical step after the recent Batch-5 sweep. Canonical
+current metrics live in
+[../PROJECT_STATUS.md](../PROJECT_STATUS.md).
 
 The key point is that this wave is attractive because much of the engine-side
 logic already exists; what remains is mostly dispatch cleanup, scoped

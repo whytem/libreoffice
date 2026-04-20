@@ -35,15 +35,34 @@ That splits into two tracks:
 - `0` cached-fallback cells
 - `0` cached-fallback rate
 
-### North-Star Live Authoritative Match
+### Replay Parity
 
-This is the deletion-gating number for the standing replay corpus:
+This is the deletion-gating replay surface for the standing corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
 - `interpret_tail_live_authoritative_probe_formula_cells=50392`
 - `interpret_tail_live_authoritative_match_total=50392`
 - `interpret_tail_live_authoritative_fallback_total=0`
 - `known_regressions_baseline=0`
+- live authoritative-match rate over the corpus: `99.4690%`
+- live authoritative-match rate over the current promoted probe: `100.0000%`
+
+### Ambient Authority
+
+Ambient non-debug authority transfer is not yet a headline metric.
+
+- the substrate still does not own ordinary AutoCalc traffic broadly enough to
+  claim ambient authority transfer
+- upstream ambient `InterpretTail -> RpnEvaluator` counters do not exist yet
+- Phase 3 of
+  [COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md)
+  is the step that adds those counters and promotes ambient authority to a
+  first-class dashboard section
+
+### Forced-Legacy Audit And Retirement
+
+These are the current retirement and audit counters:
+
 - `legacy_interpreter_subroutine_count=51`
 - `interp4_dispatch_legacy_lambda_count=21`
 - `interp4_dispatch_legacy_dispatch_target_count=21`
@@ -72,41 +91,30 @@ This is the deletion-gating number for the standing replay corpus:
 - `sc_formula_executor_interpret_tail_total_core_forced_full_legacy=89542`
 - `sc_formula_executor_classic_interpret_total_core_forced_full_legacy=606`
 - `interp4_dispatch_legacy_quarantine_missing_dispatch_target_count=0`
-- live authoritative-match rate over the corpus: `99.4690%`
-- live authoritative-match rate over the current promoted probe: `100.0000%`
 
-The north-star measures live authority transfer. `legacy_interpreter_subroutine_count`
-is the blunt retirement-progress companion metric, derived from the remaining
-`void Sc*()` declarations in [interpre.hxx](/home/ubuntu/repos/libreoffice/sc/source/core/inc/interpre.hxx).
+The north-star measures replay parity, not ambient production ownership.
+`legacy_interpreter_subroutine_count` is the blunt retirement-progress
+companion metric, derived from the remaining `void Sc*()` declarations in
+[interpre.hxx](/home/ubuntu/repos/libreoffice/sc/source/core/inc/interpre.hxx).
 Lower is better. `interp4_dispatch_legacy_lambda_count` is the relocated-legacy
 companion metric: it counts `pushLegacy*` lambdas still living inside
 [interpr4.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr4.cxx).
 If the wrapper count falls while the lambda count stays flat or rises, we are
 relocating Calc logic rather than moving authority into the standalone engine.
-`interp4_dispatch_engine_attempt_count` is the static companion for the first
-real engine-first dispatch work inside `Interpret()`: it counts dispatch cases
-that now try the standalone engine first before falling back to Calc. The
-paired runtime totals show whether that path is actually carrying replay load.
-On the standing live corpus those totals are still `0 / 0 / 0`, which is still
-an honest sign that the upstream seam prevents this path from seeing ordinary
-replay traffic. But the core-forced full-legacy audit lane now reports
-`606 / 602 / 4`, so the engine-first dispatch path is no longer theoretical:
-it is carrying real classic-tail load, but it is not yet at blanket `100%`
-acceptance across the residual audit lane. `ocBad` remains the reference
-retirement template: the legacy `ScBadName()` path is deleted, and the classic
-interpreter no longer coexists with an alternate Calc implementation for root
-error literals. The remaining highest-leverage interpreter surface is now the
-text/info cluster in [interpr4.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr4.cxx):
-`26` text-utility lambdas, `7` information-predicate lambdas, and a smaller
-parsing/inspection tail that already leans on engine/shared helpers. The first
-Phase-1 text/info admission-tightening slice is now landed for the Wave-A
-unary direct cases: classic `Interpret()` tries the standalone engine first
-for `CODE`, `TRIM`, `CLEAN`, `LEN`, `CHAR`, `UNICODE`, `UNICHAR`, `ASC`,
-`JIS`, `ISBLANK`, `ISTEXT`, `ISNONTEXT`, `ISNUMBER`, `ISNA`, `ISERR`, and
-`ISERROR` when the operand is a direct scalar token or a scalarized
-single-cell reference. Matrix / jump-matrix / table-op shapes still decline
-intentionally to legacy, so this is runtime exercise and admission tightening,
-not retirement yet.
+`interp4_dispatch_engine_attempt_count` is now an audit metric: it counts
+lower-seam `Interpret()` dispatch cases that try the standalone engine first
+before falling back to Calc. The paired runtime totals show whether that path
+is actually carrying audit load. On the standing replay corpus those totals are
+still `0 / 0 / 0`, which is the honest sign that the upstream seam prevents
+this path from seeing ordinary replay traffic. The core-forced full-legacy
+audit lane reports `606 / 602 / 4`, so the lower seam is still useful for
+retirement validation, but it is not ambient authority transfer on its own.
+`ocBad` remains the reference retirement template: the legacy `ScBadName()`
+path is deleted, and the classic interpreter no longer coexists with an
+alternate Calc implementation for root error literals. The focused pure
+text/info and parsing/inspection retirement wave is now complete, so the next
+interpreter-resident cleanup target is the host-sensitive text tail rather than
+another pure-scalar text sweep.
 
 Batch 1 of the five-batch RPN evaluator plan has now landed its substrate
 (`runtime/RpnControlFlow.hxx`) and six explicit admissions:

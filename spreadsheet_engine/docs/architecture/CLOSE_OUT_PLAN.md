@@ -12,13 +12,16 @@ Execution of the current strategic pivot is tracked in
 Close out the five-batch RPN Evaluator plan against its explicit Success
 Criteria:
 
-- `legacy_interpreter_subroutine_count` ≤ `40` (currently `51`)
-- `interp4_dispatch_legacy_lambda_count` ≤ `10` (currently `21`)
+- `legacy_interpreter_subroutine_count` ≤ `40` (see current value in
+  [../PROJECT_STATUS.md](../PROJECT_STATUS.md))
+- `interp4_dispatch_legacy_lambda_count` ≤ `10` (see current value in
+  [../PROJECT_STATUS.md](../PROJECT_STATUS.md))
 - every retired opcode shows non-zero exercised engine-first runtime on a
   focused or corpus audit lane before fallback deletion
 - acceptance rate ≥ `0.95` across the exercised retirement lane for each
   retired opcode family
-- Live authoritative-match rate ≥ `99.5%` (currently `99.4690%`)
+- Live authoritative-match rate ≥ `99.5%` (see current value in
+  [../PROJECT_STATUS.md](../PROJECT_STATUS.md))
 - Host facade has stable explicit contracts for every resolution /
   iteration / materialization primitive the batches depend on
 - Every retirement commit follows the `ocBad` template
@@ -29,7 +32,8 @@ Criteria:
 
 Retirement — not admission — remains the main lever that reduces the two
 headline counters, but the recent Batch-5 sweep changed the local optimum.
-With the honest baseline now at `51` subroutines and `21` lambdas, the
+With the honest baseline tracked canonically in
+[../PROJECT_STATUS.md](../PROJECT_STATUS.md), the
 highest-leverage remaining surface is no longer the pure text/info and
 parsing/inspection cluster inside `Interpret()` because that focused wave is
 now complete. The next leverage point is the remaining host-sensitive text

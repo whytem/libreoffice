@@ -68,6 +68,8 @@ The pivot is working only if all of these move together:
 
 ## Phase 0: Governance Reset
 
+Status: complete on the current tree
+
 ### Goal
 
 End dashboard drift and make metric ownership explicit before more execution
@@ -95,6 +97,20 @@ work lands.
 - no duplicated canonical metrics survive across docs
 - doc drift becomes a hard failure rather than an editorial nuisance
 - every metric in the dashboard is tagged as replay, ambient, or audit
+
+Implemented result:
+
+- [PROJECT_STATUS.md](../PROJECT_STATUS.md) is now the sole canonical
+  current-state dashboard
+- active execution docs now point back to `PROJECT_STATUS.md` instead of
+  mirroring current metric assignments
+- [COMPUTATIONAL_SUBSTRATE_MASTER.md](COMPUTATIONAL_SUBSTRATE_MASTER.md) now
+  explicitly declares itself narrative rather than canonical
+- `testProjectStatusOwnsCanonicalDashboardMetrics` in
+  [interpret_tail_corpus.cxx](/home/ubuntu/repos/libreoffice/sc/qa/unit/interpret_tail_corpus.cxx)
+  enforces the rule in CI
+- the top dashboard in `PROJECT_STATUS.md` is now split into replay parity,
+  ambient authority, and forced-legacy audit sections
 
 ## Phase 1: Freeze the Wrong Kind of Progress
 
