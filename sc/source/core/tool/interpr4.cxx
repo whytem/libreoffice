@@ -5992,26 +5992,6 @@ StackVar ScInterpreter::Interpret()
                         PushDouble(aResult.maValue);
                     }
                 };
-                const auto pushLegacyDateOrTimeValue =
-                    [&](const char* pFunctionName, SvNumFormatType eFormatType,
-                        auto aEvaluator) {
-                        warnIfLegacyDispatchReached(
-                            "literal-only hard-routed", OUString::createFromAscii(pFunctionName),
-                            [](std::u16string_view rFormula) {
-                                return setaileval::isHardRoutedFormula(rFormula);
-                            },
-                            "literal-only hard-routed text parsing slice reached ScInterpreter");
-
-                        const OUString aInputString = GetString().getString();
-                        const auto aResult = aEvaluator(aInputString);
-                        if (aResult)
-                        {
-                            nFuncFmtType = eFormatType;
-                            PushDouble(aResult.maValue);
-                        }
-                        else
-                            PushIllegalArgument();
-                    };
                 const auto warnIfLegacyDateFamilyReached = [&](std::u16string_view rFunctionName) {
                     warnIfLegacyDispatchReached(
                         "family-local default-on", rFunctionName,
@@ -6209,128 +6189,6 @@ StackVar ScInterpreter::Interpret()
                         PushString(sStr.copy(0, nDelimiterPos));
                     else
                         PushString(sStr.copy(nDelimiterPos, nLength - nDelimiterPos));
-                };
-                const auto pushLegacyValue = [&]() {
-                    warnTextUtilityDispatch(u"VALUE");
-
-                    OUString aInputString;
-                    double fVal;
-
-                    switch (GetRawStackType())
-                    {
-                        case svMissing:
-                        case svEmptyCell:
-                            Pop();
-                            PushInt(0);
-                            return;
-                        case svDouble:
-                            return;
-                        case svSingleRef:
-                        case svDoubleRef:
-                        {
-                            ScAddress aAdr;
-                            if (!PopDoubleRefOrSingleRef(aAdr))
-                            {
-                                PushInt(0);
-                                return;
-                            }
-                            ScRefCellValue aCell(mrDoc, aAdr);
-                            if (aCell.hasString())
-                            {
-                                svl::SharedString aSS;
-                                GetCellString(aSS, aCell);
-                                aInputString = aSS.getString();
-                            }
-                            else if (aCell.hasNumeric())
-                            {
-                                PushDouble(GetCellValue(aAdr, aCell));
-                                return;
-                            }
-                            else
-                            {
-                                PushDouble(0.0);
-                                return;
-                            }
-                        }
-                        break;
-                        case svMatrix:
-                        {
-                            svl::SharedString aSS;
-                            ScMatValType nType = GetDoubleOrStringFromMatrix(fVal, aSS);
-                            aInputString = aSS.getString();
-                            switch (nType)
-                            {
-                                case ScMatValType::Empty:
-                                    fVal = 0.0;
-                                    [[fallthrough]];
-                                case ScMatValType::Value:
-                                case ScMatValType::Boolean:
-                                    PushDouble(fVal);
-                                    return;
-                                case ScMatValType::String:
-                                    break;
-                                default:
-                                    PushIllegalArgument();
-                            }
-                        }
-                        break;
-                        default:
-                            aInputString = GetString().getString();
-                            break;
-                    }
-
-                    const auto aResult
-                        = setextparseexec::evaluateValue(mrDoc, mrContext, aInputString);
-                    if (aResult)
-                        PushDouble(aResult.maValue);
-                    else
-                        PushIllegalArgument();
-                };
-                const auto pushLegacyNumberValue = [&](std::optional<sal_uInt8> oParamCount = std::nullopt) {
-                    warnTextUtilityDispatch(u"NUMBERVALUE");
-
-                    sal_uInt8 nParamCount = oParamCount ? *oParamCount : GetByte();
-                    if (!MustHaveParamCount(nParamCount, 1, 3))
-                        return;
-
-                    std::optional<OUString> oGroupSeparator;
-                    std::optional<OUString> oDecimalSeparator;
-                    if (nParamCount == 3)
-                        oGroupSeparator = GetString().getString();
-                    if (nParamCount >= 2)
-                        oDecimalSeparator = GetString().getString();
-
-                    if (GetStackType() == svDouble)
-                        return;
-
-                    OUString aInputString = GetString().getString();
-                    if (nGlobalError != FormulaError::NONE)
-                    {
-                        PushError(nGlobalError);
-                        return;
-                    }
-
-                    const auto aResult = setextparseexec::evaluateNumberValue(
-                        mrDoc, mrContext, aInputString, oDecimalSeparator, oGroupSeparator,
-                        maCalcConfig.mbEmptyStringAsZero);
-                    if (aResult)
-                    {
-                        PushDouble(aResult.maValue);
-                        return;
-                    }
-
-                    switch (aResult.meError)
-                    {
-                        case spreadsheetengine::api::Error::IllegalArgument:
-                            PushIllegalArgument();
-                            return;
-                        case spreadsheetengine::api::Error::NoValue:
-                            PushNoValue();
-                            return;
-                        default:
-                            PushIllegalArgument();
-                            return;
-                    }
                 };
                 const auto pushLegacyCurrency = [&]() {
                     warnTextUtilityDispatch(u"DOLLAR");
@@ -14801,153 +14659,22 @@ StackVar ScInterpreter::Interpret()
                     case ocIsFormula        :
                         if (!tryPushEngineFormulaInspectionFunction(u"ISFORMULA"))
                         {
-                            [&]() {
-                                warnInformationPredicateDispatch(u"ISFORMULA");
-                                nFuncFmtType = SvNumFormatType::LOGICAL;
-                                bool bRes = false;
-                                switch (GetStackType())
-                                {
-                                    case svDoubleRef:
-                                        if (IsInArrayContext())
-                                        {
-                                            SCCOL nCol1, nCol2;
-                                            SCROW nRow1, nRow2;
-                                            SCTAB nTab1, nTab2;
-                                            PopDoubleRef(nCol1, nRow1, nTab1, nCol2, nRow2,
-                                                nTab2);
-                                            if (nGlobalError != FormulaError::NONE)
-                                            {
-                                                PushError(nGlobalError);
-                                                return;
-                                            }
-                                            if (nTab1 != nTab2)
-                                            {
-                                                PushIllegalArgument();
-                                                return;
-                                            }
-
-                                            const auto aMatrixResult
-                                                = seformulainspect::buildIsFormulaMatrix(
-                                                    mrDoc, mrContext,
-                                                    ScRange(nCol1, nRow1, nTab1, nCol2, nRow2,
-                                                        nTab2),
-                                                    [this](SCSIZE nColumns, SCSIZE nRows) {
-                                                        return GetNewMat(nColumns, nRows, true);
-                                                    });
-                                            if (aMatrixResult.meFailure
-                                                == seformulainspect::MatrixInspectionFailure::IllegalArgument)
-                                            {
-                                                PushIllegalArgument();
-                                                return;
-                                            }
-                                            if (aMatrixResult.meFailure
-                                                == seformulainspect::MatrixInspectionFailure::MatrixSize)
-                                            {
-                                                PushError(FormulaError::MatrixSize);
-                                                return;
-                                            }
-
-                                            PushMatrix(aMatrixResult.mpMatrix);
-                                            return;
-                                        }
-                                        [[fallthrough]];
-                                    case svSingleRef:
-                                    {
-                                        ScAddress aAdr;
-                                        if (!PopDoubleRefOrSingleRef(aAdr))
-                                            break;
-                                        bRes = seformulainspect::isFormulaCell(
-                                            mrDoc, mrContext, aAdr);
-                                    }
-                                    break;
-                                    default:
-                                        Pop();
-                                }
-                                nGlobalError = FormulaError::NONE;
-                                PushInt(int(bRes));
-                            }();
+                            warnInformationPredicateDispatch(u"ISFORMULA");
+                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                                formulaInspectionIsFormula(*this);
                         }
                         break;
                     case ocFormula          :
                         if (!tryPushEngineFormulaInspectionFunction(u"FORMULA"))
                         {
-                            [&]() {
-                                warnIfLegacyDispatchReached(
-                                    "family-local default-on", u"FORMULA",
-                                    [](std::u16string_view rFormula) {
-                                        return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
-                                    },
-                                    "family-local default-on FORMULA reached ScInterpreter",
-                                    true);
-
-                                OUString aFormula;
-                                switch (GetStackType())
-                                {
-                                    case svDoubleRef:
-                                        if (IsInArrayContext())
-                                        {
-                                            SCCOL nCol1, nCol2;
-                                            SCROW nRow1, nRow2;
-                                            SCTAB nTab1, nTab2;
-                                            PopDoubleRef(nCol1, nRow1, nTab1, nCol2, nRow2,
-                                                nTab2);
-                                            if (nGlobalError != FormulaError::NONE)
-                                                break;
-
-                                            if (nTab1 != nTab2)
-                                            {
-                                                SetError(FormulaError::IllegalArgument);
-                                                break;
-                                            }
-
-                                            const auto aMatrixResult
-                                                = seformulainspect::buildFormulaTextMatrix(
-                                                    mrDoc, mrContext,
-                                                    ScRange(nCol1, nRow1, nTab1, nCol2, nRow2,
-                                                        nTab2),
-                                                    mrStrPool,
-                                                    [this](SCSIZE nColumns, SCSIZE nRows) {
-                                                        return GetNewMat(nColumns, nRows, true);
-                                                    });
-                                            if (aMatrixResult.meFailure
-                                                == seformulainspect::MatrixInspectionFailure::IllegalArgument)
-                                            {
-                                                SetError(FormulaError::IllegalArgument);
-                                                break;
-                                            }
-                                            if (aMatrixResult.meFailure
-                                                == seformulainspect::MatrixInspectionFailure::MatrixSize)
-                                            {
-                                                break;
-                                            }
-
-                                            PushMatrix(aMatrixResult.mpMatrix);
-                                            return;
-                                        }
-                                        [[fallthrough]];
-                                    case svSingleRef:
-                                    {
-                                        ScAddress aAdr;
-                                        if (!PopDoubleRefOrSingleRef(aAdr))
-                                            break;
-
-                                        const auto aFormulaText
-                                            = seformulainspect::formulaTextForCell(
-                                                mrDoc, mrContext, aAdr);
-                                        if (!aFormulaText)
-                                            SetError(selibreoffice::toFormulaError(
-                                                aFormulaText.meError));
-                                        else
-                                            aFormula = aFormulaText.maValue;
-                                    }
-                                    break;
-                                    default:
-                                        PopError();
-                                        SetError(FormulaError::NotAvailable);
-                                }
-
-                                PushString(aFormula);
-                            }();
+                            warnIfLegacyDispatchReached(
+                                "family-local default-on", u"FORMULA",
+                                [](std::u16string_view rFormula) {
+                                    return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
+                                },
+                                "family-local default-on FORMULA reached ScInterpreter", true);
+                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                                formulaInspectionFormulaText(*this);
                         }
                         break;
                     case ocIsNA             :
@@ -14988,23 +14715,29 @@ StackVar ScInterpreter::Interpret()
                     case ocGetDateValue     :
                         if (!tryPushEngineTextParsingFunction(u"DATEVALUE", 1))
                         {
-                            pushLegacyDateOrTimeValue(
-                                "DATEVALUE", SvNumFormatType::DATE,
-                                [&](const OUString& rInputString) {
-                                    return setextparseexec::evaluateDateValue(
-                                        mrDoc, mrContext, rInputString);
-                                });
+                            warnIfLegacyDispatchReached(
+                                "literal-only hard-routed", u"DATEVALUE",
+                                [](std::u16string_view rFormula) {
+                                    return setaileval::isHardRoutedFormula(rFormula);
+                                },
+                                "literal-only hard-routed text parsing slice reached "
+                                "ScInterpreter");
+                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                                textParsingDateValue(*this);
                         }
                         break;
                     case ocGetTimeValue     :
                         if (!tryPushEngineTextParsingFunction(u"TIMEVALUE", 1))
                         {
-                            pushLegacyDateOrTimeValue(
-                                "TIMEVALUE", SvNumFormatType::TIME,
-                                [&](const OUString& rInputString) {
-                                    return setextparseexec::evaluateTimeValue(
-                                        mrDoc, mrContext, rInputString);
-                                });
+                            warnIfLegacyDispatchReached(
+                                "literal-only hard-routed", u"TIMEVALUE",
+                                [](std::u16string_view rFormula) {
+                                    return setaileval::isHardRoutedFormula(rFormula);
+                                },
+                                "literal-only hard-routed text parsing slice reached "
+                                "ScInterpreter");
+                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                                textParsingTimeValue(*this);
                         }
                         break;
                     case ocCode             :
@@ -15128,13 +14861,21 @@ StackVar ScInterpreter::Interpret()
                         break;
                     case ocValue            :
                         if (!tryPushEngineTextParsingFunction(u"VALUE", 1))
-                            pushLegacyValue();
+                        {
+                            warnTextUtilityDispatch(u"VALUE");
+                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                                textParsingValue(*this);
+                        }
                         break;
                     case ocNumberValue      :
                     {
                         const sal_uInt8 nParamCount = GetByte();
                         if (!tryPushEngineTextParsingFunction(u"NUMBERVALUE", nParamCount))
-                            pushLegacyNumberValue(nParamCount);
+                        {
+                            warnTextUtilityDispatch(u"NUMBERVALUE");
+                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                                textParsingNumberValue(*this, nParamCount);
+                        }
                     }
                     break;
                     case ocChar             :

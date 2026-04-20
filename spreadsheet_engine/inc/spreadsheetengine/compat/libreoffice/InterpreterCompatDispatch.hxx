@@ -10,7 +10,9 @@
 #pragma once
 
 #include <interpre.hxx>
+#include <spreadsheetengine/compat/libreoffice/FormulaInspectionExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/TextServices.hxx>
+#include <spreadsheetengine/compat/libreoffice/TextParsingExecution.hxx>
 
 namespace spreadsheetengine::compat::libreoffice::interpretercompatdispatch
 {
@@ -450,6 +452,294 @@ struct Dispatcher
         else
             PushIllegalArgument();
     }
+
+    static void textParsingDateValue(ScInterpreter& rCalc)
+    {
+        const OUString aInputString = SEIC.GetString().getString();
+        const auto aResult = spreadsheetengine::compat::libreoffice::textparsingexecution::
+            evaluateDateValue(mrDoc, mrContext, aInputString);
+        if (aResult)
+        {
+            nFuncFmtType = SvNumFormatType::DATE;
+            PushDouble(aResult.maValue);
+        }
+        else
+            PushIllegalArgument();
+    }
+
+    static void textParsingTimeValue(ScInterpreter& rCalc)
+    {
+        const OUString aInputString = SEIC.GetString().getString();
+        const auto aResult = spreadsheetengine::compat::libreoffice::textparsingexecution::
+            evaluateTimeValue(mrDoc, mrContext, aInputString);
+        if (aResult)
+        {
+            nFuncFmtType = SvNumFormatType::TIME;
+            PushDouble(aResult.maValue);
+        }
+        else
+            PushIllegalArgument();
+    }
+
+    static void textParsingValue(ScInterpreter& rCalc)
+    {
+        OUString aInputString;
+        double fVal = 0.0;
+
+        switch (SEIC.GetRawStackType())
+        {
+            case svMissing:
+            case svEmptyCell:
+                Pop();
+                SEIC.PushInt(0);
+                return;
+            case svDouble:
+                return;
+            case svSingleRef:
+            case svDoubleRef:
+            {
+                ScAddress aAdr;
+                if (!SEIC.PopDoubleRefOrSingleRef(aAdr))
+                {
+                    SEIC.PushInt(0);
+                    return;
+                }
+                ScRefCellValue aCell(mrDoc, aAdr);
+                if (aCell.hasString())
+                {
+                    svl::SharedString aSS;
+                    SEIC.GetCellString(aSS, aCell);
+                    aInputString = aSS.getString();
+                }
+                else if (aCell.hasNumeric())
+                {
+                    PushDouble(GetCellValue(aAdr, aCell));
+                    return;
+                }
+                else
+                {
+                    PushDouble(0.0);
+                    return;
+                }
+            }
+            break;
+            case svMatrix:
+            {
+                svl::SharedString aSS;
+                const ScMatValType nType = SEIC.GetDoubleOrStringFromMatrix(fVal, aSS);
+                aInputString = aSS.getString();
+                switch (nType)
+                {
+                    case ScMatValType::Empty:
+                        fVal = 0.0;
+                        [[fallthrough]];
+                    case ScMatValType::Value:
+                    case ScMatValType::Boolean:
+                        PushDouble(fVal);
+                        return;
+                    case ScMatValType::String:
+                        break;
+                    default:
+                        PushIllegalArgument();
+                }
+            }
+            break;
+            default:
+                aInputString = SEIC.GetString().getString();
+                break;
+        }
+
+        const auto aResult = spreadsheetengine::compat::libreoffice::textparsingexecution::
+            evaluateValue(mrDoc, mrContext, aInputString);
+        if (aResult)
+            PushDouble(aResult.maValue);
+        else
+            PushIllegalArgument();
+    }
+
+    static void textParsingNumberValue(ScInterpreter& rCalc, sal_uInt8 nParamCount)
+    {
+        if (!MustHaveParamCount(nParamCount, 1, 3))
+            return;
+
+        std::optional<OUString> oGroupSeparator;
+        std::optional<OUString> oDecimalSeparator;
+        if (nParamCount == 3)
+            oGroupSeparator = SEIC.GetString().getString();
+        if (nParamCount >= 2)
+            oDecimalSeparator = SEIC.GetString().getString();
+
+        if (GetStackType() == svDouble)
+            return;
+
+        OUString aInputString = SEIC.GetString().getString();
+        if (nGlobalError != FormulaError::NONE)
+        {
+            PushError(nGlobalError);
+            return;
+        }
+
+        const auto aResult = spreadsheetengine::compat::libreoffice::textparsingexecution::
+            evaluateNumberValue(mrDoc, mrContext, aInputString, oDecimalSeparator,
+                oGroupSeparator, SEIC.maCalcConfig.mbEmptyStringAsZero);
+        if (aResult)
+        {
+            PushDouble(aResult.maValue);
+            return;
+        }
+
+        switch (aResult.meError)
+        {
+            case spreadsheetengine::api::Error::IllegalArgument:
+                PushIllegalArgument();
+                return;
+            case spreadsheetengine::api::Error::NoValue:
+                PushNoValue();
+                return;
+            default:
+                PushIllegalArgument();
+                return;
+        }
+    }
+
+#undef GetNewMat
+    static void formulaInspectionIsFormula(ScInterpreter& rCalc)
+    {
+        nFuncFmtType = SvNumFormatType::LOGICAL;
+        bool bRes = false;
+        switch (GetStackType())
+        {
+            case svDoubleRef:
+                if (SEIC.IsInArrayContext())
+                {
+                    SCCOL nCol1, nCol2;
+                    SCROW nRow1, nRow2;
+                    SCTAB nTab1, nTab2;
+                    PopDoubleRef(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2);
+                    if (nGlobalError != FormulaError::NONE)
+                    {
+                        PushError(nGlobalError);
+                        return;
+                    }
+                    if (nTab1 != nTab2)
+                    {
+                        PushIllegalArgument();
+                        return;
+                    }
+
+                    const auto aMatrixResult
+                        = spreadsheetengine::compat::libreoffice::formulainspection::
+                            buildIsFormulaMatrix(
+                                mrDoc, mrContext,
+                                ScRange(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2),
+                                [&rCalc](SCSIZE nColumns, SCSIZE nRows) {
+                                    return rCalc.GetNewMat(nColumns, nRows, true);
+                                });
+                    if (aMatrixResult.meFailure
+                        == spreadsheetengine::compat::libreoffice::formulainspection::
+                               MatrixInspectionFailure::IllegalArgument)
+                    {
+                        PushIllegalArgument();
+                        return;
+                    }
+                    if (aMatrixResult.meFailure
+                        == spreadsheetengine::compat::libreoffice::formulainspection::
+                               MatrixInspectionFailure::MatrixSize)
+                    {
+                        PushError(FormulaError::MatrixSize);
+                        return;
+                    }
+
+                    PushMatrix(aMatrixResult.mpMatrix);
+                    return;
+                }
+                [[fallthrough]];
+            case svSingleRef:
+            {
+                ScAddress aAdr;
+                if (!SEIC.PopDoubleRefOrSingleRef(aAdr))
+                    break;
+                bRes = spreadsheetengine::compat::libreoffice::formulainspection::isFormulaCell(
+                    mrDoc, mrContext, aAdr);
+            }
+            break;
+            default:
+                Pop();
+        }
+        nGlobalError = FormulaError::NONE;
+        SEIC.PushInt(int(bRes));
+    }
+
+    static void formulaInspectionFormulaText(ScInterpreter& rCalc)
+    {
+        OUString aFormula;
+        switch (GetStackType())
+        {
+            case svDoubleRef:
+                if (SEIC.IsInArrayContext())
+                {
+                    SCCOL nCol1, nCol2;
+                    SCROW nRow1, nRow2;
+                    SCTAB nTab1, nTab2;
+                    PopDoubleRef(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2);
+                    if (nGlobalError != FormulaError::NONE)
+                        break;
+
+                    if (nTab1 != nTab2)
+                    {
+                        SetError(FormulaError::IllegalArgument);
+                        break;
+                    }
+
+                    const auto aMatrixResult
+                        = spreadsheetengine::compat::libreoffice::formulainspection::
+                            buildFormulaTextMatrix(
+                                mrDoc, mrContext,
+                                ScRange(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2),
+                                SEIC.mrStrPool, [&rCalc](SCSIZE nColumns, SCSIZE nRows) {
+                                    return rCalc.GetNewMat(nColumns, nRows, true);
+                                });
+                    if (aMatrixResult.meFailure
+                        == spreadsheetengine::compat::libreoffice::formulainspection::
+                               MatrixInspectionFailure::IllegalArgument)
+                    {
+                        SetError(FormulaError::IllegalArgument);
+                        break;
+                    }
+                    if (aMatrixResult.meFailure
+                        == spreadsheetengine::compat::libreoffice::formulainspection::
+                               MatrixInspectionFailure::MatrixSize)
+                    {
+                        break;
+                    }
+
+                    PushMatrix(aMatrixResult.mpMatrix);
+                    return;
+                }
+                [[fallthrough]];
+            case svSingleRef:
+            {
+                ScAddress aAdr;
+                if (!SEIC.PopDoubleRefOrSingleRef(aAdr))
+                    break;
+
+                const auto aFormulaText
+                    = spreadsheetengine::compat::libreoffice::formulainspection::formulaTextForCell(
+                        mrDoc, mrContext, aAdr);
+                if (!aFormulaText)
+                    SetError(selibreoffice::toFormulaError(aFormulaText.meError));
+                else
+                    aFormula = aFormulaText.maValue;
+            }
+            break;
+            default:
+                PopError();
+                SetError(FormulaError::NotAvailable);
+        }
+
+        SEIC.PushString(aFormula);
+    }
+#define GetNewMat(...) SEIC.GetNewMat(__VA_ARGS__)
 
     static void statisticalKurt(ScInterpreter& rCalc)
     {
