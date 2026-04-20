@@ -719,7 +719,6 @@ public:
     void ScAddressFunc();
     void ScIndex();
     void ScMultiArea();
-    void ScAreas();
     void ScExternal();
     void ScMissing();
     void ScMacro();

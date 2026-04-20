@@ -7503,45 +7503,6 @@ void ScInterpreter::ScMultiArea()
     }
 }
 
-void ScInterpreter::ScAreas()
-{
-    sal_uInt8 nParamCount = GetByte();
-    if (!MustHaveParamCount( nParamCount, 1))
-        return;
-
-    FormulaConstTokenRef xT = PopToken();
-    if (!xT || !serefexec::isReferenceOperandToken(*xT))
-    {
-        SetError(FormulaError::IllegalParameter);
-        PushDouble(0.0);
-        return;
-    }
-
-    double fCount = 0.0;
-    switch (xT->GetType())
-    {
-        case formula::svSingleRef:
-            ValidateRef(*xT->GetSingleRef());
-            break;
-        case formula::svDoubleRef:
-            ValidateRef(*xT->GetDoubleRef());
-            break;
-        case formula::svRefList:
-            ValidateRef(*xT->GetRefList());
-            break;
-        default:
-            break;
-    }
-
-    const auto aCount = serefexec::referenceOperandAreaCount(*xT);
-    if (!aCount)
-        SetError(selibreoffice::toFormulaError(aCount.meError));
-    else
-    {
-        fCount = aCount.maValue;
-    }
-    PushDouble(fCount);
-}
 
 FormulaError ScInterpreter::GetErrorType()
 {

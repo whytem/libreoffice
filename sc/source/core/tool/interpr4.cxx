@@ -12020,10 +12020,11 @@ StackVar ScInterpreter::Interpret()
                     return true;
                 };
 
-                // Batch 2 third admission: ocAreas with a single scalar
-                // reference always has an area count of 1. svRefList and
-                // anything else defer to legacy where iteration over the
-                // reference list is canonical.
+                // Batch 2 third admission: ocAreas. Phase G1 widens the
+                // scope fence to cover every shape legacy ScAreas accepts:
+                // svSingleRef / svDoubleRef (count 1) and svRefList (count
+                // = list size). Non-reference shapes set IllegalParameter
+                // and push 0.0 to match the legacy default branch.
                 const auto tryPlanEngineAreaCount = [&]() -> bool {
                     addDispatchRuntimeStat(
                         interpreterDispatchRuntimeStatsStore()
@@ -12038,32 +12039,56 @@ StackVar ScInterpreter::Interpret()
                         return false;
                     }
                     const FormulaToken* pTop = pStack[sp - 1];
-                    if (!pTop
-                        || (pTop->GetType() != svSingleRef
-                            && pTop->GetType() != svDoubleRef))
+                    if (!pTop)
                     {
                         addDispatchRuntimeStat(
                             interpreterDispatchRuntimeStatsStore()
                                 .mnReferenceEngineDeclinedCount);
                         return false;
                     }
-
-                    // Single scalar reference operand — exactly one area.
-                    const auto aPlan = serpn::planAreaCount(1);
-                    if (!aPlan)
+                    FormulaConstTokenRef xToken = PopToken();
+                    if (!xToken || !serefexec::isReferenceOperandToken(*xToken))
                     {
                         addDispatchRuntimeStat(
                             interpreterDispatchRuntimeStatsStore()
-                                .mnReferenceEngineDeclinedCount);
-                        return false;
+                                .mnReferenceEngineSucceededCount);
+                        SetError(FormulaError::IllegalParameter);
+                        PushDouble(0.0);
+                        return true;
                     }
 
-                    Pop();
-                    nGlobalError = FormulaError::NONE;
+                    // ValidateRef mirrors the legacy ScAreas entry checks
+                    // for single / double / ref-list tokens. External refs
+                    // fall through (isReferenceOperandToken returns false
+                    // for them so we never reach here for those shapes).
+                    switch (xToken->GetType())
+                    {
+                        case formula::svSingleRef:
+                            ValidateRef(*xToken->GetSingleRef());
+                            break;
+                        case formula::svDoubleRef:
+                            ValidateRef(*xToken->GetDoubleRef());
+                            break;
+                        case formula::svRefList:
+                            ValidateRef(*xToken->GetRefList());
+                            break;
+                        default:
+                            break;
+                    }
+
+                    const auto aCount = serefexec::referenceOperandAreaCount(*xToken);
                     addDispatchRuntimeStat(
                         interpreterDispatchRuntimeStatsStore()
                             .mnReferenceEngineSucceededCount);
-                    PushDouble(aPlan.maValue);
+                    if (!aCount)
+                    {
+                        SetError(selibreoffice::toFormulaError(aCount.meError));
+                        PushDouble(0.0);
+                    }
+                    else
+                    {
+                        PushDouble(aCount.maValue);
+                    }
                     return true;
                 };
 
@@ -14661,7 +14686,10 @@ StackVar ScInterpreter::Interpret()
                         break;
                     case ocAreas            :
                         if (!tryPlanEngineAreaCount())
-                            ScAreas();
+                        {
+                            OSL_FAIL("engine-backed AREAS declined ocAreas");
+                            PushIllegalParameter();
+                        }
                         break;
                     case ocCurrency         : pushLegacyCurrency();     break;
                     case ocReplace          : pushLegacyReplace();      break;
