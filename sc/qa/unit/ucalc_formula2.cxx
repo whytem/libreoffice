@@ -1455,9 +1455,9 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterReferenceOffsetDispatch)
     // assert no parse error so we know dispatch succeeded.
     CPPUNIT_ASSERT(m_pDoc->GetString(ScAddress(5, 1, 0)) != u"Err:502"_ustr);
 
-    // 5-argument OFFSET declines to legacy (scope fence).
+    // Phase G1 widened OFFSET to cover the 5-argument form; engine now
+    // handles it directly rather than declining to legacy.
     m_pDoc->SetString(ScAddress(5, 2, 0), u"=OFFSET(A1;1;1;2;2)"_ustr);
-    // Legacy handles this and should succeed.
     CPPUNIT_ASSERT(m_pDoc->GetString(ScAddress(5, 2, 0)) != u"Err:502"_ustr);
 
     const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
@@ -1474,9 +1474,6 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterReferenceOffsetDispatch)
     CPPUNIT_ASSERT_MESSAGE(
         "3-arg OFFSET with single-ref base should succeed through engine: " + aLabel,
         aDispatchStats.mnReferenceEngineSucceededCount > 0);
-    CPPUNIT_ASSERT_MESSAGE(
-        "5-arg OFFSET should produce an engine decline: " + aLabel,
-        aDispatchStats.mnReferenceEngineDeclinedCount > 0);
 
     m_pDoc->DeleteTab(0);
 }

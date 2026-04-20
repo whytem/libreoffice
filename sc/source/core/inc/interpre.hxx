@@ -717,7 +717,6 @@ public:
     void ScDBVarP();
     void ScIndirect();
     void ScAddressFunc();
-    void ScOffset();
     void ScIndex();
     void ScMultiArea();
     void ScAreas();
