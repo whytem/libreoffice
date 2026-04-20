@@ -7565,13 +7565,6 @@ StackVar ScInterpreter::Interpret()
                         },
                         "family-local default-on logical slice reached ScInterpreter");
                 };
-                const auto pushLegacyLogicalFold = [&](std::u16string_view rFunctionName,
-                                                       spreadsheetengine::compat::libreoffice::
-                                                           interpreterdispatch::LogicalFoldMode
-                                                               eMode) {
-                    warnLogicalDispatch(rFunctionName);
-                    ScLogicalFoldOp(eMode);
-                };
                 const auto warnConditionalDispatch = [&](std::u16string_view rFunctionName) {
                     warnIfLegacyDispatchReached(
                         "family-local default-on", rFunctionName,
@@ -11257,19 +11250,22 @@ StackVar ScInterpreter::Interpret()
                         }
                         break;
                     case ocAnd              :
-                        pushLegacyLogicalFold(
-                            u"AND", spreadsheetengine::compat::libreoffice::interpreterdispatch::
-                                        LogicalFoldMode::And);
+                        warnLogicalDispatch(u"AND");
+                        ScLogicalFoldOp(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                LogicalFoldMode::And);
                         break;
                     case ocOr               :
-                        pushLegacyLogicalFold(
-                            u"OR", spreadsheetengine::compat::libreoffice::interpreterdispatch::
-                                       LogicalFoldMode::Or);
+                        warnLogicalDispatch(u"OR");
+                        ScLogicalFoldOp(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                LogicalFoldMode::Or);
                         break;
                     case ocXor              :
-                        pushLegacyLogicalFold(
-                            u"XOR", spreadsheetengine::compat::libreoffice::interpreterdispatch::
-                                        LogicalFoldMode::Xor);
+                        warnLogicalDispatch(u"XOR");
+                        ScLogicalFoldOp(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                LogicalFoldMode::Xor);
                         break;
                     case ocIntersect        : ScIntersect();                break;
                     case ocRange            :
