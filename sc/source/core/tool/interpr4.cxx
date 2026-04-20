@@ -5544,34 +5544,6 @@ StackVar ScInterpreter::Interpret()
                         PushString(aOldStr);
                     }
                 };
-                const auto pushLegacyFind = [&]() {
-                    warnTextUtilityDispatch(u"FIND");
-                    sal_uInt8 nParamCount = GetByte();
-                    if (!MustHaveParamCount(nParamCount, 2, 3))
-                        return;
-
-                    sal_Int32 nCnt = nParamCount == 3 ? GetDouble() : 1;
-                    OUString sStr = GetString().getString();
-                    if (nCnt < 1 || nCnt > sStr.getLength())
-                        PushNoValue();
-                    else
-                    {
-                        sal_Int32 nPos = sStr.indexOf(GetString().getString(), nCnt - 1);
-                        if (nPos == -1)
-                            PushNoValue();
-                        else
-                        {
-                            sal_Int32 nIdx = 0;
-                            nCnt = 0;
-                            while (nIdx < nPos)
-                            {
-                                sStr.iterateCodePoints(&nIdx);
-                                ++nCnt;
-                            }
-                            PushDouble(static_cast<double>(nCnt + 1));
-                        }
-                    }
-                };
                 const auto pushLegacyMid = [&]() {
                     warnTextUtilityDispatch(u"MID");
                     if (!MustHaveParamCount(GetByte(), 3))
@@ -15645,7 +15617,36 @@ StackVar ScInterpreter::Interpret()
                                 PushString(aStr);
                         }();
                         break;
-                    case ocFind             : pushLegacyFind();         break;
+                    case ocFind             :
+                        [&]() {
+                            warnTextUtilityDispatch(u"FIND");
+                            sal_uInt8 nParamCount = GetByte();
+                            if (!MustHaveParamCount(nParamCount, 2, 3))
+                                return;
+
+                            sal_Int32 nCnt = nParamCount == 3 ? GetDouble() : 1;
+                            OUString sStr = GetString().getString();
+                            if (nCnt < 1 || nCnt > sStr.getLength())
+                                PushNoValue();
+                            else
+                            {
+                                sal_Int32 nPos = sStr.indexOf(GetString().getString(), nCnt - 1);
+                                if (nPos == -1)
+                                    PushNoValue();
+                                else
+                                {
+                                    sal_Int32 nIdx = 0;
+                                    nCnt = 0;
+                                    while (nIdx < nPos)
+                                    {
+                                        sStr.iterateCodePoints(&nIdx);
+                                        ++nCnt;
+                                    }
+                                    PushDouble(static_cast<double>(nCnt + 1));
+                                }
+                            }
+                        }();
+                        break;
                     case ocExact            :
                         warnTextUtilityDispatch(u"EXACT");
                         nFuncFmtType = SvNumFormatType::LOGICAL;
