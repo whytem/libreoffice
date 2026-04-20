@@ -1508,8 +1508,9 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterReferenceAxisOrdinalDisp
     m_pDoc->SetString(ScAddress(5, 1, 0), u"=ROW(C7)"_ustr);
     ASSERT_DOUBLES_EQUAL(7.0, m_pDoc->GetValue(ScAddress(5, 1, 0)));
 
-    // Double-ref argument declines to legacy; legacy returns the leftmost
-    // column scalar when not in matrix context.
+    // Phase G1 widened COLUMN / ROW / SHEET to cover svDoubleRef; the
+    // engine now succeeds (pushing a matrix plan of which the top-left
+    // is returned for a non-matrix cell) rather than declining to legacy.
     m_pDoc->SetString(ScAddress(5, 2, 0), u"=COLUMN(B5:D8)"_ustr);
     ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(5, 2, 0)));
 
@@ -1525,11 +1526,8 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterReferenceAxisOrdinalDisp
         "COLUMN/ROW/SHEET should attempt engine dispatch: " + aLabel,
         aDispatchStats.mnReferenceEngineAttemptedCount > 0);
     CPPUNIT_ASSERT_MESSAGE(
-        "scalar COLUMN/ROW/SHEET should succeed through engine: " + aLabel,
+        "COLUMN/ROW/SHEET should succeed through engine: " + aLabel,
         aDispatchStats.mnReferenceEngineSucceededCount > 0);
-    CPPUNIT_ASSERT_MESSAGE(
-        "double-ref COLUMN(B5:D8) should produce an engine decline: " + aLabel,
-        aDispatchStats.mnReferenceEngineDeclinedCount > 0);
     CPPUNIT_ASSERT_EQUAL_MESSAGE(
         "reference dispatch accounting should stay balanced: " + aLabel,
         aDispatchStats.mnReferenceEngineAttemptedCount,
