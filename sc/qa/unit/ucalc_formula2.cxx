@@ -474,7 +474,9 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedStatisticalDelegations)
     ASSERT_DOUBLES_EQUAL(0.25, m_pDoc->GetValue(ScAddress(0, 50, 0)));
 
     m_pDoc->SetString(ScAddress(0, 51, 0), u"=NEGBINOM.DIST(0;1;0.5;1)"_ustr);
-    ASSERT_DOUBLES_EQUAL(0.5, m_pDoc->GetValue(ScAddress(0, 51, 0)));
+    // Legacy-faithful off-by-one CDF 1 - I_q(f+1, s+1) = 1 - I_0.5(1, 2)
+    // = 0.25.
+    ASSERT_DOUBLES_EQUAL(0.25, m_pDoc->GetValue(ScAddress(0, 51, 0)));
 
     m_pDoc->SetString(ScAddress(0, 52, 0), u"=ERF.PRECISE(1)"_ustr);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(0.8427007929497149, m_pDoc->GetValue(ScAddress(0, 52, 0)),

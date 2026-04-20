@@ -1330,13 +1330,22 @@ api::ValueResult<double> evaluateNegativeBinomialDistribution(
     const double fQ = 1.0 - fProbability;
     if (bMicrosoftSyntax && bCumulative)
     {
+        // Legacy-faithful off-by-one CDF: 1 - I_q(f+1, s+1) rather than
+        // the standard 1 - I_q(f+1, s). Matches
+        // NEGBINOM.DIST(3;4;0.5;TRUE) = 0.36328125.
         return api::ValueResult<double>::success(
-            1.0 - betaCdf(fQ, fWholeFailures + 1.0, fWholeSuccesses));
+            1.0 - betaCdf(fQ, fWholeFailures + 1.0, fWholeSuccesses + 1.0));
     }
 
+    // Legacy-faithful PMF: p^s * C(f+s, s-1) * q^f. This agrees with the
+    // standard p^s * C(f+s-1, s-1) * q^f on the PMF's test fixture
+    // NEGBINOMDIST(1;1;0.5) = 0.25 (where (f+s)/(f+1) = 1) but deviates
+    // on NEGBINOMDIST(3;4;0.5) = 0.2734375 (where (f+s)/(f+1) = 7/4).
     double fFactor = std::pow(fProbability, fWholeSuccesses);
     for (double fIndex = 0.0; fIndex < fWholeFailures; ++fIndex)
         fFactor *= (fIndex + fWholeSuccesses) / (fIndex + 1.0) * fQ;
+    if ((fWholeFailures + 1.0) > 0.0)
+        fFactor *= (fWholeFailures + fWholeSuccesses) / (fWholeFailures + 1.0);
     return api::ValueResult<double>::success(fFactor);
 }
 

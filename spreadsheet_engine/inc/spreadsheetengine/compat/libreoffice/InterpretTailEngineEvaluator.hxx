@@ -11271,6 +11271,14 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
     ScInterpreterContext& rContext, const ScAddress& rFormulaPos)
 {
+    // This handler only implements GROWTH semantics (log-linear fit).
+    // Sister GrowthProjection members (SLOPE / RSQ / STEYX /
+    // FORECAST.ETS variants) would be mis-computed here, so decline
+    // back to legacy for anything other than GROWTH itself.
+    const api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
+    if (aFunctionName != u"GROWTH")
+        return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
+
     const auto makeNumericAttempt = [&](double fValue) {
         return makeNumericResult(eFunction, fValue, SvNumFormatType::NUMBER);
     };
