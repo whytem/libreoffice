@@ -7549,18 +7549,12 @@ StackVar ScInterpreter::Interpret()
                         },
                         "family-local default-on logical slice reached ScInterpreter");
                 };
-                const auto warnConditionalDispatch = [&](std::u16string_view rFunctionName) {
-                    warnIfLegacyDispatchReached(
-                        "family-local default-on", rFunctionName,
-                        [](std::u16string_view rFormula) {
-                            return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
-                        },
-                        "family-local default-on conditional slice reached ScInterpreter");
-                };
-                // Batch 1 first admission: scalar IF condition through the
-                // engine-native planIfBranch. Reference and matrix operands
-                // defer to the legacy ScIfJump path, which still owns the
-                // matrix-frame JumpMatrix protocol until Batch 4 lands.
+                // Batch 1 + 4B admission: scalar / reference / matrix IF
+                // condition through the engine-native planIfBranch plus
+                // initializeIfJumpMatrix; the matrix-frame JumpMatrix
+                // protocol is widened via MatrixJumpConditionToMatrix so
+                // svDoubleRef and nested-JumpMatrix cases fall into the
+                // svMatrix branch below before the scalar fast path runs.
                 const auto tryPlanEngineIfJump = [&]() -> bool {
                     addDispatchRuntimeStat(
                         interpreterDispatchRuntimeStatsStore()
@@ -13678,6 +13672,43 @@ StackVar ScInterpreter::Interpret()
                             case svEmptyCell:
                             case svMissing:
                                 return serpn::RpnValue::empty();
+                            case svSingleRef:
+                            case svDoubleRef:
+                            {
+                                // Legacy `pushLegacySwitch` collapses the
+                                // selector / case label via `GetDouble` or
+                                // `GetString` which reads the cell at the
+                                // (single-cell) reference. Match that here.
+                                ScAddress aAdr;
+                                if (pTok->GetType() == svSingleRef)
+                                {
+                                    const ScSingleRefData& rRef
+                                        = *pTok->GetSingleRef();
+                                    aAdr = rRef.toAbs(mrDoc, aPos);
+                                }
+                                else
+                                {
+                                    const ScComplexRefData& rRef
+                                        = *pTok->GetDoubleRef();
+                                    const ScRange aRange = rRef.toAbs(mrDoc, aPos);
+                                    if (aRange.aStart != aRange.aEnd)
+                                        return std::nullopt;
+                                    aAdr = aRange.aStart;
+                                }
+                                ScRefCellValue aCell(mrDoc, aAdr);
+                                if (aCell.hasEmptyValue() || aCell.isEmpty())
+                                    return serpn::RpnValue::empty();
+                                if (aCell.hasString())
+                                {
+                                    svl::SharedString aStr;
+                                    GetCellString(aStr, aCell);
+                                    return serpn::RpnValue::text(
+                                        selibreoffice::toApiString(
+                                            aStr.getString()));
+                                }
+                                return serpn::RpnValue::number(
+                                    GetCellValue(aAdr, aCell));
+                            }
                             default:
                                 return std::nullopt;
                         }
@@ -13768,115 +13799,6 @@ StackVar ScInterpreter::Interpret()
                         interpreterDispatchRuntimeStatsStore()
                             .mnControlFlowEngineSucceededCount);
                     return true;
-                };
-                const auto pushLegacySwitch = [&]() {
-                    warnConditionalDispatch(u"COM.MICROSOFT.SWITCH");
-
-                    short nParamCount = GetByte();
-                    if (!MustHaveParamCountMin(nParamCount, 3))
-                        return;
-
-                    ReverseStack(nParamCount);
-
-                    nGlobalError = FormulaError::NONE;
-                    seswitchexec::SwitchValue aReference;
-                    switch (GetStackType())
-                    {
-                        case svDouble:
-                            aReference = seswitchexec::makeNumericSwitchValue(GetDouble());
-                            break;
-                        case svString:
-                            aReference = seswitchexec::makeTextSwitchValue(GetString());
-                            break;
-                        case svSingleRef:
-                        case svDoubleRef:
-                        {
-                            ScAddress aAdr;
-                            if (!PopDoubleRefOrSingleRef(aAdr))
-                                break;
-                            ScRefCellValue aCell(mrDoc, aAdr);
-                            if (!(aCell.hasString() || aCell.hasEmptyValue() || aCell.isEmpty()))
-                                aReference
-                                    = seswitchexec::makeNumericSwitchValue(GetCellValue(aAdr, aCell));
-                            else
-                            {
-                                svl::SharedString aRefStr;
-                                GetCellString(aRefStr, aCell);
-                                aReference = seswitchexec::makeTextSwitchValue(aRefStr);
-                            }
-                        }
-                        break;
-                        case svExternalSingleRef:
-                        case svExternalDoubleRef:
-                        case svMatrix:
-                        {
-                            double fRefVal = 0.0;
-                            svl::SharedString aRefStr;
-                            if (ScMatrix::IsValueType(GetDoubleOrStringFromMatrix(fRefVal, aRefStr)))
-                                aReference = seswitchexec::makeNumericSwitchValue(fRefVal);
-                            else
-                                aReference = seswitchexec::makeTextSwitchValue(aRefStr);
-                        }
-                        break;
-                        default:
-                            PopError();
-                            PushIllegalArgument();
-                            return;
-                    }
-
-                    nParamCount--;
-                    bool bFinished = false;
-                    while (nParamCount > 1 && !bFinished && nGlobalError == FormulaError::NONE)
-                    {
-                        seswitchexec::SwitchValue aCandidate;
-                        if (aReference.mbNumeric)
-                            aCandidate = seswitchexec::makeNumericSwitchValue(GetDouble());
-                        else
-                            aCandidate = seswitchexec::makeTextSwitchValue(GetString());
-                        nParamCount--;
-                        if ((nGlobalError != FormulaError::NONE && nParamCount < 2)
-                            || seswitchexec::matchesSwitchCase(aReference, aCandidate))
-                        {
-                            bFinished = true;
-                        }
-                        else
-                        {
-                            if (nParamCount >= 2)
-                            {
-                                Pop();
-                                nParamCount--;
-                                bFinished = (nParamCount == 1);
-                            }
-                            else
-                            {
-                                PushNA();
-                                return;
-                            }
-                            nGlobalError = FormulaError::NONE;
-                        }
-                    }
-
-                    if (nGlobalError != FormulaError::NONE || !bFinished)
-                    {
-                        if (!bFinished)
-                            PushNA();
-                        else
-                            PushError(nGlobalError);
-                        return;
-                    }
-
-                    FormulaConstTokenRef xToken(PopToken());
-                    if (xToken)
-                    {
-                        while (nParamCount > 1)
-                        {
-                            Pop();
-                            nParamCount--;
-                        }
-                        PushTokenRef(xToken);
-                    }
-                    else
-                        PushError(FormulaError::UnknownStackVariable);
                 };
 
                 switch( eOp )
@@ -15687,7 +15609,10 @@ StackVar ScInterpreter::Interpret()
                         break;
                     case ocSwitch_MS        :
                         if (!tryPlanEngineSwitch())
-                            pushLegacySwitch();
+                        {
+                            OSL_FAIL("engine-backed SWITCH declined ocSwitch_MS");
+                            PushIllegalParameter();
+                        }
                         break;
                     case ocMinIfs_MS:
                     {
