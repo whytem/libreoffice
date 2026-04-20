@@ -241,36 +241,14 @@ EvaluationResult Evaluator::evaluateStatisticalRuntimeFamilyBody(
 
     const auto materializeMatrixOperand = [&](const formula::Node& rArgument)
         -> api::ValueResult<MatrixOperand> {
-        EvaluationResult aValue = evaluateNode(rArgument, rCurrentAddress);
-        if (!aValue)
-            return api::ValueResult<MatrixOperand>::failure(aValue.meError);
+        auto aInput = aContext.materializeMatrixInput(rArgument);
+        if (!aInput)
+            return api::ValueResult<MatrixOperand>::failure(aInput.meError);
 
         MatrixOperand aOperand;
-        if (aValue.maValue.isScalar())
-        {
-            aOperand.maValues.push_back(aValue.maValue.maValue);
-            return api::ValueResult<MatrixOperand>::success(std::move(aOperand));
-        }
-
-        const auto aDimensions = aValue.maValue.maReference.matrixDimensions();
-        aOperand.mnColumns = aDimensions.mnColumns;
-        aOperand.mnRows = aDimensions.mnRows;
-        aOperand.maValues.reserve(static_cast<std::size_t>(aOperand.mnColumns)
-                                  * static_cast<std::size_t>(aOperand.mnRows));
-        for (api::MatrixSize nRow = 0; nRow < aOperand.mnRows; ++nRow)
-        {
-            for (api::MatrixSize nColumn = 0; nColumn < aOperand.mnColumns; ++nColumn)
-            {
-                EvaluationResult aElement
-                    = materializeReferenceValue(aValue.maValue.maReference, nColumn, nRow);
-                if (!aElement)
-                    return api::ValueResult<MatrixOperand>::failure(aElement.meError);
-                if (!aElement.maValue.isScalar())
-                    return api::ValueResult<MatrixOperand>::failure(api::Error::IllegalArgument);
-                aOperand.maValues.push_back(aElement.maValue.maValue);
-            }
-        }
-
+        aOperand.mnColumns = aInput.maValue.maDimensions.mnColumns;
+        aOperand.mnRows = aInput.maValue.maDimensions.mnRows;
+        aOperand.maValues = std::move(aInput.maValue.maValues);
         return api::ValueResult<MatrixOperand>::success(std::move(aOperand));
     };
 

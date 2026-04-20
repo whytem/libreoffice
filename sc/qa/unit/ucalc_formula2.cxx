@@ -4419,16 +4419,18 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorMatrixMathDef
         setaileval::resetStats();
 
         m_pDoc->SetString(0, 7, 0, u"=MDETERM(A1:B2)"_ustr);
+        m_pDoc->SetString(1, 7, 0, u"=MDETERM({1;2|3;4})"_ustr);
 
         CPPUNIT_ASSERT_DOUBLES_EQUAL(-2.0, m_pDoc->GetValue(0, 7, 0), 1.0E-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(-2.0, m_pDoc->GetValue(1, 7, 0), 1.0E-12);
 
         const auto aStats = setaileval::getStatsSnapshot();
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 1);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 2);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::MatrixMath)]
-            >= 1);
+            >= 2);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
             aStats.maFunctionFallbackCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::MatrixMath)]);
@@ -4463,6 +4465,11 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorConditionalAu
         m_pDoc->SetString(5, 7, 0, u"=IF(A1=2;B1;C1)"_ustr);
         m_pDoc->SetString(6, 7, 0, u"=IFS(A1=1;11;A1=2;22)"_ustr);
         m_pDoc->SetString(7, 7, 0, u"=COM.MICROSOFT.SWITCH(A1;1;11;2;22;99)"_ustr);
+        m_pDoc->SetString(8, 7, 0, u"=LET(first;5;second;first+7;second)"_ustr);
+        m_pDoc->SetString(9, 7, 0, u"=CHOOSE(2;11;22;33)"_ustr);
+        m_pDoc->SetString(10, 7, 0, u"=IFERROR(1/0;42)"_ustr);
+        m_pDoc->SetString(11, 7, 0, u"=IFNA(NA();77)"_ustr);
+        m_pDoc->SetString(12, 7, 0, u"=LET(ref;B1;IF(ISREF(ref);ref+1;0))"_ustr);
 
         ASSERT_DOUBLES_EQUAL(42.0, m_pDoc->GetValue(0, 7, 0));
         ASSERT_DOUBLES_EQUAL(99.0, m_pDoc->GetValue(1, 7, 0));
@@ -4472,14 +4479,19 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorConditionalAu
         ASSERT_DOUBLES_EQUAL(10.0, m_pDoc->GetValue(5, 7, 0));
         ASSERT_DOUBLES_EQUAL(22.0, m_pDoc->GetValue(6, 7, 0));
         ASSERT_DOUBLES_EQUAL(22.0, m_pDoc->GetValue(7, 7, 0));
+        ASSERT_DOUBLES_EQUAL(12.0, m_pDoc->GetValue(8, 7, 0));
+        ASSERT_DOUBLES_EQUAL(22.0, m_pDoc->GetValue(9, 7, 0));
+        ASSERT_DOUBLES_EQUAL(42.0, m_pDoc->GetValue(10, 7, 0));
+        ASSERT_DOUBLES_EQUAL(77.0, m_pDoc->GetValue(11, 7, 0));
+        ASSERT_DOUBLES_EQUAL(11.0, m_pDoc->GetValue(12, 7, 0));
 
         const auto aStats = setaileval::getStatsSnapshot();
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 8);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 13);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::Conditional)]
-            >= 8);
+            >= 13);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
             aStats.maFunctionFallbackCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::Conditional)]);
@@ -5174,6 +5186,8 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorInformationPr
         m_pDoc->SetString(0, 6, 0, u"=ISEVEN(4)"_ustr);
         m_pDoc->SetString(0, 7, 0, u"=ISODD(3)"_ustr);
         m_pDoc->SetString(0, 8, 0, u"=ERROR.TYPE(NA())"_ustr);
+        m_pDoc->SetString(1, 9, 0, u"=ISREF(OFFSET(B1;0;0;1;1))"_ustr);
+        m_pDoc->SetString(1, 10, 0, u"=ISFORMULA(OFFSET(B1;0;0;1;1))"_ustr);
 
         CPPUNIT_ASSERT_EQUAL(u"TRUE"_ustr, m_pDoc->GetString(0, 0, 0));
         CPPUNIT_ASSERT_EQUAL(u"TRUE"_ustr, m_pDoc->GetString(0, 1, 0));
@@ -5184,13 +5198,27 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorInformationPr
         CPPUNIT_ASSERT_EQUAL(u"TRUE"_ustr, m_pDoc->GetString(0, 6, 0));
         CPPUNIT_ASSERT_EQUAL(u"TRUE"_ustr, m_pDoc->GetString(0, 7, 0));
         CPPUNIT_ASSERT_DOUBLES_EQUAL(7.0, m_pDoc->GetValue(0, 8, 0), 1e-12);
+        CPPUNIT_ASSERT_EQUAL(u"TRUE"_ustr, m_pDoc->GetString(1, 9, 0));
+        CPPUNIT_ASSERT_EQUAL(u"TRUE"_ustr, m_pDoc->GetString(1, 10, 0));
 
         const auto aStats = setaileval::getStatsSnapshot();
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 1);
-        CPPUNIT_ASSERT(
+        const auto aStatuses = setaileval::getObservedFormulaCellStatuses();
+        const auto hasSupportedStatus = [&aStatuses](SCCOL nCol, SCROW nRow) {
+            return std::any_of(aStatuses.begin(), aStatuses.end(),
+                [nCol, nRow](const auto& rStatus) {
+                    return rStatus.maAddress.Col() == nCol && rStatus.maAddress.Row() == nRow
+                           && rStatus.mbSupported && !rStatus.mbFallback;
+                });
+        };
+
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 9);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(9),
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
-                setaileval::FunctionKind::InformationPredicate)]
-            >= 1);
+                setaileval::FunctionKind::InformationPredicate)]);
+        CPPUNIT_ASSERT(hasSupportedStatus(0, 4));
+        CPPUNIT_ASSERT(hasSupportedStatus(1, 9));
+        CPPUNIT_ASSERT(hasSupportedStatus(1, 10));
     }
 
     m_pDoc->DeleteTab(0);
@@ -5251,18 +5279,25 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorConditionalDe
         m_pDoc->SetString(1, 0, 0, u"=IFERROR(1/0;42)"_ustr);
         m_pDoc->SetString(2, 0, 0, u"=IFS(TRUE;11;FALSE;22)"_ustr);
         m_pDoc->SetString(3, 0, 0, u"=COM.MICROSOFT.SWITCH(2;1;11;2;22;99)"_ustr);
+        m_pDoc->SetString(4, 0, 0, u"=CHOOSE(2;11;22;33)"_ustr);
+        m_pDoc->SetString(5, 0, 0, u"=IFNA(NA();77)"_ustr);
+        m_pDoc->SetString(6, 0, 0, u"=LET(first;5;second;first+7;second)"_ustr);
 
         ASSERT_DOUBLES_EQUAL(42.0, m_pDoc->GetValue(0, 0, 0));
         ASSERT_DOUBLES_EQUAL(42.0, m_pDoc->GetValue(1, 0, 0));
         ASSERT_DOUBLES_EQUAL(11.0, m_pDoc->GetValue(2, 0, 0));
         ASSERT_DOUBLES_EQUAL(22.0, m_pDoc->GetValue(3, 0, 0));
+        ASSERT_DOUBLES_EQUAL(22.0, m_pDoc->GetValue(4, 0, 0));
+        ASSERT_DOUBLES_EQUAL(77.0, m_pDoc->GetValue(5, 0, 0));
+        ASSERT_DOUBLES_EQUAL(12.0, m_pDoc->GetValue(6, 0, 0));
 
         const auto aStats = setaileval::getStatsSnapshot();
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 1);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 7);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::Conditional)]
-            >= 1);
+            >= 7);
     }
 
     m_pDoc->DeleteTab(0);

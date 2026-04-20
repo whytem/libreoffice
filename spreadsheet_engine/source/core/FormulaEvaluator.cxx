@@ -570,16 +570,22 @@ EvaluationResult Evaluator::makeStoredReplayOrFailure(
     return makeFailure(eError);
 }
 
-const EvaluationResult* Evaluator::lookupLocalBinding(api::StringView rName) const
+std::optional<EvaluationResult> Evaluator::lookupLocalBinding(api::StringView rName) const
 {
     const api::String aNormalizedName = uppercaseAscii(rName);
     for (auto aScopeIt = maLocalBindings.rbegin(); aScopeIt != maLocalBindings.rend(); ++aScopeIt)
     {
-        const auto aBindingIt = aScopeIt->find(aNormalizedName);
-        if (aBindingIt != aScopeIt->end())
-            return &aBindingIt->second;
+        const auto oBinding = aScopeIt->lookup(aNormalizedName);
+        if (!oBinding)
+            continue;
+
+        if (oBinding->isReference())
+            return makeReferenceResult(oBinding->maReference);
+        if (oBinding->isMatrix())
+            return makeFailure(api::Error::IllegalArgument);
+        return makeScalarResult(oBinding->maScalar);
     }
-    return nullptr;
+    return std::nullopt;
 }
 
 std::map<Evaluator::AddressKey, Evaluator::CacheEntry>& Evaluator::cacheForMode(ExecutionMode eMode)
@@ -670,6 +676,73 @@ api::ValueResult<api::ResolvedReference> Evaluator::resolveNamedRange(
     return api::ValueResult<api::ResolvedReference>::failure(api::Error::NotAvailable);
 }
 
+api::ValueResult<api::CellRange> Evaluator::resolveReferenceRangeArgument(
+    const formula::Node& rNode, const api::CellAddress& rCurrentAddress)
+{
+    if (rNode.meKind == formula::NodeKind::CellReference)
+        return resolveReferenceRangeText(rNode.maPrimaryText, rCurrentAddress.mnSheet);
+
+    if (rNode.meKind == formula::NodeKind::RangeReference)
+    {
+        api::String aAddress = rNode.maPrimaryText;
+        aAddress.push_back(u':');
+        aAddress += rNode.maSecondaryText;
+        return resolveReferenceRangeText(aAddress, rCurrentAddress.mnSheet);
+    }
+
+    if (rNode.meKind == formula::NodeKind::NamedReference)
+    {
+        if (const auto oLocalBinding = lookupLocalBinding(rNode.maPrimaryText))
+        {
+            if (!oLocalBinding->maValue.isMatrixReference())
+                return api::ValueResult<api::CellRange>::failure(api::Error::IllegalArgument);
+            return api::ValueResult<api::CellRange>::success(
+                oLocalBinding->maValue.maReference.maRange);
+        }
+
+        if (rCurrentAddress.mnSheet >= 0
+            && static_cast<std::size_t>(rCurrentAddress.mnSheet) < mrWorkbook.maSheets.size())
+        {
+            const auto& rSheet = mrWorkbook.maSheets[static_cast<std::size_t>(
+                rCurrentAddress.mnSheet)];
+            if (const auto* pLocal = mrWorkbook.findNamedRange(
+                    rNode.maPrimaryText, rSheet.maName))
+            {
+                return resolveReferenceRangeText(
+                    pLocal->maCellRangeAddress, rCurrentAddress.mnSheet);
+            }
+        }
+
+        if (const auto* pGlobal = mrWorkbook.findNamedRange(rNode.maPrimaryText))
+        {
+            return resolveReferenceRangeText(
+                pGlobal->maCellRangeAddress, rCurrentAddress.mnSheet);
+        }
+
+        return api::ValueResult<api::CellRange>::failure(api::Error::NotAvailable);
+    }
+
+    EvaluationResult aValue = evaluateNode(rNode, rCurrentAddress);
+    if (!aValue)
+        return api::ValueResult<api::CellRange>::failure(aValue.meError);
+    if (!aValue.maValue.isMatrixReference())
+        return api::ValueResult<api::CellRange>::failure(api::Error::IllegalArgument);
+    return api::ValueResult<api::CellRange>::success(aValue.maValue.maReference.maRange);
+}
+
+api::ValueResult<api::ResolvedReference> Evaluator::resolveReferenceArgument(
+    const formula::Node& rNode, const api::CellAddress& rCurrentAddress)
+{
+    const auto aRange = resolveReferenceRangeArgument(rNode, rCurrentAddress);
+    if (!aRange)
+        return api::ValueResult<api::ResolvedReference>::failure(aRange.meError);
+    if (aRange.maValue.maStart.mnSheet != aRange.maValue.maEnd.mnSheet)
+        return api::ValueResult<api::ResolvedReference>::failure(api::Error::IllegalArgument);
+
+    api::ResolvedReference aReference { aRange.maValue };
+    return api::ValueResult<api::ResolvedReference>::success(aReference);
+}
+
 EvaluationResult Evaluator::evaluateFunction(
     const formula::Node& rNode, const api::CellAddress& rCurrentAddress)
 {
@@ -718,18 +791,9 @@ EvaluationResult Evaluator::evaluateNode(
         case formula::NodeKind::EmptyArgument:
             return makeScalarResult(api::CellValue::empty());
         case formula::NodeKind::CellReference:
-        {
-            const auto aReference = resolveReferenceText(rNode.maPrimaryText, rCurrentAddress.mnSheet);
-            if (!aReference)
-                return makeStoredReplayOrFailure(rNode, rCurrentAddress, aReference.meError);
-            return materializeReferenceValue(aReference.maValue, 0, 0);
-        }
         case formula::NodeKind::RangeReference:
         {
-            api::String aReference = rNode.maPrimaryText;
-            aReference.push_back(u':');
-            aReference += rNode.maSecondaryText;
-            const auto aRange = resolveReferenceText(aReference, rCurrentAddress.mnSheet);
+            const auto aRange = resolveReferenceArgument(rNode, rCurrentAddress);
             if (!aRange)
                 return makeStoredReplayOrFailure(rNode, rCurrentAddress, aRange.meError);
             if (aRange.maValue.isSingleCell())
@@ -738,9 +802,9 @@ EvaluationResult Evaluator::evaluateNode(
         }
         case formula::NodeKind::NamedReference:
         {
-            if (const auto* pLocalBinding = lookupLocalBinding(rNode.maPrimaryText))
-                return *pLocalBinding;
-            const auto aRange = resolveNamedRange(rNode.maPrimaryText, rCurrentAddress.mnSheet);
+            if (const auto oLocalBinding = lookupLocalBinding(rNode.maPrimaryText))
+                return *oLocalBinding;
+            const auto aRange = resolveReferenceArgument(rNode, rCurrentAddress);
             if (!aRange)
                 return makeStoredReplayOrFailure(rNode, rCurrentAddress, aRange.meError);
             if (aRange.maValue.isSingleCell())

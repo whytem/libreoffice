@@ -117,6 +117,22 @@ struct Evaluator::FunctionEvalContext
     const formula::Node& mrNode;
     const api::CellAddress& mrCurrentAddress;
 
+    struct MaterializedMatrixInput
+    {
+        api::MatrixDimensions maDimensions { 1, 1 };
+        std::vector<api::CellValue> maValues;
+        std::optional<api::ResolvedReference> moReference;
+
+        [[nodiscard]] const api::CellValue& valueAt(
+            api::MatrixSize nColumn, api::MatrixSize nRow) const
+        {
+            const std::size_t nLinearIndex
+                = static_cast<std::size_t>(nRow) * maDimensions.mnColumns
+                  + static_cast<std::size_t>(nColumn);
+            return maValues[nLinearIndex];
+        }
+    };
+
     template <typename Visitor>
     [[nodiscard]] api::ValueResult<bool> visitFlattenedValues(
         const formula::Node& rArgument, const Visitor& rVisitor) const
@@ -213,6 +229,75 @@ struct Evaluator::FunctionEvalContext
         }
 
         return api::ValueResult<std::vector<double>>::success(std::move(aNumbers));
+    }
+
+    [[nodiscard]] api::ValueResult<MaterializedMatrixInput> materializeMatrixInput(
+        const formula::Node& rArgument) const
+    {
+        MaterializedMatrixInput aInput;
+
+        if (rArgument.meKind == formula::NodeKind::ArrayConstant)
+        {
+            if (rArgument.mnArrayColumns < 1 || rArgument.mnArrayRows < 1
+                || static_cast<sal_Int32>(rArgument.maChildren.size())
+                       != rArgument.mnArrayColumns * rArgument.mnArrayRows)
+            {
+                return api::ValueResult<MaterializedMatrixInput>::failure(
+                    api::Error::IllegalArgument);
+            }
+
+            aInput.maDimensions = { rArgument.mnArrayColumns, rArgument.mnArrayRows };
+            aInput.maValues.reserve(rArgument.maChildren.size());
+            for (const auto& pChild : rArgument.maChildren)
+            {
+                const auto aValue = evaluateScalarArgumentValue(*pChild);
+                if (!aValue)
+                    return api::ValueResult<MaterializedMatrixInput>::failure(aValue.meError);
+                aInput.maValues.push_back(aValue.maValue);
+            }
+            return api::ValueResult<MaterializedMatrixInput>::success(std::move(aInput));
+        }
+
+        const bool bReferenceLike = rArgument.meKind == formula::NodeKind::CellReference
+                                    || rArgument.meKind == formula::NodeKind::RangeReference
+                                    || rArgument.meKind == formula::NodeKind::NamedReference;
+        EvaluationResult aValue
+            = bReferenceLike ? mrEvaluator.evaluateReferenceNode(rArgument, mrCurrentAddress)
+                             : mrEvaluator.evaluateNode(rArgument, mrCurrentAddress);
+        if (!aValue)
+            return api::ValueResult<MaterializedMatrixInput>::failure(aValue.meError);
+
+        if (aValue.maValue.isScalar())
+        {
+            aInput.maValues.push_back(aValue.maValue.maValue);
+            return api::ValueResult<MaterializedMatrixInput>::success(std::move(aInput));
+        }
+
+        aInput.moReference = aValue.maValue.maReference;
+        aInput.maDimensions = aValue.maValue.maReference.matrixDimensions();
+        if (aInput.maDimensions.mnColumns < 1 || aInput.maDimensions.mnRows < 1)
+            return api::ValueResult<MaterializedMatrixInput>::failure(api::Error::IllegalArgument);
+
+        aInput.maValues.reserve(
+            static_cast<std::size_t>(aInput.maDimensions.mnColumns) * aInput.maDimensions.mnRows);
+        for (api::MatrixSize nRow = 0; nRow < aInput.maDimensions.mnRows; ++nRow)
+        {
+            for (api::MatrixSize nColumn = 0; nColumn < aInput.maDimensions.mnColumns; ++nColumn)
+            {
+                EvaluationResult aCell = mrEvaluator.materializeReferenceValue(
+                    *aInput.moReference, nColumn, nRow);
+                if (!aCell)
+                    return api::ValueResult<MaterializedMatrixInput>::failure(aCell.meError);
+                if (!aCell.maValue.isScalar())
+                {
+                    return api::ValueResult<MaterializedMatrixInput>::failure(
+                        api::Error::IllegalArgument);
+                }
+                aInput.maValues.push_back(aCell.maValue.maValue);
+            }
+        }
+
+        return api::ValueResult<MaterializedMatrixInput>::success(std::move(aInput));
     }
 
     [[nodiscard]] api::ValueResult<std::vector<double>> collectVarianceArguments(

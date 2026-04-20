@@ -122,87 +122,6 @@ EvaluationResult Evaluator::evaluateSpreadsheetFamilyBody(
         return replayStoredOrFailure(api::Error::IllegalArgument);
     }
 
-    struct MaterializedMatrixInput
-    {
-        api::MatrixDimensions maDimensions;
-        std::vector<api::CellValue> maValues;
-        std::optional<api::ResolvedReference> moReference;
-
-        [[nodiscard]] const api::CellValue& valueAt(
-            api::MatrixSize nColumn, api::MatrixSize nRow) const
-        {
-            const std::size_t nLinearIndex = static_cast<std::size_t>(nRow) * maDimensions.mnColumns
-                                             + static_cast<std::size_t>(nColumn);
-            return maValues[nLinearIndex];
-        }
-    };
-
-    const auto materializeMatrixInput
-        = [&](const formula::Node& rArgument) -> api::ValueResult<MaterializedMatrixInput> {
-        MaterializedMatrixInput aInput;
-
-        if (rArgument.meKind == formula::NodeKind::ArrayConstant)
-        {
-            if (rArgument.mnArrayColumns < 1 || rArgument.mnArrayRows < 1
-                || static_cast<sal_Int32>(rArgument.maChildren.size())
-                       != rArgument.mnArrayColumns * rArgument.mnArrayRows)
-            {
-                return api::ValueResult<MaterializedMatrixInput>::failure(
-                    api::Error::IllegalArgument);
-            }
-
-            aInput.maDimensions = { rArgument.mnArrayColumns, rArgument.mnArrayRows };
-            aInput.maValues.reserve(rArgument.maChildren.size());
-            for (const auto& pChild : rArgument.maChildren)
-            {
-                const auto aValue = aContext.evaluateScalarArgumentValue(*pChild);
-                if (!aValue)
-                    return api::ValueResult<MaterializedMatrixInput>::failure(aValue.meError);
-                aInput.maValues.push_back(aValue.maValue);
-            }
-            return api::ValueResult<MaterializedMatrixInput>::success(std::move(aInput));
-        }
-
-        const bool bReferenceLike = rArgument.meKind == formula::NodeKind::CellReference
-                                    || rArgument.meKind == formula::NodeKind::RangeReference
-                                    || rArgument.meKind == formula::NodeKind::NamedReference;
-        EvaluationResult aValue = bReferenceLike ? evaluateReferenceNode(rArgument, rCurrentAddress)
-                                                 : evaluateNode(rArgument, rCurrentAddress);
-        if (!aValue)
-            return api::ValueResult<MaterializedMatrixInput>::failure(aValue.meError);
-
-        if (aValue.maValue.isScalar())
-        {
-            aInput.maDimensions = { 1, 1 };
-            aInput.maValues.push_back(aValue.maValue.maValue);
-            return api::ValueResult<MaterializedMatrixInput>::success(std::move(aInput));
-        }
-
-        aInput.moReference = aValue.maValue.maReference;
-        aInput.maDimensions = aValue.maValue.maReference.matrixDimensions();
-        if (aInput.maDimensions.mnColumns < 1 || aInput.maDimensions.mnRows < 1)
-            return api::ValueResult<MaterializedMatrixInput>::failure(api::Error::IllegalArgument);
-
-        aInput.maValues.reserve(
-            static_cast<std::size_t>(aInput.maDimensions.mnColumns) * aInput.maDimensions.mnRows);
-        for (api::MatrixSize nRow = 0; nRow < aInput.maDimensions.mnRows; ++nRow)
-        {
-            for (api::MatrixSize nColumn = 0; nColumn < aInput.maDimensions.mnColumns; ++nColumn)
-            {
-                EvaluationResult aCell = materializeReferenceValue(
-                    *aInput.moReference, nColumn, nRow);
-                if (!aCell)
-                    return api::ValueResult<MaterializedMatrixInput>::failure(aCell.meError);
-                if (!aCell.maValue.isScalar())
-                    return api::ValueResult<MaterializedMatrixInput>::failure(
-                        api::Error::IllegalArgument);
-                aInput.maValues.push_back(aCell.maValue.maValue);
-            }
-        }
-
-        return api::ValueResult<MaterializedMatrixInput>::success(std::move(aInput));
-    };
-
     const auto evaluateOptionalSignedWholeArgument
         = [&](const formula::Node& rArgument) -> api::ValueResult<std::optional<sal_Int32>> {
         if (rArgument.meKind == formula::NodeKind::EmptyArgument)
@@ -413,7 +332,7 @@ EvaluationResult Evaluator::evaluateSpreadsheetFamilyBody(
         if (rNode.maChildren.empty() || rNode.maChildren.size() > 3)
             return makeFailure(api::Error::IllegalArgument);
 
-        const auto aSource = materializeMatrixInput(*rNode.maChildren[0]);
+        const auto aSource = aContext.materializeMatrixInput(*rNode.maChildren[0]);
         if (!aSource)
             return makeFailure(aSource.meError);
         const auto oRows = rNode.maChildren.size() >= 2
@@ -454,7 +373,7 @@ EvaluationResult Evaluator::evaluateSpreadsheetFamilyBody(
         if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 4)
             return makeFailure(api::Error::IllegalArgument);
 
-        const auto aSource = materializeMatrixInput(*rNode.maChildren[0]);
+        const auto aSource = aContext.materializeMatrixInput(*rNode.maChildren[0]);
         if (!aSource)
             return makeFailure(aSource.meError);
 
@@ -538,7 +457,7 @@ EvaluationResult Evaluator::evaluateSpreadsheetFamilyBody(
         if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 4)
             return makeFailure(api::Error::IllegalArgument);
 
-        const auto aSource = materializeMatrixInput(*rNode.maChildren[0]);
+        const auto aSource = aContext.materializeMatrixInput(*rNode.maChildren[0]);
         if (!aSource)
             return makeFailure(aSource.meError);
         const auto oRows = evaluateOptionalSignedWholeArgument(*rNode.maChildren[1]);
@@ -573,7 +492,7 @@ EvaluationResult Evaluator::evaluateSpreadsheetFamilyBody(
         if (rNode.maChildren.empty() || rNode.maChildren.size() > 4)
             return makeFailure(api::Error::IllegalArgument);
 
-        const auto aSource = materializeMatrixInput(*rNode.maChildren[0]);
+        const auto aSource = aContext.materializeMatrixInput(*rNode.maChildren[0]);
         if (!aSource)
             return makeFailure(aSource.meError);
 
@@ -650,20 +569,20 @@ EvaluationResult Evaluator::evaluateSpreadsheetFamilyBody(
         if (rNode.maChildren.size() < 2)
             return makeFailure(api::Error::IllegalArgument);
 
-        const auto aSource = materializeMatrixInput(*rNode.maChildren[0]);
+        const auto aSource = aContext.materializeMatrixInput(*rNode.maChildren[0]);
         if (!aSource)
             return makeFailure(aSource.meError);
 
         struct SortKeyInput
         {
-            MaterializedMatrixInput maMatrix;
+            FunctionEvalContext::MaterializedMatrixInput maMatrix;
             std::int32_t mnOrder = 1;
         };
 
         std::vector<SortKeyInput> aKeys;
         for (std::size_t nIndex = 1; nIndex < rNode.maChildren.size();)
         {
-            const auto aKeyMatrix = materializeMatrixInput(*rNode.maChildren[nIndex]);
+            const auto aKeyMatrix = aContext.materializeMatrixInput(*rNode.maChildren[nIndex]);
             if (!aKeyMatrix)
                 return makeFailure(aKeyMatrix.meError);
             ++nIndex;
@@ -690,7 +609,7 @@ EvaluationResult Evaluator::evaluateSpreadsheetFamilyBody(
         if (aKeys.empty())
             return makeFailure(api::Error::IllegalArgument);
 
-        const MaterializedMatrixInput& rPrimaryKey = aKeys.front().maMatrix;
+        const FunctionEvalContext::MaterializedMatrixInput& rPrimaryKey = aKeys.front().maMatrix;
         const bool bSortRows = rPrimaryKey.maDimensions.mnColumns == 1 && rPrimaryKey.maDimensions.mnRows > 1;
         const bool bSortColumns
             = rPrimaryKey.maDimensions.mnRows == 1 && rPrimaryKey.maDimensions.mnColumns > 1;

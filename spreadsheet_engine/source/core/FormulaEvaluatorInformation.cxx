@@ -71,41 +71,9 @@ EvaluationResult Evaluator::evaluateInformationFamilyBody(
     const auto makeCellError = [&](api::Error eError) -> EvaluationResult {
         return makeScalarResult(api::CellValue::error(eError));
     };
-    const auto resolveNamedRangeRange
-        = [&](api::StringView rName) -> api::ValueResult<api::CellRange> {
-        if (rCurrentAddress.mnSheet >= 0
-            && static_cast<std::size_t>(rCurrentAddress.mnSheet) < mrWorkbook.maSheets.size())
-        {
-            const auto& rSheet
-                = mrWorkbook.maSheets[static_cast<std::size_t>(rCurrentAddress.mnSheet)];
-            if (const auto* pLocal = mrWorkbook.findNamedRange(rName, rSheet.maName))
-            {
-                return resolveReferenceRangeText(pLocal->maCellRangeAddress, rCurrentAddress.mnSheet);
-            }
-        }
-
-        if (const auto* pGlobal = mrWorkbook.findNamedRange(rName))
-            return resolveReferenceRangeText(pGlobal->maCellRangeAddress, rCurrentAddress.mnSheet);
-
-        return api::ValueResult<api::CellRange>::failure(api::Error::NotAvailable);
-    };
     const auto resolveReferenceRangeArgument
         = [&](const formula::Node& rArgument) -> api::ValueResult<api::CellRange> {
-        if (rArgument.meKind == formula::NodeKind::CellReference)
-            return resolveReferenceRangeText(rArgument.maPrimaryText, rCurrentAddress.mnSheet);
-
-        if (rArgument.meKind == formula::NodeKind::RangeReference)
-        {
-            api::String aAddress = rArgument.maPrimaryText;
-            aAddress.push_back(u':');
-            aAddress += rArgument.maSecondaryText;
-            return resolveReferenceRangeText(aAddress, rCurrentAddress.mnSheet);
-        }
-
-        if (rArgument.meKind == formula::NodeKind::NamedReference)
-            return resolveNamedRangeRange(rArgument.maPrimaryText);
-
-        return api::ValueResult<api::CellRange>::failure(api::Error::IllegalArgument);
+        return this->resolveReferenceRangeArgument(rArgument, rCurrentAddress);
     };
     const auto resolveAxisReferencePlan = [&](const formula::Node& rArgument,
                                           api::reference::ReferenceAxis eAxis)
@@ -125,26 +93,7 @@ EvaluationResult Evaluator::evaluateInformationFamilyBody(
     };
     const auto resolveCellInspectionReference
         = [&](const formula::Node& rArgument) -> api::ValueResult<api::ResolvedReference> {
-        if (rArgument.meKind == formula::NodeKind::CellReference)
-            return resolveReferenceText(rArgument.maPrimaryText, rCurrentAddress.mnSheet);
-
-        if (rArgument.meKind == formula::NodeKind::RangeReference)
-        {
-            api::String aAddress = rArgument.maPrimaryText;
-            aAddress.push_back(u':');
-            aAddress += rArgument.maSecondaryText;
-            return resolveReferenceText(aAddress, rCurrentAddress.mnSheet);
-        }
-
-        if (rArgument.meKind == formula::NodeKind::NamedReference)
-            return resolveNamedRange(rArgument.maPrimaryText, rCurrentAddress.mnSheet);
-
-        EvaluationResult aArgument = evaluateNode(rArgument, rCurrentAddress);
-        if (!aArgument)
-            return api::ValueResult<api::ResolvedReference>::failure(aArgument.meError);
-        if (!aArgument.maValue.isMatrixReference())
-            return api::ValueResult<api::ResolvedReference>::failure(api::Error::IllegalArgument);
-        return api::ValueResult<api::ResolvedReference>::success(aArgument.maValue.maReference);
+        return this->resolveReferenceArgument(rArgument, rCurrentAddress);
     };
     const auto materializeCellInspectionValue
         = [&](const formula::Node* pArgument, const api::CellAddress& rTarget)
@@ -368,28 +317,8 @@ EvaluationResult Evaluator::evaluateInformationFamilyBody(
         if (rNode.maChildren.size() != 1)
             return makeFailure(api::Error::IllegalArgument);
 
-        const formula::Node& rArgument = *rNode.maChildren[0];
-        bool bIsReference = false;
-        if (rArgument.meKind == formula::NodeKind::CellReference)
-        {
-            const auto aResolved = resolveReferenceText(rArgument.maPrimaryText, rCurrentAddress.mnSheet);
-            bIsReference = aResolved.ok();
-        }
-        else if (rArgument.meKind == formula::NodeKind::RangeReference)
-        {
-            api::String aAddress = rArgument.maPrimaryText;
-            aAddress.push_back(u':');
-            aAddress += rArgument.maSecondaryText;
-            const auto aResolved = resolveReferenceText(aAddress, rCurrentAddress.mnSheet);
-            bIsReference = aResolved.ok();
-        }
-        else if (rArgument.meKind == formula::NodeKind::NamedReference)
-        {
-            const auto aResolved = resolveNamedRange(rArgument.maPrimaryText, rCurrentAddress.mnSheet);
-            bIsReference = aResolved.ok();
-        }
-
-        return makeScalarResult(api::CellValue::boolean(bIsReference));
+        return makeScalarResult(api::CellValue::boolean(
+            resolveReferenceArgument(*rNode.maChildren[0], rCurrentAddress).ok()));
     }
 
     if (aFunctionName == u"N")
@@ -439,21 +368,11 @@ EvaluationResult Evaluator::evaluateInformationFamilyBody(
         if (rNode.maChildren.size() != 1)
             return makeCellError(api::Error::IllegalArgument);
 
-        const formula::Node& rArgument = *rNode.maChildren[0];
-        if (rArgument.meKind != formula::NodeKind::CellReference
-            && rArgument.meKind != formula::NodeKind::RangeReference
-            && rArgument.meKind != formula::NodeKind::NamedReference)
-        {
-            return makeScalarResult(api::CellValue::boolean(false));
-        }
-
-        EvaluationResult aReference = evaluateReferenceNode(rArgument, rCurrentAddress);
-        if (!aReference || !aReference.maValue.isMatrixReference())
-            return makeScalarResult(api::CellValue::boolean(false));
-        if (!aReference.maValue.maReference.isSingleCell())
+        const auto aReference = resolveReferenceArgument(*rNode.maChildren[0], rCurrentAddress);
+        if (!aReference || !aReference.maValue.isSingleCell())
             return makeScalarResult(api::CellValue::boolean(false));
 
-        const workbook::Cell* pCell = getCell(aReference.maValue.maReference.maRange.maStart);
+        const workbook::Cell* pCell = getCell(aReference.maValue.maRange.maStart);
         return makeScalarResult(api::CellValue::boolean(pCell && pCell->hasFormula()));
     }
 
@@ -698,34 +617,20 @@ EvaluationResult Evaluator::evaluateInformationFamilyBody(
         const formula::Node& rArgument = *rNode.maChildren[0];
         const auto classifyReferenceErrorType = [&](const formula::Node& rReferenceNode)
             -> std::optional<std::int32_t> {
-            api::ValueResult<api::ResolvedReference> aReference
-                = api::ValueResult<api::ResolvedReference>::failure(api::Error::IllegalArgument);
+            if (rReferenceNode.meKind != formula::NodeKind::CellReference
+                && rReferenceNode.meKind != formula::NodeKind::RangeReference
+                && rReferenceNode.meKind != formula::NodeKind::NamedReference)
+            {
+                return std::nullopt;
+            }
 
-            if (rReferenceNode.meKind == formula::NodeKind::CellReference)
+            const auto aReference = resolveReferenceArgument(rReferenceNode, rCurrentAddress);
+            if (!aReference)
             {
-                aReference
-                    = resolveReferenceText(rReferenceNode.maPrimaryText, rCurrentAddress.mnSheet);
-                if (!aReference && aReference.meError == api::Error::IllegalArgument)
+                if (aReference.meError == api::Error::IllegalArgument)
                     return bLegacyErrorType ? 524 : 4;
-            }
-            else if (rReferenceNode.meKind == formula::NodeKind::RangeReference)
-            {
-                api::String aAddress = rReferenceNode.maPrimaryText;
-                aAddress.push_back(u':');
-                aAddress += rReferenceNode.maSecondaryText;
-                aReference = resolveReferenceText(aAddress, rCurrentAddress.mnSheet);
-                if (!aReference && aReference.meError == api::Error::IllegalArgument)
-                    return bLegacyErrorType ? 524 : 4;
-            }
-            else if (rReferenceNode.meKind == formula::NodeKind::NamedReference)
-            {
-                aReference
-                    = resolveNamedRange(rReferenceNode.maPrimaryText, rCurrentAddress.mnSheet);
-                if (!aReference && aReference.meError == api::Error::NotAvailable)
+                if (aReference.meError == api::Error::NotAvailable)
                     return bLegacyErrorType ? 525 : 5;
-            }
-            else
-            {
                 return std::nullopt;
             }
 

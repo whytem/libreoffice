@@ -350,6 +350,8 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateSpecialForm(
 
     if (rFunctionName == u"CHOOSE")
     {
+        namespace serpn = spreadsheetengine::core::rpn;
+
         if (rNode.maChildren.size() < 2)
             return detail::makeFailure(api::Error::IllegalArgument);
 
@@ -358,21 +360,28 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateSpecialForm(
         if (!aIndex)
             return aIndex;
 
-        const auto aNumber = detail::coerceToNumber(aIndex.maValue.maValue);
-        if (!aNumber)
-            return detail::makeFailure(aNumber.meError);
-
-        const auto oChoiceIndex = api::logic::normalizeChooseIndex(
-            aNumber.maValue, static_cast<std::int16_t>(rNode.maChildren.size()));
-        if (!oChoiceIndex)
+        const auto aPlan = serpn::planChooseBranch(
+            serpn::RpnValue::fromCellValue(aIndex.maValue.maValue),
+            static_cast<std::int16_t>(rNode.maChildren.size() - 1));
+        if (aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
             return detail::makeFailure(api::Error::IllegalArgument);
 
-        return evaluateNode(*rNode.maChildren[static_cast<std::size_t>(*oChoiceIndex)],
-            rCurrentAddress);
+        const auto& rBranch = aPlan.maValue;
+        switch (rBranch.meDirective)
+        {
+            case serpn::BranchDirective::PropagateError:
+                return detail::makeFailure(rBranch.meError);
+            case serpn::BranchDirective::TakeSlot:
+                return evaluateNode(*rNode.maChildren[rBranch.mnSlot], rCurrentAddress);
+            default:
+                return detail::makeFailure(api::Error::IllegalArgument);
+        }
     }
 
     if (rFunctionName == u"LET")
     {
+        namespace serpn = spreadsheetengine::core::rpn;
+
         if (rNode.maChildren.size() < 3 || (rNode.maChildren.size() % 2) == 0)
             return detail::makeFailure(api::Error::IllegalArgument);
 
@@ -395,7 +404,13 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateSpecialForm(
                 return aValue;
             }
 
-            maLocalBindings.back()[detail::uppercaseAscii(rNameNode.maPrimaryText)] = aValue;
+            const serpn::RpnValue aBindingValue = aValue.maValue.isMatrixReference()
+                                                      ? serpn::RpnValue::reference(
+                                                            aValue.maValue.maReference)
+                                                      : serpn::RpnValue::fromCellValue(
+                                                            aValue.maValue.maValue);
+            maLocalBindings.back().bind(
+                detail::uppercaseAscii(rNameNode.maPrimaryText), aBindingValue);
         }
 
         EvaluationResult aResult = evaluateNode(*rNode.maChildren.back(), rCurrentAddress);
@@ -406,6 +421,8 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateSpecialForm(
     if (rFunctionName == u"IFERROR" || rFunctionName == u"COM.MICROSOFT.IFERROR"
         || rFunctionName == u"IFNA" || rFunctionName == u"COM.MICROSOFT.IFNA")
     {
+        namespace serpn = spreadsheetengine::core::rpn;
+
         if (rNode.maChildren.size() != 2)
             return detail::makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
         if (rNode.maChildren[0]->meKind == formula::NodeKind::EmptyArgument)
@@ -413,23 +430,26 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateSpecialForm(
 
         const bool bNAOnly = rFunctionName == u"IFNA" || rFunctionName == u"COM.MICROSOFT.IFNA";
         EvaluationResult aPrimary = evaluateNode(*rNode.maChildren[0], rCurrentAddress);
+        api::Error ePrimaryError = api::Error::None;
         if (!aPrimary)
         {
-            const auto eAction = api::logic::selectIfErrorAction(aPrimary.meError, bNAOnly);
-            if (eAction == api::logic::IfErrorAction::KeepPrimary)
-                return aPrimary;
-            return evaluateNode(*rNode.maChildren[1], rCurrentAddress);
+            ePrimaryError = aPrimary.meError;
         }
-
-        if (aPrimary.maValue.isScalar() && aPrimary.maValue.maValue.isError())
+        else if (aPrimary.maValue.isScalar() && aPrimary.maValue.maValue.isError())
         {
-            const auto eAction = api::logic::selectIfErrorAction(
-                aPrimary.maValue.maValue.meError, bNAOnly);
-            if (eAction == api::logic::IfErrorAction::EvaluateAlternate)
-                return evaluateNode(*rNode.maChildren[1], rCurrentAddress);
+            ePrimaryError = aPrimary.maValue.maValue.meError;
         }
 
-        return aPrimary;
+        const auto aPlan = serpn::planIfErrorBranch(ePrimaryError, bNAOnly, std::size_t { 1 });
+        switch (aPlan.meDirective)
+        {
+            case serpn::BranchDirective::KeepPrimaryValue:
+                return aPrimary;
+            case serpn::BranchDirective::EvaluateAlternate:
+                return evaluateNode(*rNode.maChildren[1], rCurrentAddress);
+            default:
+                return detail::makeFailure(api::Error::IllegalArgument);
+        }
     }
 
     if (rFunctionName == u"INDIRECT")
@@ -515,12 +535,7 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateSpecialForm(
         if (rNode.maChildren.size() < 3 || rNode.maChildren.size() > 5)
             return detail::makeFailure(api::Error::IllegalArgument);
 
-        const bool bReferenceLike = rNode.maChildren[0]->meKind == formula::NodeKind::CellReference
-                                    || rNode.maChildren[0]->meKind == formula::NodeKind::RangeReference
-                                    || rNode.maChildren[0]->meKind == formula::NodeKind::NamedReference;
-        EvaluationResult aReference = bReferenceLike
-                                          ? evaluateReferenceNode(*rNode.maChildren[0], rCurrentAddress)
-                                          : evaluateNode(*rNode.maChildren[0], rCurrentAddress);
+        EvaluationResult aReference = evaluateReferenceNode(*rNode.maChildren[0], rCurrentAddress);
         if (!aReference)
             return aReference;
         if (!aReference.maValue.isMatrixReference())

@@ -18,6 +18,7 @@
 #include <spreadsheetengine/detail/TokenModel.hxx>
 #include <spreadsheetengine/detail/WorkbookModel.hxx>
 #include <spreadsheetengine/runtime/MathAggregate.hxx>
+#include <spreadsheetengine/runtime/RpnControlFlow.hxx>
 
 namespace spreadsheetengine::core::eval
 {
@@ -37,7 +38,7 @@ struct EvaluationResult
 class Evaluator
 {
     using AddressKey = std::tuple<api::SheetId, api::ColumnIndex, api::RowIndex>;
-    using LocalBindingMap = std::map<api::String, EvaluationResult>;
+    using LocalBindingScope = spreadsheetengine::core::rpn::LetScope;
 
     enum class CacheState : std::uint8_t
     {
@@ -66,7 +67,7 @@ class Evaluator
     std::vector<api::CellAddress> maEvaluationStack;
     std::vector<const formula::Node*> maActiveFormulaRoots;
     std::size_t mnWorkbookFormulaDepth = 0;
-    std::vector<LocalBindingMap> maLocalBindings;
+    std::vector<LocalBindingScope> maLocalBindings;
     ExecutionMode meActiveExecutionMode = ExecutionMode::Ast;
 
     [[nodiscard]] const workbook::Sheet* getSheet(api::SheetId nSheet) const;
@@ -90,6 +91,10 @@ class Evaluator
     [[nodiscard]] EvaluationResult evaluateNode(
         const formula::Node& rNode, const api::CellAddress& rCurrentAddress);
     [[nodiscard]] EvaluationResult evaluateReferenceNode(
+        const formula::Node& rNode, const api::CellAddress& rCurrentAddress);
+    [[nodiscard]] api::ValueResult<api::CellRange> resolveReferenceRangeArgument(
+        const formula::Node& rNode, const api::CellAddress& rCurrentAddress);
+    [[nodiscard]] api::ValueResult<api::ResolvedReference> resolveReferenceArgument(
         const formula::Node& rNode, const api::CellAddress& rCurrentAddress);
     [[nodiscard]] EvaluationResult evaluateUnaryOperationNode(
         const formula::Node& rNode, const api::CellAddress& rCurrentAddress);
@@ -170,7 +175,7 @@ class Evaluator
     [[nodiscard]] std::optional<EvaluationResult> tryEvaluateSpecialForm(
         api::StringView rFunctionName, const formula::Node& rNode,
         const api::CellAddress& rCurrentAddress);
-    [[nodiscard]] const EvaluationResult* lookupLocalBinding(api::StringView rName) const;
+    [[nodiscard]] std::optional<EvaluationResult> lookupLocalBinding(api::StringView rName) const;
 
 public:
     explicit Evaluator(const workbook::Workbook& rWorkbook)

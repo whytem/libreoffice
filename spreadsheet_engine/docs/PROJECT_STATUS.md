@@ -129,13 +129,21 @@ legacy surface. Phase 3 is now complete, and Phase 4 has landed its first
 upper-seam delegation slice plus exit criteria: upstream
 `InterpretTail -> RpnEvaluator` counters are wired and observation is
 default-on in all builds. The FormulaEvaluator (AST walker used by the upper
-seam) now delegates binary/unary operators to `serpn::evaluateBinaryScalarOperator`
-/ `serpn::evaluateUnaryNumericOperator` and IF condition planning to
-`rpn::planIfBranch`, eliminating the duplicated inline implementations and
-making the upstream path exercise those same engine-native RPN contracts that
-the lower seam already uses. Remaining Phase 4 control-flow / reference /
-matrix work is still mixed between upper-seam local logic and the newer RPN
-substrate.
+seam) now delegates binary/unary operators to
+`serpn::evaluateBinaryScalarOperator` /
+`serpn::evaluateUnaryNumericOperator`, and the upper seam's full
+control-flow family now consumes `runtime/RpnControlFlow.hxx`:
+`IF`, `CHOOSE`, `IFS`, `SWITCH`, `IFERROR`, `IFNA`, and `LET` all route
+through the shared branch planners / `LetScope` instead of carrying
+duplicated local branching logic. Reference execution is also more unified:
+the AST walker now centralizes direct cell/range/named reference resolution,
+`OFFSET` and information predicates consume those helpers, compat-side
+`ISREF` / `ISFORMULA` now resolve `OFFSET(...)` and LET-bound reference
+names authoritatively, and spreadsheet/statistical matrix consumers share
+one range-to-matrix materialization helper. Remaining Phase 4 work is now
+concentrated in the still-deferred external-reference and
+broadcast-compatible / jump-matrix matrix-frame paths rather than the
+earlier broad control-flow/ref/matrix split.
 
 Batch 1 of the five-batch RPN evaluator plan has now landed its substrate
 (`runtime/RpnControlFlow.hxx`) and six explicit admissions:
@@ -152,10 +160,13 @@ Batch 1 of the five-batch RPN evaluator plan has now landed its substrate
 - `ocSwitch_MS` (SWITCH) routes through `planSwitchBranch` when the
   selector and every case label are simple scalars; case-result and
   default slots are resolved off the un-reversed param window.
-Reference, matrix, external-ref, and jump-matrix shapes still defer
-to the legacy `pushLegacy*` lambdas, which own the matrix-frame
-`JumpMatrix` protocol until Batch 4 lands. `ocLet` remains deferred
-pending the nested-interpreter spawn contract. The three
+External-ref and jump-matrix shapes still defer to the legacy
+`pushLegacy*` lambdas, which own the matrix-frame `JumpMatrix`
+protocol until Batch 4 lands. `ocLet` no longer defers: the
+upper seam now carries scoped LET bindings through
+`runtime/RpnControlFlow.hxx`, so the remaining control-flow gap is no
+longer LET itself but the host-only matrix/external-reference edges that
+still fence off parts of the lower seam. The three
 `controlflow_engine_*` runtime totals stay at `0 / 0 / 0` on the
 live corpus because the upstream seam captures virtually all
 control-flow traffic before reaching `Interpret()`, matching the

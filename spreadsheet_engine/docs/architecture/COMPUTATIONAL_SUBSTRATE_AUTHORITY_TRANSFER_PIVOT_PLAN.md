@@ -277,8 +277,9 @@ Implemented result:
 
 Status: partial on the current tree
 
-Exit criteria are satisfied, but the broader dependency-ordered migration in
-this phase remains in progress.
+The control-flow slice is now closed out at both seams and the reference /
+matrix substrate is substantially more unified, but external-reference and
+deferred broadcast / jump-matrix cases still keep the full phase marker open.
 
 ### Goal
 
@@ -337,6 +338,27 @@ Implemented result:
   [RpnControlFlow.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/runtime/RpnControlFlow.hxx),
   replacing the inline `selectIfBranch` call with the full RPN coercion +
   branch-planning path
+- the remaining upper-seam control-flow entries now consume the same
+  substrate contracts:
+  `CHOOSE` routes through `planChooseBranch`, `IFS` through
+  `planIfsBranch`, `SWITCH` through `planSwitchBranch`, `IFERROR` /
+  `IFNA` through `planIfErrorBranch`, and `LET` now uses
+  `rpn::LetScope` for scoped bindings in both the standalone evaluator and
+  the `InterpretTail` compat evaluator
+- reference execution is now routed through shared helpers in the AST walker:
+  `resolveReferenceArgument` / `resolveReferenceRangeArgument` own direct
+  cell, range, named-range, and LET-bound reference resolution for
+  `evaluateNode`, `evaluateReferenceNode`, `OFFSET`, and the information
+  predicate family instead of each call site carrying its own local logic
+- compat-side information predicates now authoritatively resolve `ISREF`
+  and `ISFORMULA`, including `OFFSET(...)` references and LET-bound
+  reference names, so upper-seam reference inspection no longer depends on
+  legacy fallback for those paths
+- matrix materialization is now shared through one
+  `FunctionEvalContext::materializeMatrixInput` helper consumed by the
+  spreadsheet and statistical families, which removes duplicate scalar /
+  reference / array-constant matrix loading logic and makes the admitted
+  matrix-math paths exercise the same range-to-matrix contract
 - `testRpnSubstrateExercisedThroughUpperSeam` in
   [interpret_tail_corpus.cxx](/home/ubuntu/repos/libreoffice/sc/qa/unit/interpret_tail_corpus.cxx)
   enforces that both the Operator and ControlFlow RPN categories show
@@ -346,9 +368,10 @@ Implemented result:
   upstream under ambient load through the FormulaEvaluator; the upper seam
   now consumes engine-native RPN contracts for binary/unary operators and IF
   branch planning rather than only lower-seam pilots doing so
-- remaining Phase 4 work stays explicitly open: CHOOSE / IFS / SWITCH /
-  IFERROR / IFNA / LET, broader reference execution, and matrix-frame
-  semantics still have partial upper-seam local logic to retire
+- remaining Phase 4 work stays explicitly open only for the still-deferred
+  edges: external-reference execution plus broadcast-compatible /
+  jump-matrix matrix-frame semantics that are still intentionally left on
+  the Calc side
 
 ## Phase 5: Ambient Default-On Pilot
 

@@ -71,6 +71,7 @@
 #include <spreadsheetengine/runtime/MathStatistical.hxx>
 #include <spreadsheetengine/runtime/MathTranscendental.hxx>
 #include <spreadsheetengine/runtime/QueryRuntime.hxx>
+#include <spreadsheetengine/runtime/RpnControlFlow.hxx>
 #include <spreadsheetengine/runtime/RpnMatrix.hxx>
 #include <spreadsheetengine/runtime/ScalarCoercion.hxx>
 #include <spreadsheetengine/runtime/TextFunctionRuntime.hxx>
@@ -348,6 +349,61 @@ private:
         return aStack;
     }
 };
+
+[[nodiscard]] inline std::vector<const spreadsheetengine::core::rpn::LetScope*>& letScopeStack()
+{
+    static thread_local std::vector<const spreadsheetengine::core::rpn::LetScope*> aStack;
+    return aStack;
+}
+
+struct ScopedLetBindings
+{
+    bool mbActive = false;
+
+    explicit ScopedLetBindings(const spreadsheetengine::core::rpn::LetScope& rScope)
+    {
+        letScopeStack().push_back(&rScope);
+        mbActive = true;
+    }
+
+    ~ScopedLetBindings()
+    {
+        if (!mbActive)
+            return;
+
+        letScopeStack().pop_back();
+    }
+};
+
+struct SuspendedLetBindings
+{
+    std::vector<const spreadsheetengine::core::rpn::LetScope*> maSuspended;
+
+    SuspendedLetBindings()
+    {
+        maSuspended.swap(letScopeStack());
+    }
+
+    ~SuspendedLetBindings()
+    {
+        maSuspended.swap(letScopeStack());
+    }
+};
+
+[[nodiscard]] inline std::optional<spreadsheetengine::core::rpn::RpnValue> lookupLetBinding(
+    api::StringView rName)
+{
+    api::String aNormalizedName(rName);
+    std::transform(aNormalizedName.begin(), aNormalizedName.end(), aNormalizedName.begin(),
+        [](sal_Unicode c) { return c >= u'a' && c <= u'z' ? static_cast<sal_Unicode>(c - 32) : c; });
+    auto& rScopes = letScopeStack();
+    for (auto aScopeIt = rScopes.rbegin(); aScopeIt != rScopes.rend(); ++aScopeIt)
+    {
+        if (const auto oBinding = (*aScopeIt)->lookup(aNormalizedName))
+            return oBinding;
+    }
+    return std::nullopt;
+}
 
 [[nodiscard]] inline StatsStore& statsStore()
 {
@@ -1010,7 +1066,8 @@ classifyImportedStoredHostTruthFunction(api::StringView rFunctionName)
     }
     if (rFunctionName == u"SUBTOTAL")
         return FunctionKind::Aggregate;
-    if (rFunctionName == u"COM.MICROSOFT.LET" || rFunctionName == u"CHOOSE")
+    if (rFunctionName == u"LET" || rFunctionName == u"COM.MICROSOFT.LET"
+        || rFunctionName == u"CHOOSE")
         return FunctionKind::Conditional;
     if (rFunctionName == u"COM.MICROSOFT.EXPAND"
         || rFunctionName == u"COM.MICROSOFT.DROP"
@@ -1050,7 +1107,8 @@ classifyImportedStoredHostTruthFunction(api::StringView rFunctionName)
 {
     if (rFunctionName == u"IF" || rFunctionName == u"IFS"
         || rFunctionName == u"COM.MICROSOFT.IFS" || rFunctionName == u"SWITCH"
-        || rFunctionName == u"COM.MICROSOFT.SWITCH")
+        || rFunctionName == u"COM.MICROSOFT.SWITCH" || rFunctionName == u"LET"
+        || rFunctionName == u"COM.MICROSOFT.LET" || rFunctionName == u"CHOOSE")
     {
         return FunctionKind::Conditional;
     }
@@ -1256,7 +1314,8 @@ classifyImportedStoredHostTruthFunction(api::StringView rFunctionName)
     if (rFunctionName == u"ISERROR" || rFunctionName == u"ISERR" || rFunctionName == u"ISNUMBER"
         || rFunctionName == u"ISNA" || rFunctionName == u"ISTEXT"
         || rFunctionName == u"ISNONTEXT" || rFunctionName == u"ISBLANK"
-        || rFunctionName == u"ERROR.TYPE" || rFunctionName == u"ERRORTYPE")
+        || rFunctionName == u"ERROR.TYPE" || rFunctionName == u"ERRORTYPE"
+        || rFunctionName == u"ISREF" || rFunctionName == u"ISFORMULA")
     {
         return FunctionKind::InformationPredicate;
     }
@@ -1411,6 +1470,7 @@ classifyImportedStoredHostTruthFunction(api::StringView rFunctionName)
         u"IMSUB",
         u"LOGNORMDIST",
         u"ODDLPRICE",
+        u"LET",
         u"COM.MICROSOFT.LET",
         u"CUMPRINC",
         u"IMPRODUCT",
@@ -3225,6 +3285,13 @@ template <typename T>
         }
         case core::formula::NodeKind::NamedReference:
         {
+            if (const auto oBinding = lookupLetBinding(rNode.maPrimaryText))
+            {
+                if (!oBinding->isReference())
+                    return makeMaterializedError<ScRange>(api::Error::IllegalArgument);
+                return makeMaterializedValue(toLibreOfficeRange(oBinding->maReference.maRange));
+            }
+
             const OUString aName = toLibreOfficeString(rNode.maPrimaryText);
             ScRangeData* pRangeData = findNamedRangeData(aName, rDoc, rFormulaPos);
             if (!pRangeData)
@@ -3465,6 +3532,8 @@ template <typename T>
 [[nodiscard]] inline api::CellValue readMaterializedHostCellValue(
     const ScDocument& rDoc, ScInterpreterContext& rContext, const ScAddress& rAddress)
 {
+    SuspendedLetBindings aSuspendLetBindings;
+
     if (ScFormulaCell* pFormula = const_cast<ScDocument&>(rDoc).GetFormulaCell(rAddress))
     {
         if (const auto oImportedCachedValue
@@ -3642,6 +3711,31 @@ inline void putScalarIntoMatrix(
         case core::formula::NodeKind::CellReference:
         case core::formula::NodeKind::NamedReference:
         {
+            if (rNode.meKind == core::formula::NodeKind::NamedReference)
+            {
+                if (const auto oBinding = lookupLetBinding(rNode.maPrimaryText))
+                {
+                    if (oBinding->isReference())
+                    {
+                        const auto oScalarAddress = tryImplicitIntersectionAddress(
+                            toLibreOfficeRange(oBinding->maReference.maRange), rFormulaPos);
+                        if (!oScalarAddress || *oScalarAddress == rFormulaPos)
+                        {
+                            return makeUnsupportedMaterialization<api::CellValue>(
+                                FallbackReason::UnsupportedHostSurface);
+                        }
+                        return makeMaterializedValue(
+                            readMaterializedHostCellValue(rDoc, rContext, *oScalarAddress));
+                    }
+                    if (oBinding->isMatrix())
+                    {
+                        return makeUnsupportedMaterialization<api::CellValue>(
+                            FallbackReason::UnsupportedFormulaShape);
+                    }
+                    return makeMaterializedValue(oBinding->maScalar);
+                }
+            }
+
             const auto aRange = resolveReferenceRangeNode(rNode, rDoc, rFormulaPos);
             if (!aRange.mbSupported)
                 return makeUnsupportedMaterialization<api::CellValue>(aRange.meFallbackReason);
@@ -5957,11 +6051,10 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
                                                  : FunctionKind::Unknown;
 
     const api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
-    if (aFunctionName == u"IFERROR" || aFunctionName == u"IFNA")
+    if (aFunctionName == u"IFERROR" || aFunctionName == u"COM.MICROSOFT.IFERROR"
+        || aFunctionName == u"IFNA" || aFunctionName == u"COM.MICROSOFT.IFNA")
     {
-        if (rNode.maChildren.empty())
-            return FunctionKind::Unknown;
-        return classifyDelegatedFunctionNode(*rNode.maChildren[0]);
+        return FunctionKind::Conditional;
     }
 
     return classifyFunction(aFunctionName);
@@ -12293,10 +12386,13 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         aCanonicalFunctionName = u"IFS"_ustr;
     else if (aCanonicalFunctionName == u"COM.MICROSOFT.SWITCH")
         aCanonicalFunctionName = u"SWITCH"_ustr;
+    else if (aCanonicalFunctionName == u"COM.MICROSOFT.LET")
+        aCanonicalFunctionName = u"LET"_ustr;
     auto materializeArgument = [&](const core::formula::Node& rArgument)
         -> Materialization<api::CellValue> {
         const auto aAttempt = evaluateScalarOrDelegatedNode(
-            rArgument, eFunction, rDoc, rContext, rFormulaPos, bEmptyStringAsZero, 1);
+            rArgument, eFunction, rDoc, rContext, rFormulaPos, bEmptyStringAsZero, 1,
+            bImportedCanonicalSource);
         if (!aAttempt.mbSupported)
             return makeUnsupportedMaterialization<api::CellValue>(aAttempt.meFallbackReason);
 
@@ -12374,6 +12470,8 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
 
     if (eFunction == FunctionKind::Conditional)
     {
+        namespace serpn = spreadsheetengine::core::rpn;
+
         if (aCanonicalFunctionName == u"IF")
         {
             if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 3)
@@ -12385,21 +12483,135 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
             if (!aCondition.moValue)
                 return makeErrorResult(eFunction, aCondition.meError);
 
-            const auto aBool = coerceScalarToBool(rDoc, rContext, *aCondition.moValue);
-            if (!aBool)
-                return makeErrorResult(eFunction, aBool.meError);
-
-            if (!aBool.maValue && rNode.maChildren.size() < 3)
-                return makeNumericResult(eFunction, 0.0, SvNumFormatType::LOGICAL);
-
-            const auto& rxSelected = aBool.maValue ? rNode.maChildren[1] : rNode.maChildren[2];
-            if (!rxSelected)
+            const auto aPlan = serpn::planIfBranch(
+                serpn::RpnValue::fromCellValue(*aCondition.moValue), std::size_t { 1 },
+                rNode.maChildren.size() == 3 ? std::optional<std::size_t>(2) : std::nullopt);
+            if (aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
                 return makeErrorResult(eFunction, api::Error::IllegalArgument);
 
-            auto aBranch = evaluateScalarOrDelegatedNode(*rxSelected, eFunction, rDoc, rContext,
-                rFormulaPos, bEmptyStringAsZero, 1, bImportedCanonicalSource);
-            aBranch.meFunction = eFunction;
-            return aBranch;
+            switch (aPlan.maValue.meDirective)
+            {
+                case serpn::BranchDirective::TakeSlot:
+                {
+                    if (aPlan.maValue.mnSlot >= rNode.maChildren.size()
+                        || !rNode.maChildren[aPlan.maValue.mnSlot])
+                    {
+                        return makeErrorResult(eFunction, api::Error::IllegalArgument);
+                    }
+
+                    auto aBranch = evaluateScalarOrDelegatedNode(
+                        *rNode.maChildren[aPlan.maValue.mnSlot], eFunction, rDoc, rContext,
+                        rFormulaPos, bEmptyStringAsZero, 1, bImportedCanonicalSource);
+                    aBranch.meFunction = eFunction;
+                    return aBranch;
+                }
+                case serpn::BranchDirective::ReturnSyntheticBoolean:
+                    return makeNumericResult(
+                        eFunction, aPlan.maValue.mbSyntheticBool ? 1.0 : 0.0,
+                        SvNumFormatType::LOGICAL);
+                case serpn::BranchDirective::PropagateError:
+                    return makeErrorResult(eFunction, aPlan.maValue.meError);
+                default:
+                    return makeErrorResult(eFunction, api::Error::IllegalArgument);
+            }
+        }
+
+        if (aCanonicalFunctionName == u"CHOOSE")
+        {
+            if (rNode.maChildren.size() < 2)
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+            const auto aSelector = materializeArgument(*rNode.maChildren[0]);
+            if (!aSelector.mbSupported)
+                return makeUnsupported(eFunction, aSelector.meFallbackReason);
+            if (!aSelector.moValue)
+                return makeErrorResult(eFunction, aSelector.meError);
+
+            const auto aPlan = serpn::planChooseBranch(
+                serpn::RpnValue::fromCellValue(*aSelector.moValue),
+                static_cast<std::int16_t>(rNode.maChildren.size() - 1));
+            if (aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+            switch (aPlan.maValue.meDirective)
+            {
+                case serpn::BranchDirective::TakeSlot:
+                {
+                    if (aPlan.maValue.mnSlot >= rNode.maChildren.size()
+                        || !rNode.maChildren[aPlan.maValue.mnSlot])
+                    {
+                        return makeErrorResult(eFunction, api::Error::IllegalArgument);
+                    }
+
+                    auto aBranch = evaluateScalarOrDelegatedNode(
+                        *rNode.maChildren[aPlan.maValue.mnSlot], eFunction, rDoc, rContext,
+                        rFormulaPos, bEmptyStringAsZero, 1, bImportedCanonicalSource);
+                    aBranch.meFunction = eFunction;
+                    return aBranch;
+                }
+                case serpn::BranchDirective::PropagateError:
+                    return makeErrorResult(eFunction, aPlan.maValue.meError);
+                default:
+                    return makeErrorResult(eFunction, api::Error::IllegalArgument);
+            }
+        }
+
+        if (aCanonicalFunctionName == u"LET")
+        {
+            if (rNode.maChildren.size() < 3 || (rNode.maChildren.size() % 2) == 0)
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+            serpn::LetScope aScope;
+            ScopedLetBindings aBindings(aScope);
+            const auto materializeBindingValue = [&](const core::formula::Node& rBindingNode)
+                -> Materialization<serpn::RpnValue> {
+                if (rBindingNode.meKind == core::formula::NodeKind::CellReference
+                    || rBindingNode.meKind == core::formula::NodeKind::RangeReference
+                    || rBindingNode.meKind == core::formula::NodeKind::NamedReference)
+                {
+                    const auto aRange = resolveReferenceRangeNode(rBindingNode, rDoc, rFormulaPos);
+                    if (!aRange.mbSupported)
+                    {
+                        return makeUnsupportedMaterialization<serpn::RpnValue>(
+                            aRange.meFallbackReason);
+                    }
+                    if (!aRange.moValue)
+                        return makeMaterializedError<serpn::RpnValue>(aRange.meError);
+                    return makeMaterializedValue(
+                        serpn::RpnValue::reference({ toApiCellRange(*aRange.moValue) }));
+                }
+
+                const auto aValue = materializeArgument(rBindingNode);
+                if (!aValue.mbSupported)
+                    return makeUnsupportedMaterialization<serpn::RpnValue>(aValue.meFallbackReason);
+                if (!aValue.moValue)
+                    return makeMaterializedError<serpn::RpnValue>(aValue.meError);
+                return makeMaterializedValue(serpn::RpnValue::fromCellValue(*aValue.moValue));
+            };
+
+            for (std::size_t nIndex = 0; nIndex + 1 < rNode.maChildren.size(); nIndex += 2)
+            {
+                if (!rNode.maChildren[nIndex] || !rNode.maChildren[nIndex + 1]
+                    || rNode.maChildren[nIndex]->meKind != core::formula::NodeKind::NamedReference
+                    || rNode.maChildren[nIndex]->maPrimaryText.empty())
+                {
+                    return makeErrorResult(eFunction, api::Error::IllegalArgument);
+                }
+
+                const auto aBindingValue = materializeBindingValue(*rNode.maChildren[nIndex + 1]);
+                if (!aBindingValue.mbSupported)
+                    return makeUnsupported(eFunction, aBindingValue.meFallbackReason);
+                if (!aBindingValue.moValue)
+                    return makeErrorResult(eFunction, aBindingValue.meError);
+
+                aScope.bind(
+                    uppercaseAscii(rNode.maChildren[nIndex]->maPrimaryText), *aBindingValue.moValue);
+            }
+
+            auto aResult = evaluateScalarOrDelegatedNode(*rNode.maChildren.back(), eFunction, rDoc,
+                rContext, rFormulaPos, bEmptyStringAsZero, 1, bImportedCanonicalSource);
+            aResult.meFunction = eFunction;
+            return aResult;
         }
 
         if (aCanonicalFunctionName == u"IFS")
@@ -12407,45 +12619,45 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
             if (rNode.maChildren.empty())
                 return makeErrorResult(eFunction, api::Error::IllegalArgument);
 
-            for (std::size_t nIndex = 0; nIndex < rNode.maChildren.size(); nIndex += 2)
+            std::size_t nPairIndex = 0;
+            while (nPairIndex * 2 < rNode.maChildren.size())
             {
-                const auto aCondition = materializeArgument(*rNode.maChildren[nIndex]);
-                const std::int16_t nRemaining
-                    = static_cast<std::int16_t>(rNode.maChildren.size() - nIndex - 1);
-
-                bool bCondition = false;
-                bool bConditionError = false;
+                const std::size_t nConditionIndex = nPairIndex * 2;
+                const auto aCondition = materializeArgument(*rNode.maChildren[nConditionIndex]);
                 if (!aCondition.mbSupported)
                     return makeUnsupported(eFunction, aCondition.meFallbackReason);
-                if (!aCondition.moValue)
-                    bConditionError = true;
-                else
-                {
-                    const auto aBool = coerceScalarToBool(rDoc, rContext, *aCondition.moValue);
-                    if (!aBool)
-                        bConditionError = true;
-                    else
-                        bCondition = aBool.maValue;
-                }
 
-                switch (api::logic::evaluateIfsCondition(bCondition, bConditionError, nRemaining))
+                const serpn::RpnValue aConditionRpn
+                    = aCondition.moValue
+                          ? serpn::RpnValue::fromCellValue(*aCondition.moValue)
+                          : serpn::RpnValue::error(aCondition.meError);
+                const auto aPlan = serpn::planIfsBranch(
+                    aConditionRpn, nPairIndex,
+                    static_cast<std::int16_t>(rNode.maChildren.size() - nConditionIndex - 1));
+                if (aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
+                    return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+                switch (aPlan.maValue.meDirective)
                 {
-                    case api::logic::IfsAction::SelectCurrentResult:
-                    {
-                        auto aBranch = evaluateScalarOrDelegatedNode(*rNode.maChildren[nIndex + 1],
-                            eFunction, rDoc, rContext, rFormulaPos, bEmptyStringAsZero, 1,
-                            bImportedCanonicalSource);
-                        aBranch.meFunction = eFunction;
-                        return aBranch;
-                    }
-                    case api::logic::IfsAction::SkipCurrentResult:
-                        break;
-                    case api::logic::IfsAction::ReturnParameterExpected:
+                    case serpn::BranchDirective::TakeSlot:
+                        if (aPlan.maValue.mnSlot == nPairIndex)
+                        {
+                            auto aBranch = evaluateScalarOrDelegatedNode(
+                                *rNode.maChildren[nConditionIndex + 1], eFunction, rDoc, rContext,
+                                rFormulaPos, bEmptyStringAsZero, 1, bImportedCanonicalSource);
+                            aBranch.meFunction = eFunction;
+                            return aBranch;
+                        }
+                        nPairIndex = aPlan.maValue.mnSlot;
+                        continue;
+                    case serpn::BranchDirective::PropagateError:
+                        return makeErrorResult(eFunction, aPlan.maValue.meError);
+                    case serpn::BranchDirective::ReturnParameterExpected:
                         return makeErrorResult(eFunction, api::Error::IllegalArgument);
-                    case api::logic::IfsAction::ReturnNotAvailable:
+                    case serpn::BranchDirective::ReturnNotAvailable:
                         return makeErrorResult(eFunction, api::Error::NotAvailable);
-                    case api::logic::IfsAction::ReturnNoValue:
-                        return makeErrorResult(eFunction, api::Error::NoValue);
+                    default:
+                        return makeErrorResult(eFunction, api::Error::IllegalArgument);
                 }
             }
 
@@ -12457,78 +12669,63 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
             if (rNode.maChildren.size() < 3)
                 return makeErrorResult(eFunction, api::Error::IllegalArgument);
 
-            const auto aReference = materializeArgument(*rNode.maChildren[0]);
-            if (!aReference.mbSupported)
-                return makeUnsupported(eFunction, aReference.meFallbackReason);
-            if (!aReference.moValue)
-                return makeErrorResult(eFunction, aReference.meError);
+            const auto aSelector = materializeArgument(*rNode.maChildren[0]);
+            if (!aSelector.mbSupported)
+                return makeUnsupported(eFunction, aSelector.meFallbackReason);
+            if (!aSelector.moValue)
+                return makeErrorResult(eFunction, aSelector.meError);
 
-            const api::CellValue aReferenceValue = *aReference.moValue;
-            const bool bReferenceIsText = aReferenceValue.isText() || aReferenceValue.isEmpty();
-            std::size_t nIndex = 1;
-            while (nIndex + 1 < rNode.maChildren.size())
+            std::vector<serpn::RpnValue> aCaseLabels;
+            aCaseLabels.reserve((rNode.maChildren.size() - 1) / 2);
+            for (std::size_t nIndex = 1; nIndex + 1 < rNode.maChildren.size(); nIndex += 2)
             {
                 const auto aCase = materializeArgument(*rNode.maChildren[nIndex]);
                 if (!aCase.mbSupported)
                     return makeUnsupported(eFunction, aCase.meFallbackReason);
                 if (!aCase.moValue)
                 {
-                    if (nIndex + 2 >= rNode.maChildren.size())
-                        return makeErrorResult(eFunction, aCase.meError);
-                    nIndex += 2;
+                    aCaseLabels.push_back(serpn::RpnValue::error(aCase.meError));
                     continue;
                 }
-
-                bool bMatched = false;
-                if (bReferenceIsText)
-                {
-                    const auto aReferenceText = coerceScalarToText(rDoc, rContext, aReferenceValue);
-                    const auto aCaseText = coerceScalarToText(rDoc, rContext, *aCase.moValue);
-                    if (!aReferenceText || !aCaseText)
-                        return makeErrorResult(eFunction, api::Error::NoValue);
-                    bMatched = spreadsheetengine::core::query::compareFoldedText(
-                                   toApiString(aReferenceText.maValue),
-                                   toApiString(aCaseText.maValue))
-                               == 0;
-                }
-                else
-                {
-                    const auto aReferenceNumber
-                        = coerceScalarToNumber(rDoc, rContext, aReferenceValue);
-                    const auto aCaseNumber = coerceScalarToNumber(rDoc, rContext, *aCase.moValue);
-                    if (!aReferenceNumber || !aCaseNumber)
-                    {
-                        if (nIndex + 2 >= rNode.maChildren.size())
-                            return makeErrorResult(eFunction, api::Error::NoValue);
-                        nIndex += 2;
-                        continue;
-                    }
-                    bMatched
-                        = rtl::math::approxEqual(aReferenceNumber.maValue, aCaseNumber.maValue);
-                }
-
-                if (bMatched)
-                {
-                    auto aBranch = evaluateScalarOrDelegatedNode(*rNode.maChildren[nIndex + 1],
-                        eFunction, rDoc, rContext, rFormulaPos, bEmptyStringAsZero, 1,
-                        bImportedCanonicalSource);
-                    aBranch.meFunction = eFunction;
-                    return aBranch;
-                }
-
-                nIndex += 2;
+                aCaseLabels.push_back(serpn::RpnValue::fromCellValue(*aCase.moValue));
             }
 
-            if (nIndex < rNode.maChildren.size())
+            const std::span<const serpn::RpnValue> aCaseSpan(aCaseLabels.data(), aCaseLabels.size());
+            const bool bHasDefault = (rNode.maChildren.size() % 2) == 0;
+            const auto aPlan = serpn::planSwitchBranch(
+                serpn::RpnValue::fromCellValue(*aSelector.moValue), aCaseSpan,
+                bHasDefault ? std::optional(aCaseLabels.size()) : std::nullopt);
+            if (aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+            switch (aPlan.maValue.meDirective)
             {
-                auto aBranch = evaluateScalarOrDelegatedNode(*rNode.maChildren[nIndex], eFunction,
-                    rDoc, rContext, rFormulaPos, bEmptyStringAsZero, 1,
-                    bImportedCanonicalSource);
-                aBranch.meFunction = eFunction;
-                return aBranch;
+                case serpn::BranchDirective::TakeSlot:
+                {
+                    if (aPlan.maValue.mnSlot < aCaseLabels.size())
+                    {
+                        auto aBranch = evaluateScalarOrDelegatedNode(
+                            *rNode.maChildren[2 + (aPlan.maValue.mnSlot * 2)], eFunction, rDoc,
+                            rContext, rFormulaPos, bEmptyStringAsZero, 1,
+                            bImportedCanonicalSource);
+                        aBranch.meFunction = eFunction;
+                        return aBranch;
+                    }
+                    if (bHasDefault && aPlan.maValue.mnSlot == aCaseLabels.size())
+                    {
+                        auto aBranch = evaluateScalarOrDelegatedNode(*rNode.maChildren.back(),
+                            eFunction, rDoc, rContext, rFormulaPos, bEmptyStringAsZero, 1,
+                            bImportedCanonicalSource);
+                        aBranch.meFunction = eFunction;
+                        return aBranch;
+                    }
+                    return makeErrorResult(eFunction, api::Error::IllegalArgument);
+                }
+                case serpn::BranchDirective::PropagateError:
+                    return makeErrorResult(eFunction, aPlan.maValue.meError);
+                default:
+                    return makeErrorResult(eFunction, api::Error::IllegalArgument);
             }
-
-            return makeErrorResult(eFunction, api::Error::NotAvailable);
         }
 
         return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
@@ -12644,6 +12841,89 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
             const FormulaError eFormulaError = toFormulaError(rValue.meError);
             return bLegacy ? classifyLegacyErrorTypeFormulaError(eFormulaError)
                            : classifyOdfErrorTypeFormulaError(eFormulaError);
+        };
+        const auto resolveReferencePredicateRange = [&](const core::formula::Node& rArgument)
+            -> Materialization<ScRange> {
+            if (rArgument.meKind == core::formula::NodeKind::CellReference
+                || rArgument.meKind == core::formula::NodeKind::RangeReference
+                || rArgument.meKind == core::formula::NodeKind::NamedReference)
+            {
+                return resolveReferenceRangeNode(rArgument, rDoc, rFormulaPos);
+            }
+
+            if (rArgument.meKind != core::formula::NodeKind::FunctionCall)
+            {
+                return makeUnsupportedMaterialization<ScRange>(
+                    FallbackReason::UnsupportedFunction);
+            }
+
+            const api::String aReferenceFunction = uppercaseAscii(rArgument.maPrimaryText);
+            if (aReferenceFunction != u"OFFSET")
+            {
+                return makeUnsupportedMaterialization<ScRange>(
+                    FallbackReason::UnsupportedFunction);
+            }
+
+            if (rArgument.maChildren.size() < 3 || rArgument.maChildren.size() > 5)
+                return makeMaterializedError<ScRange>(api::Error::IllegalArgument);
+
+            const auto aBaseRange
+                = resolveReferenceRangeNode(*rArgument.maChildren[0], rDoc, rFormulaPos);
+            if (!aBaseRange.mbSupported)
+                return makeUnsupportedMaterialization<ScRange>(aBaseRange.meFallbackReason);
+            if (!aBaseRange.moValue)
+                return makeMaterializedError<ScRange>(aBaseRange.meError);
+
+            const auto aRowOffset = normalizeWholeMaterializedArgument(
+                *rArgument.maChildren[1], rDoc, rContext, rFormulaPos);
+            if (!aRowOffset.mbSupported)
+                return makeUnsupportedMaterialization<ScRange>(aRowOffset.meFallbackReason);
+            if (!aRowOffset.moValue)
+                return makeMaterializedError<ScRange>(aRowOffset.meError);
+
+            const auto aColumnOffset = normalizeWholeMaterializedArgument(
+                *rArgument.maChildren[2], rDoc, rContext, rFormulaPos);
+            if (!aColumnOffset.mbSupported)
+                return makeUnsupportedMaterialization<ScRange>(aColumnOffset.meFallbackReason);
+            if (!aColumnOffset.moValue)
+                return makeMaterializedError<ScRange>(aColumnOffset.meError);
+
+            std::optional<api::RowIndex> oHeight;
+            if (rArgument.maChildren.size() >= 4
+                && rArgument.maChildren[3]->meKind != core::formula::NodeKind::EmptyArgument)
+            {
+                const auto aHeight = normalizeWholeMaterializedArgument(
+                    *rArgument.maChildren[3], rDoc, rContext, rFormulaPos);
+                if (!aHeight.mbSupported)
+                    return makeUnsupportedMaterialization<ScRange>(aHeight.meFallbackReason);
+                if (!aHeight.moValue)
+                    return makeMaterializedError<ScRange>(aHeight.meError);
+                if (*aHeight.moValue <= 0)
+                    return makeMaterializedError<ScRange>(api::Error::IllegalArgument);
+                oHeight = *aHeight.moValue;
+            }
+
+            std::optional<api::ColumnIndex> oWidth;
+            if (rArgument.maChildren.size() >= 5
+                && rArgument.maChildren[4]->meKind != core::formula::NodeKind::EmptyArgument)
+            {
+                const auto aWidth = normalizeWholeMaterializedArgument(
+                    *rArgument.maChildren[4], rDoc, rContext, rFormulaPos);
+                if (!aWidth.mbSupported)
+                    return makeUnsupportedMaterialization<ScRange>(aWidth.meFallbackReason);
+                if (!aWidth.moValue)
+                    return makeMaterializedError<ScRange>(aWidth.meError);
+                if (*aWidth.moValue <= 0)
+                    return makeMaterializedError<ScRange>(api::Error::IllegalArgument);
+                oWidth = *aWidth.moValue;
+            }
+
+            const auto aOffsetRange = api::reference::planOffsetRange(
+                toApiCellRange(*aBaseRange.moValue), *aRowOffset.moValue, *aColumnOffset.moValue,
+                oHeight, oWidth, rDoc.MaxCol(), rDoc.MaxRow());
+            if (!aOffsetRange)
+                return makeMaterializedError<ScRange>(aOffsetRange.meError);
+            return makeMaterializedValue(toLibreOfficeRange(aOffsetRange.maValue));
         };
 
         if (aFunctionName == u"ERROR.TYPE" || aFunctionName == u"ERRORTYPE")
@@ -12845,6 +13125,24 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         else if (aFunctionName == u"ISBLANK")
         {
             bResult = aArgument.moValue->isEmpty();
+        }
+        else if (aFunctionName == u"ISREF")
+        {
+            const auto aReference = resolveReferencePredicateRange(*rNode.maChildren[0]);
+            if (!aReference.mbSupported)
+                return makeUnsupported(eFunction, aReference.meFallbackReason);
+            bResult = aReference.moValue.has_value();
+        }
+        else if (aFunctionName == u"ISFORMULA")
+        {
+            const auto aReference = resolveReferencePredicateRange(*rNode.maChildren[0]);
+            if (!aReference.mbSupported)
+                return makeUnsupported(eFunction, aReference.meFallbackReason);
+            if (aReference.moValue && aReference.moValue->aStart == aReference.moValue->aEnd)
+            {
+                bResult = const_cast<ScDocument&>(rDoc).GetFormulaCell(aReference.moValue->aStart)
+                          != nullptr;
+            }
         }
         else
         {
@@ -13924,11 +14222,18 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         return makeUnsupported(classifyDelegatedFunctionNode(rNode),
             FallbackReason::UnsupportedFormulaShape);
 
-    const api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
+    namespace serpn = spreadsheetengine::core::rpn;
+
+    api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
+    if (aFunctionName == u"COM.MICROSOFT.IFERROR")
+        aFunctionName = u"IFERROR"_ustr;
+    else if (aFunctionName == u"COM.MICROSOFT.IFNA")
+        aFunctionName = u"IFNA"_ustr;
+
     if (aFunctionName == u"IFERROR" || aFunctionName == u"IFNA")
     {
         if (rNode.maChildren.size() != 2)
-            return makeErrorResult(FunctionKind::Unknown, api::Error::IllegalArgument);
+            return makeErrorResult(FunctionKind::Conditional, api::Error::IllegalArgument);
 
         const FunctionKind ePrimaryFunction = classifyDelegatedFunctionNode(*rNode.maChildren[0]);
         auto aPrimary = evaluateScalarOrDelegatedNode(
@@ -13936,29 +14241,32 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
             bEmptyStringAsZero, nDepth + 1, bImportedCanonicalSource);
         if (!aPrimary.mbSupported)
         {
-            if (aPrimary.meFunction == FunctionKind::Unknown)
-                aPrimary.meFunction = ePrimaryFunction;
+            aPrimary.meFunction = FunctionKind::Conditional;
             return aPrimary;
         }
 
-        const bool bUseFallback
-            = aPrimary.maResult.meType == api::formulavalue::ValueType::Error
-              && (aFunctionName == u"IFERROR"
-                  || aPrimary.maResult.meError == api::Error::NotAvailable);
-        if (!bUseFallback)
+        api::Error ePrimaryError = api::Error::None;
+        if (aPrimary.maResult.meType == api::formulavalue::ValueType::Error)
+            ePrimaryError = aPrimary.maResult.meError;
+
+        const auto aPlan = serpn::planIfErrorBranch(
+            ePrimaryError, aFunctionName == u"IFNA", std::size_t { 1 });
+        switch (aPlan.meDirective)
         {
-            if (aPrimary.meFunction == FunctionKind::Unknown)
-                aPrimary.meFunction = ePrimaryFunction;
-            return aPrimary;
+            case serpn::BranchDirective::KeepPrimaryValue:
+                aPrimary.meFunction = FunctionKind::Conditional;
+                return aPrimary;
+            case serpn::BranchDirective::EvaluateAlternate:
+            {
+                auto aFallback = evaluateScalarOrDelegatedNode(*rNode.maChildren[aPlan.mnSlot],
+                    FunctionKind::Conditional, rDoc, rContext, rFormulaPos, bEmptyStringAsZero,
+                    nDepth + 1, bImportedCanonicalSource);
+                aFallback.meFunction = FunctionKind::Conditional;
+                return aFallback;
+            }
+            default:
+                return makeErrorResult(FunctionKind::Conditional, api::Error::IllegalArgument);
         }
-
-        auto aFallback = evaluateScalarOrDelegatedNode(*rNode.maChildren[1],
-            ePrimaryFunction != FunctionKind::Unknown ? ePrimaryFunction : FunctionKind::Unknown,
-            rDoc, rContext, rFormulaPos, bEmptyStringAsZero, nDepth + 1,
-            bImportedCanonicalSource);
-        if (aFallback.meFunction == FunctionKind::Unknown)
-            aFallback.meFunction = ePrimaryFunction;
-        return aFallback;
     }
 
     return evaluateFunctionNode(

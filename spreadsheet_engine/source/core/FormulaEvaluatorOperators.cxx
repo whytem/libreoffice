@@ -48,25 +48,26 @@ EvaluationResult Evaluator::evaluateReferenceNode(
     switch (rNode.meKind)
     {
         case formula::NodeKind::CellReference:
-        {
-            const auto aReference = resolveReferenceText(rNode.maPrimaryText, rCurrentAddress.mnSheet);
-            if (!aReference)
-                return makeStoredReplayOrFailure(rNode, rCurrentAddress, aReference.meError);
-            return makeReferenceResult(aReference.maValue);
-        }
         case formula::NodeKind::RangeReference:
         {
-            api::String aReference = rNode.maPrimaryText;
-            aReference.push_back(u':');
-            aReference += rNode.maSecondaryText;
-            const auto aRange = resolveReferenceText(aReference, rCurrentAddress.mnSheet);
+            const auto aRange = resolveReferenceArgument(rNode, rCurrentAddress);
             if (!aRange)
                 return makeStoredReplayOrFailure(rNode, rCurrentAddress, aRange.meError);
             return makeReferenceResult(aRange.maValue);
         }
         case formula::NodeKind::NamedReference:
         {
-            const auto aRange = resolveNamedRange(rNode.maPrimaryText, rCurrentAddress.mnSheet);
+            if (const auto oLocalBinding = lookupLocalBinding(rNode.maPrimaryText))
+            {
+                if (!oLocalBinding->maValue.isMatrixReference())
+                {
+                    return makeStoredReplayOrFailure(
+                        rNode, rCurrentAddress, api::Error::IllegalArgument);
+                }
+                return *oLocalBinding;
+            }
+
+            const auto aRange = resolveReferenceArgument(rNode, rCurrentAddress);
             if (!aRange)
                 return makeStoredReplayOrFailure(rNode, rCurrentAddress, aRange.meError);
             return makeReferenceResult(aRange.maValue);

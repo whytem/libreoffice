@@ -9,8 +9,11 @@
 
 #include "FormulaEvaluatorInternals.hxx"
 
+#include <spreadsheetengine/runtime/RpnControlFlow.hxx>
+
 #include <algorithm>
 #include <array>
+#include <vector>
 
 namespace spreadsheetengine::core::eval
 {
@@ -156,43 +159,43 @@ EvaluationResult Evaluator::evaluateLogicalFamilyBody(
 
     if (aFunctionName == u"IFS" || aFunctionName == u"COM.MICROSOFT.IFS")
     {
+        namespace serpn = spreadsheetengine::core::rpn;
+
         if (rNode.maChildren.empty())
             return makeFailure(api::Error::IllegalArgument);
 
-        for (std::size_t nIndex = 0; nIndex < rNode.maChildren.size(); nIndex += 2)
+        std::size_t nPairIndex = 0;
+        while (nPairIndex * 2 < rNode.maChildren.size())
         {
-            if (nIndex >= rNode.maChildren.size())
-                break;
+            const std::size_t nConditionIndex = nPairIndex * 2;
+            EvaluationResult aCondition = ensureScalarValue(
+                *this, evaluateNode(*rNode.maChildren[nConditionIndex], rCurrentAddress));
+            const serpn::RpnValue aConditionRpn
+                = aCondition ? serpn::RpnValue::fromCellValue(aCondition.maValue.maValue)
+                             : serpn::RpnValue::error(aCondition.meError);
 
-            EvaluationResult aCondition
-                = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[nIndex], rCurrentAddress));
-            const std::int16_t nRemaining = static_cast<std::int16_t>(rNode.maChildren.size() - nIndex - 1);
+            const auto aPlan = serpn::planIfsBranch(
+                aConditionRpn, nPairIndex,
+                static_cast<std::int16_t>(rNode.maChildren.size() - nConditionIndex - 1));
+            if (aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
+                return makeFailure(api::Error::IllegalArgument);
 
-            bool bCondition = false;
-            bool bConditionError = false;
-            if (!aCondition)
-                bConditionError = true;
-            else
+            const auto& rBranch = aPlan.maValue;
+            switch (rBranch.meDirective)
             {
-                const auto aBool = coerceToBoolean(aCondition.maValue.maValue);
-                if (!aBool)
-                    bConditionError = true;
-                else
-                    bCondition = aBool.maValue;
-            }
-
-            switch (api::logic::evaluateIfsCondition(bCondition, bConditionError, nRemaining))
-            {
-                case api::logic::IfsAction::SelectCurrentResult:
-                    return evaluateNode(*rNode.maChildren[nIndex + 1], rCurrentAddress);
-                case api::logic::IfsAction::SkipCurrentResult:
-                    break;
-                case api::logic::IfsAction::ReturnParameterExpected:
+                case serpn::BranchDirective::TakeSlot:
+                    if (rBranch.mnSlot == nPairIndex)
+                        return evaluateNode(*rNode.maChildren[nConditionIndex + 1], rCurrentAddress);
+                    nPairIndex = rBranch.mnSlot;
+                    continue;
+                case serpn::BranchDirective::PropagateError:
+                    return makeScalarResult(api::CellValue::error(rBranch.meError));
+                case serpn::BranchDirective::ReturnParameterExpected:
                     return makeScalarResult(api::CellValue::error(api::Error::IllegalArgument));
-                case api::logic::IfsAction::ReturnNotAvailable:
+                case serpn::BranchDirective::ReturnNotAvailable:
                     return makeScalarResult(api::CellValue::error(api::Error::NotAvailable));
-                case api::logic::IfsAction::ReturnNoValue:
-                    return makeScalarResult(api::CellValue::error(api::Error::NoValue));
+                default:
+                    return makeFailure(api::Error::IllegalArgument);
             }
         }
 
@@ -201,6 +204,8 @@ EvaluationResult Evaluator::evaluateLogicalFamilyBody(
 
     if (aFunctionName == u"SWITCH" || aFunctionName == u"COM.MICROSOFT.SWITCH")
     {
+        namespace serpn = spreadsheetengine::core::rpn;
+
         if (rNode.maChildren.size() < 3)
             return makeFailure(api::Error::IllegalArgument);
 
@@ -209,10 +214,9 @@ EvaluationResult Evaluator::evaluateLogicalFamilyBody(
         if (!aReference)
             return aReference;
 
-        const api::CellValue aReferenceValue = aReference.maValue.maValue;
-        const bool bReferenceIsText = aReferenceValue.isText() || aReferenceValue.isEmpty();
-        std::size_t nIndex = 1;
-        while (nIndex + 1 < rNode.maChildren.size())
+        std::vector<serpn::RpnValue> aCaseLabels;
+        aCaseLabels.reserve((rNode.maChildren.size() - 1) / 2);
+        for (std::size_t nIndex = 1; nIndex + 1 < rNode.maChildren.size(); nIndex += 2)
         {
             EvaluationResult aCase
                 = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[nIndex], rCurrentAddress));
@@ -220,43 +224,35 @@ EvaluationResult Evaluator::evaluateLogicalFamilyBody(
             {
                 if (nIndex + 2 >= rNode.maChildren.size())
                     return aCase;
-                nIndex += 2;
+                aCaseLabels.push_back(serpn::RpnValue::error(aCase.meError));
                 continue;
             }
 
-            bool bMatched = false;
-            if (bReferenceIsText)
-            {
-                const auto aReferenceText = coerceToString(aReferenceValue);
-                const auto aCaseText = coerceToString(aCase.maValue.maValue);
-                if (!aReferenceText || !aCaseText)
-                    return makeScalarResult(api::CellValue::error(api::Error::NoValue));
-                bMatched = sequery::compareFoldedText(aReferenceText.maValue, aCaseText.maValue) == 0;
-            }
-            else
-            {
-                const auto aReferenceNumber = coerceToNumber(aReferenceValue);
-                const auto aCaseNumber = coerceToNumber(aCase.maValue.maValue);
-                if (!aReferenceNumber || !aCaseNumber)
-                {
-                    if (nIndex + 2 >= rNode.maChildren.size())
-                        return makeScalarResult(api::CellValue::error(api::Error::NoValue));
-                    nIndex += 2;
-                    continue;
-                }
-                bMatched = fp::approxEqual(aReferenceNumber.maValue, aCaseNumber.maValue);
-            }
-
-            if (bMatched)
-                return evaluateNode(*rNode.maChildren[nIndex + 1], rCurrentAddress);
-
-            nIndex += 2;
+            aCaseLabels.push_back(serpn::RpnValue::fromCellValue(aCase.maValue.maValue));
         }
 
-        if (nIndex < rNode.maChildren.size())
-            return evaluateNode(*rNode.maChildren[nIndex], rCurrentAddress);
+        const std::span<const serpn::RpnValue> aCaseSpan(aCaseLabels.data(), aCaseLabels.size());
+        const bool bHasDefault = (rNode.maChildren.size() % 2) == 0;
+        const auto aPlan = serpn::planSwitchBranch(
+            serpn::RpnValue::fromCellValue(aReference.maValue.maValue), aCaseSpan,
+            bHasDefault ? std::optional(aCaseLabels.size()) : std::nullopt);
+        if (aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
+            return makeFailure(api::Error::IllegalArgument);
 
-        return makeScalarResult(api::CellValue::error(api::Error::NotAvailable));
+        const auto& rBranch = aPlan.maValue;
+        switch (rBranch.meDirective)
+        {
+            case serpn::BranchDirective::TakeSlot:
+                if (rBranch.mnSlot < aCaseLabels.size())
+                    return evaluateNode(*rNode.maChildren[2 + (rBranch.mnSlot * 2)], rCurrentAddress);
+                if (bHasDefault && rBranch.mnSlot == aCaseLabels.size())
+                    return evaluateNode(*rNode.maChildren.back(), rCurrentAddress);
+                return makeFailure(api::Error::IllegalArgument);
+            case serpn::BranchDirective::PropagateError:
+                return makeScalarResult(api::CellValue::error(rBranch.meError));
+            default:
+                return makeFailure(api::Error::IllegalArgument);
+        }
     }
 
     return makeFailure(api::Error::IllegalArgument);
