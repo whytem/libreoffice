@@ -701,7 +701,6 @@ public:
     std::unique_ptr<ScDBQueryParamBase> GetDBParams( bool& rMissingField );
 
     void DBIterator( ScIterFunc );
-    void ScDBCount();
     void GetDBStVarParams( std::vector<double>& rValues );
     void ScIndirect();
     void ScAddressFunc();

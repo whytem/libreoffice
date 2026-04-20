@@ -6476,64 +6476,6 @@ void ScInterpreter::DBIterator( ScIterFunc eFunc )
     PushDouble( fRes );
 }
 
-void ScInterpreter::ScDBCount()
-{
-    bool bMissingField = true;
-    std::unique_ptr<ScDBQueryParamBase> pQueryParam( GetDBParams(bMissingField) );
-    if (pQueryParam)
-    {
-        sal_uLong nCount = 0;
-        if ( bMissingField && pQueryParam->GetType() == ScDBQueryParamBase::INTERNAL )
-        {   // count all matching records
-            // TODO: currently the QueryIterators only return cell pointers of
-            // existing cells, so if a query matches an empty cell there's
-            // nothing returned, and therefore not counted!
-            // Since this has ever been the case and this code here only came
-            // into existence to fix #i6899 and it never worked before we'll
-            // have to live with it until we reimplement the iterators to also
-            // return empty cells, which would mean to adapt all callers of
-            // iterators.
-            ScDBQueryParamInternal* p = static_cast<ScDBQueryParamInternal*>(pQueryParam.get());
-            p->nCol2 = p->nCol1; // Don't forget to select only one column.
-            SCTAB nTab = p->nTab;
-            // ScQueryCellIteratorDirect doesn't make use of ScDBQueryParamBase::mnField,
-            // so the source range has to be restricted, like before the introduction
-            // of ScDBQueryParamBase.
-            p->nCol1 = p->nCol2 = p->mnField;
-            ScQueryCellIteratorDirect aCellIter(mrDoc, mrContext, nTab, *p, true, false);
-            if ( aCellIter.GetFirst() )
-            {
-                do
-                {
-                    nCount++;
-                } while ( aCellIter.GetNext() );
-            }
-        }
-        else
-        {   // count only matching records with a value in the "result" field
-            if (!pQueryParam->IsValidFieldIndex())
-            {
-                SetError(FormulaError::NoValue);
-                return;
-            }
-            ScDBQueryDataIterator aValIter(mrDoc, mrContext, std::move(pQueryParam));
-            ScDBQueryDataIterator::Value aValue;
-            if ( aValIter.GetFirst(aValue) && aValue.mnError == FormulaError::NONE )
-            {
-                do
-                {
-                    nCount++;
-                }
-                while ( aValIter.GetNext(aValue) && aValue.mnError == FormulaError::NONE );
-            }
-            SetError(aValue.mnError);
-        }
-        PushDouble( nCount );
-    }
-    else
-        PushIllegalParameter();
-}
-
 void ScInterpreter::GetDBStVarParams( std::vector<double>& rValues )
 {
     rValues.clear();
