@@ -1701,6 +1701,86 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterMatrixEngineDispatch)
     m_pDoc->DeleteTab(0);
 }
 
+// Batch 4 regression/forecast admission: LINEST / LOGEST / TREND /
+// GROWTH / FORECAST / FOURIER with svMatrix inputs. Scope fence covers
+// the single-variable simple regression path plus the matrix-input
+// FFT / FORECAST closed-form that the LinestEngine / ForecastEngine
+// headers admit today.
+CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterLinestEngineDispatch)
+{
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    ScopedEnvironmentOverride aMode(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+    ScopedEnvironmentOverride aForceCalculation("SC_FORCE_CALCULATION", "core");
+    ScopedEnvironmentOverride aDisableAuthorityWhileOff(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF", "0");
+
+    m_pDoc->InsertTab(0, u"Linest"_ustr);
+    resetScInterpreterDispatchRuntimeStats();
+
+    ScMarkData aMark(m_pDoc->GetSheetLimits());
+    aMark.SelectOneTable(0);
+
+    // LINEST({3;5;7;9};{1;2;3;4}) = {slope=2, intercept=1} on Y=2X+1.
+    m_pDoc->InsertMatrixFormula(0, 0, 1, 0, aMark,
+                                u"=LINEST({3;5;7;9};{1;2;3;4})"_ustr);
+    ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(0, 0, 0)));
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(1, 0, 0)));
+
+    // LOGEST({6;18;54};{1;2;3}) = {slope=3, intercept=2} on Y=2*3^X.
+    // Tolerance loosened because log/exp round-trip is not bit-exact.
+    m_pDoc->InsertMatrixFormula(0, 3, 1, 3, aMark,
+                                u"=LOGEST({6;18;54};{1;2;3})"_ustr);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(ScAddress(0, 3, 0)),
+                                 1e-12);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(1, 3, 0)),
+                                 1e-12);
+
+    // TREND: known_y = {3;5;7;9}, known_x = {1;2;3;4}, new_x = {5;6}.
+    // In Calc inline matrix literal syntax `;` separates columns (so
+    // {5;6} is a 1-row, 2-column matrix). Y=2X+1 so new X=5,6 -> 11, 13.
+    m_pDoc->InsertMatrixFormula(
+        0, 6, 1, 6, aMark,
+        u"=TREND({3;5;7;9};{1;2;3;4};{5;6})"_ustr);
+    ASSERT_DOUBLES_EQUAL(11.0, m_pDoc->GetValue(ScAddress(0, 6, 0)));
+    ASSERT_DOUBLES_EQUAL(13.0, m_pDoc->GetValue(ScAddress(1, 6, 0)));
+
+    // GROWTH: known_y = {6;18;54}, known_x = {1;2;3}, new_x = {4}.
+    // Y=2*3^X, so new X=4 -> 2*81 = 162. Tolerance loosened because the
+    // path is log-space linear regression then exp.
+    m_pDoc->InsertMatrixFormula(
+        0, 10, 0, 10, aMark,
+        u"=GROWTH({6;18;54};{1;2;3};{4})"_ustr);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(
+        162.0, m_pDoc->GetValue(ScAddress(0, 10, 0)), 1e-9);
+
+    // FORECAST: x=5, known Y = [3,5,7,9], known X = [1,2,3,4]
+    // -> 2*5 + 1 = 11. Scalar inputs pass through svMatrix literals.
+    m_pDoc->SetString(ScAddress(2, 12, 0),
+                      u"=FORECAST(5;{3;5;7;9};{1;2;3;4})"_ustr);
+    ASSERT_DOUBLES_EQUAL(11.0, m_pDoc->GetValue(ScAddress(2, 12, 0)));
+
+    const auto aLinestDispatchStats
+        = getScInterpreterDispatchRuntimeStatsSnapshot();
+    const std::string aLinestLabel
+        = "matrix_attempted="
+          + std::to_string(aLinestDispatchStats.mnMatrixEngineAttemptedCount)
+          + " succeeded="
+          + std::to_string(aLinestDispatchStats.mnMatrixEngineSucceededCount)
+          + " declined="
+          + std::to_string(aLinestDispatchStats.mnMatrixEngineDeclinedCount);
+    CPPUNIT_ASSERT_MESSAGE(
+        "LINEST/LOGEST/TREND/GROWTH/FORECAST should attempt engine dispatch: "
+            + aLinestLabel,
+        aLinestDispatchStats.mnMatrixEngineAttemptedCount > 0);
+    CPPUNIT_ASSERT_MESSAGE(
+        "LINEST/LOGEST/TREND/GROWTH/FORECAST should succeed through engine: "
+            + aLinestLabel,
+        aLinestDispatchStats.mnMatrixEngineSucceededCount > 0);
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterBadLiteralDispatch)
 {
     sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);

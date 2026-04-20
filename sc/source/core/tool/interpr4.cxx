@@ -85,6 +85,8 @@
 #include <spreadsheetengine/runtime/DateTimeWeek.hxx>
 #include <spreadsheetengine/runtime/DateTimeWorkday.hxx>
 #include <spreadsheetengine/runtime/FinancialRuntime.hxx>
+#include <spreadsheetengine/runtime/ForecastEngine.hxx>
+#include <spreadsheetengine/runtime/LinestEngine.hxx>
 #include <spreadsheetengine/runtime/MathFunctionRuntime.hxx>
 #include <spreadsheetengine/runtime/MathBitwise.hxx>
 #include <spreadsheetengine/runtime/MathMatrix.hxx>
@@ -8639,6 +8641,492 @@ StackVar ScInterpreter::Interpret()
                     return true;
                 };
 
+                // Batch 4 regression/forecast admission: LINEST / LOGEST.
+                // Signature (Y, [X], [bConstant=true], [bStats=false]).
+                // Scope fence: svMatrix for Y / X; svDouble for
+                // bConstant / bStats. Range tokens defer.
+                const auto tryPlanEngineLinestOrLogest = [&](bool bLog) -> bool {
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnMatrixEngineAttemptedCount);
+
+                    const sal_uInt8 nParamCount = pCur->GetByte();
+                    if (nParamCount < 1 || nParamCount > 4
+                        || sp < nParamCount)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+
+                    bool bConstant = true;
+                    bool bStats = false;
+                    const FormulaToken* pYTok = pStack[sp - nParamCount];
+                    const FormulaToken* pXTok = nullptr;
+                    if (nParamCount >= 2)
+                        pXTok = pStack[sp - nParamCount + 1];
+                    if (nParamCount >= 3)
+                    {
+                        const FormulaToken* pConstTok
+                            = pStack[sp - nParamCount + 2];
+                        if (!pConstTok || pConstTok->GetType() != svDouble)
+                        {
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnMatrixEngineDeclinedCount);
+                            return false;
+                        }
+                        bConstant = pConstTok->GetDouble() != 0.0;
+                    }
+                    if (nParamCount >= 4)
+                    {
+                        const FormulaToken* pStatsTok
+                            = pStack[sp - nParamCount + 3];
+                        if (!pStatsTok || pStatsTok->GetType() != svDouble)
+                        {
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnMatrixEngineDeclinedCount);
+                            return false;
+                        }
+                        bStats = pStatsTok->GetDouble() != 0.0;
+                    }
+
+                    if (!pYTok || pYTok->GetType() != svMatrix)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    ScMatrix* pYMat
+                        = const_cast<FormulaToken*>(pYTok)->GetMatrix();
+                    if (!pYMat)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    auto oY = convertMatrixRefToMatrixOperand(*pYMat);
+                    if (!oY)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+
+                    std::optional<serpn::MatrixOperand> oX;
+                    if (pXTok)
+                    {
+                        if (pXTok->GetType() != svMatrix)
+                        {
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnMatrixEngineDeclinedCount);
+                            return false;
+                        }
+                        ScMatrix* pXMat
+                            = const_cast<FormulaToken*>(pXTok)->GetMatrix();
+                        if (!pXMat)
+                        {
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnMatrixEngineDeclinedCount);
+                            return false;
+                        }
+                        oX = convertMatrixRefToMatrixOperand(*pXMat);
+                    }
+
+                    const auto aPlan = bLog
+                        ? serpn::planLogest(oX ? &*oX : nullptr, *oY,
+                                            bConstant, bStats)
+                        : serpn::planLinest(oX ? &*oX : nullptr, *oY,
+                                            bConstant, bStats);
+                    if (aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    sp -= nParamCount;
+                    nGlobalError = FormulaError::NONE;
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnMatrixEngineSucceededCount);
+                    if (!aPlan)
+                    {
+                        PushError(selibreoffice::toFormulaError(aPlan.meError));
+                        return true;
+                    }
+                    ScMatrixRef pResult
+                        = convertMatrixOperandToMatrixRef(aPlan.maValue.maMatrix);
+                    if (!pResult)
+                    {
+                        PushError(FormulaError::MatrixSize);
+                        return true;
+                    }
+                    PushMatrix(pResult);
+                    return true;
+                };
+
+                const auto tryPlanEngineLinest = [&]() -> bool {
+                    return tryPlanEngineLinestOrLogest(false);
+                };
+                const auto tryPlanEngineLogest = [&]() -> bool {
+                    return tryPlanEngineLinestOrLogest(true);
+                };
+
+                // Batch 4 regression/forecast admission: TREND / GROWTH.
+                // Signature (knownY, [knownX], [newX], [bConstant=true]).
+                // Scope fence: svMatrix for matrix args; svDouble for
+                // bConstant. Range tokens decline and defer.
+                const auto tryPlanEngineTrendOrGrowth = [&](bool bLog) -> bool {
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnMatrixEngineAttemptedCount);
+
+                    const sal_uInt8 nParamCount = pCur->GetByte();
+                    if (nParamCount < 1 || nParamCount > 4
+                        || sp < nParamCount)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+
+                    bool bConstant = true;
+                    const FormulaToken* pYTok = pStack[sp - nParamCount];
+                    const FormulaToken* pXTok = nullptr;
+                    const FormulaToken* pNewXTok = nullptr;
+                    if (nParamCount >= 2)
+                        pXTok = pStack[sp - nParamCount + 1];
+                    if (nParamCount >= 3)
+                        pNewXTok = pStack[sp - nParamCount + 2];
+                    if (nParamCount >= 4)
+                    {
+                        const FormulaToken* pConstTok
+                            = pStack[sp - nParamCount + 3];
+                        if (!pConstTok || pConstTok->GetType() != svDouble)
+                        {
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnMatrixEngineDeclinedCount);
+                            return false;
+                        }
+                        bConstant = pConstTok->GetDouble() != 0.0;
+                    }
+
+                    if (!pYTok || pYTok->GetType() != svMatrix)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    ScMatrix* pYMat
+                        = const_cast<FormulaToken*>(pYTok)->GetMatrix();
+                    if (!pYMat)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    auto oY = convertMatrixRefToMatrixOperand(*pYMat);
+                    if (!oY)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    std::optional<serpn::MatrixOperand> oX;
+                    if (pXTok)
+                    {
+                        if (pXTok->GetType() != svMatrix)
+                        {
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnMatrixEngineDeclinedCount);
+                            return false;
+                        }
+                        ScMatrix* pXMat
+                            = const_cast<FormulaToken*>(pXTok)->GetMatrix();
+                        if (!pXMat)
+                        {
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnMatrixEngineDeclinedCount);
+                            return false;
+                        }
+                        oX = convertMatrixRefToMatrixOperand(*pXMat);
+                    }
+                    std::optional<serpn::MatrixOperand> oNewX;
+                    if (pNewXTok)
+                    {
+                        if (pNewXTok->GetType() != svMatrix)
+                        {
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnMatrixEngineDeclinedCount);
+                            return false;
+                        }
+                        ScMatrix* pNewXMat
+                            = const_cast<FormulaToken*>(pNewXTok)->GetMatrix();
+                        if (!pNewXMat)
+                        {
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnMatrixEngineDeclinedCount);
+                            return false;
+                        }
+                        oNewX = convertMatrixRefToMatrixOperand(*pNewXMat);
+                    }
+
+                    const auto aPlan = bLog
+                        ? serpn::planGrowth(*oY,
+                                            oX ? &*oX : nullptr,
+                                            oNewX ? &*oNewX : nullptr,
+                                            bConstant)
+                        : serpn::planTrend(*oY,
+                                           oX ? &*oX : nullptr,
+                                           oNewX ? &*oNewX : nullptr,
+                                           bConstant);
+                    if (aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    sp -= nParamCount;
+                    nGlobalError = FormulaError::NONE;
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnMatrixEngineSucceededCount);
+                    if (!aPlan)
+                    {
+                        PushError(selibreoffice::toFormulaError(aPlan.meError));
+                        return true;
+                    }
+                    ScMatrixRef pResult
+                        = convertMatrixOperandToMatrixRef(aPlan.maValue.maMatrix);
+                    if (!pResult)
+                    {
+                        PushError(FormulaError::MatrixSize);
+                        return true;
+                    }
+                    PushMatrix(pResult);
+                    return true;
+                };
+
+                const auto tryPlanEngineTrend = [&]() -> bool {
+                    return tryPlanEngineTrendOrGrowth(false);
+                };
+                const auto tryPlanEngineGrowth = [&]() -> bool {
+                    return tryPlanEngineTrendOrGrowth(true);
+                };
+
+                // Batch 4 regression/forecast admission: FORECAST.
+                // Signature (x, knownY, knownX). Scope fence: scalar
+                // x must be svDouble; knownY / knownX must be svMatrix.
+                const auto tryPlanEngineForecast = [&]() -> bool {
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnMatrixEngineAttemptedCount);
+
+                    const sal_uInt8 nParamCount = pCur->GetByte();
+                    if (nParamCount != 3 || sp < 3)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    const FormulaToken* pKnownXTok = pStack[sp - 1];
+                    const FormulaToken* pKnownYTok = pStack[sp - 2];
+                    const FormulaToken* pXTok = pStack[sp - 3];
+                    if (!pKnownXTok || !pKnownYTok || !pXTok
+                        || pKnownXTok->GetType() != svMatrix
+                        || pKnownYTok->GetType() != svMatrix
+                        || pXTok->GetType() != svDouble)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    ScMatrix* pKnownYMat
+                        = const_cast<FormulaToken*>(pKnownYTok)->GetMatrix();
+                    ScMatrix* pKnownXMat
+                        = const_cast<FormulaToken*>(pKnownXTok)->GetMatrix();
+                    if (!pKnownYMat || !pKnownXMat)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    auto oKnownY
+                        = convertMatrixRefToMatrixOperand(*pKnownYMat);
+                    auto oKnownX
+                        = convertMatrixRefToMatrixOperand(*pKnownXMat);
+                    if (!oKnownY || !oKnownX)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    const double fVal = pXTok->GetDouble();
+                    const auto aPlan = serpn::planForecast(
+                        fVal, *oKnownY, *oKnownX);
+                    if (aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    sp -= 3;
+                    nGlobalError = FormulaError::NONE;
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnMatrixEngineSucceededCount);
+                    if (!aPlan)
+                    {
+                        PushError(selibreoffice::toFormulaError(aPlan.meError));
+                        return true;
+                    }
+                    PushDouble(aPlan.maValue);
+                    return true;
+                };
+
+                // Batch 4 regression/forecast admission: FOURIER.
+                // Signature (Input, bGroupedByColumn, [bInverse=false],
+                //            [bPolar=false], [fMinMag=0]).
+                const auto tryPlanEngineFourier = [&]() -> bool {
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnMatrixEngineAttemptedCount);
+
+                    const sal_uInt8 nParamCount = pCur->GetByte();
+                    if (nParamCount < 2 || nParamCount > 5
+                        || sp < nParamCount)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+
+                    double fMinMag = 0.0;
+                    bool bPolar = false;
+                    bool bInverse = false;
+                    const FormulaToken* pInputTok = pStack[sp - nParamCount];
+                    const FormulaToken* pGroupTok
+                        = pStack[sp - nParamCount + 1];
+                    if (nParamCount >= 3)
+                    {
+                        const FormulaToken* pInvTok
+                            = pStack[sp - nParamCount + 2];
+                        if (!pInvTok || pInvTok->GetType() != svDouble)
+                        {
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnMatrixEngineDeclinedCount);
+                            return false;
+                        }
+                        bInverse = pInvTok->GetDouble() != 0.0;
+                    }
+                    if (nParamCount >= 4)
+                    {
+                        const FormulaToken* pPolarTok
+                            = pStack[sp - nParamCount + 3];
+                        if (!pPolarTok || pPolarTok->GetType() != svDouble)
+                        {
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnMatrixEngineDeclinedCount);
+                            return false;
+                        }
+                        bPolar = pPolarTok->GetDouble() != 0.0;
+                    }
+                    if (nParamCount >= 5)
+                    {
+                        const FormulaToken* pMinMagTok
+                            = pStack[sp - nParamCount + 4];
+                        if (!pMinMagTok || pMinMagTok->GetType() != svDouble)
+                        {
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnMatrixEngineDeclinedCount);
+                            return false;
+                        }
+                        fMinMag = pMinMagTok->GetDouble();
+                    }
+                    if (!pInputTok || pInputTok->GetType() != svMatrix
+                        || !pGroupTok || pGroupTok->GetType() != svDouble)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    const bool bGroupedByColumn
+                        = pGroupTok->GetDouble() != 0.0;
+                    ScMatrix* pInputMat
+                        = const_cast<FormulaToken*>(pInputTok)->GetMatrix();
+                    if (!pInputMat)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    auto oInput = convertMatrixRefToMatrixOperand(*pInputMat);
+                    if (!oInput)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    const auto aPlan = serpn::planFourier(
+                        *oInput, bGroupedByColumn, bInverse, bPolar, fMinMag);
+                    if (aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineDeclinedCount);
+                        return false;
+                    }
+                    sp -= nParamCount;
+                    nGlobalError = FormulaError::NONE;
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnMatrixEngineSucceededCount);
+                    if (!aPlan)
+                    {
+                        PushError(selibreoffice::toFormulaError(aPlan.meError));
+                        return true;
+                    }
+                    ScMatrixRef pResult
+                        = convertMatrixOperandToMatrixRef(aPlan.maValue.maMatrix);
+                    if (!pResult)
+                    {
+                        PushError(FormulaError::MatrixSize);
+                        return true;
+                    }
+                    PushMatrix(pResult);
+                    return true;
+                };
+
                 // Batch 3 DB family admission (DSUM / DCOUNT / DAVERAGE
                 // / DMAX / DMIN). The 3-arg shape is
                 // (database_range, field, criteria_range). Scope fence:
@@ -13423,17 +13911,32 @@ StackVar ScInterpreter::Interpret()
                     case ocSTEYX            : CalculatePearsonCovar(true, true, false); break;
                     case ocSlope            : CalculateSlopeIntercept(true); break;
                     case ocIntercept        : CalculateSlopeIntercept(false); break;
-                    case ocTrend            : ScTrend();                break;
-                    case ocGrowth:
-                        warnIfLegacyGrowthProjectionReached(u"GROWTH");
-                        seinterpcompatdispatch::Dispatcher::growth(*this);
+                    case ocTrend:
+                        if (!tryPlanEngineTrend())
+                            ScTrend();
                         break;
-                    case ocLinest           : ScLinest();               break;
-                    case ocLogest           : ScLogest();               break;
-                    case ocForecast_LIN     :
+                    case ocGrowth:
+                        if (!tryPlanEngineGrowth())
+                        {
+                            warnIfLegacyGrowthProjectionReached(u"GROWTH");
+                            seinterpcompatdispatch::Dispatcher::growth(*this);
+                        }
+                        break;
+                    case ocLinest:
+                        if (!tryPlanEngineLinest())
+                            ScLinest();
+                        break;
+                    case ocLogest:
+                        if (!tryPlanEngineLogest())
+                            ScLogest();
+                        break;
+                    case ocForecast_LIN:
                     case ocForecast:
-                        warnIfLegacyStatisticalDistributionReached(u"FORECAST");
-                        seinterpcompatdispatch::Dispatcher::forecast(*this);
+                        if (!tryPlanEngineForecast())
+                        {
+                            warnIfLegacyStatisticalDistributionReached(u"FORECAST");
+                            seinterpcompatdispatch::Dispatcher::forecast(*this);
+                        }
                         break;
                     case ocForecast_ETS_ADD : ScForecast_Ets( etsAdd );       break;
                     case ocForecast_ETS_SEA : ScForecast_Ets( etsSeason );    break;
@@ -13627,7 +14130,10 @@ StackVar ScInterpreter::Interpret()
                                     fLowerBound, fUpperBound));
                     }
                     break;
-                    case ocFourier          : ScFourier();              break;
+                    case ocFourier:
+                        if (!tryPlanEngineFourier())
+                            ScFourier();
+                        break;
                     case ocExternal         : ScExternal();                 break;
                     case ocTableOp          : ScTableOp();                  break;
                     case ocStop :                                           break;
