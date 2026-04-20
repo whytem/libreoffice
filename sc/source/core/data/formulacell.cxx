@@ -2021,15 +2021,15 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
             = aAttempt.meFunction != setaileval::FunctionKind::Unknown
                   ? aAttempt.meFunction
                   : eDelegatedFunction;
-        setaileval::recordRpnAttempt(eAttemptFunction);
+        setaileval::recordRpnAttempt(aAttempt);
         if (aAttempt.mbSupported)
         {
-            setaileval::recordRpnSuccess(eAttemptFunction);
+            setaileval::recordRpnSuccess(aAttempt);
             setaileval::recordObserveSupport(aPos, aAttempt.meFunction);
             return;
         }
 
-        setaileval::recordRpnDecline(eAttemptFunction);
+        setaileval::recordRpnDecline(aAttempt);
         setaileval::recordFallback(aPos, aAttempt.meFallbackReason, eAttemptFunction);
     };
 
@@ -2262,10 +2262,10 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
             std::u16string_view(aCanonicalFormulaSource.getStr(),
                 aCanonicalFormulaSource.getLength()));
 
-        setaileval::recordRpnAttempt(aAttempt.meFunction);
+        setaileval::recordRpnAttempt(aAttempt);
         if (aAttempt.mbSupported)
         {
-            setaileval::recordRpnSuccess(aAttempt.meFunction);
+            setaileval::recordRpnSuccess(aAttempt);
             if (bEngineAuthoritativeWhileOff
                 || eEngineRolloutMode == setaileval::RolloutMode::AuthoritativeWithFallback)
             {
@@ -2291,7 +2291,7 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
         }
         else
         {
-            setaileval::recordRpnDecline(aAttempt.meFunction);
+            setaileval::recordRpnDecline(aAttempt);
             if (bEngineAuthoritativeWhileOff
                 || eEngineRolloutMode == setaileval::RolloutMode::AuthoritativeWithFallback)
             {
@@ -2364,10 +2364,10 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
                     rDocument.GetCalcConfig().mbEmptyStringAsZero, pCode,
                     std::u16string_view(aCanonicalFormulaSource.getStr(),
                         aCanonicalFormulaSource.getLength()));
-                setaileval::recordRpnAttempt(oEngineAttempt->meFunction);
+                setaileval::recordRpnAttempt(*oEngineAttempt);
                 if (!oEngineAttempt->mbSupported)
                 {
-                    setaileval::recordRpnDecline(oEngineAttempt->meFunction);
+                    setaileval::recordRpnDecline(*oEngineAttempt);
                     if (bEngineAuthoritativeWhileOff)
                     {
                         setaileval::recordAuthoritativeFallback(
@@ -2386,7 +2386,7 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
                 }
                 else
                 {
-                    setaileval::recordRpnSuccess(oEngineAttempt->meFunction);
+                    setaileval::recordRpnSuccess(*oEngineAttempt);
                 }
             }
         }
@@ -5263,12 +5263,15 @@ void maybeRecordFormulaGroupInterpretTailRouting(
         const auto eAttemptFunction
             = aAttempt.meFunction != setaileval::FunctionKind::Unknown ? aAttempt.meFunction
                                                                        : eDelegatedFunction;
+        setaileval::recordRpnAttempt(aAttempt);
         if (!aAttempt.mbSupported)
         {
+            setaileval::recordRpnDecline(aAttempt);
             setaileval::recordFallback(aCellPos, aAttempt.meFallbackReason, eAttemptFunction);
             continue;
         }
 
+        setaileval::recordRpnSuccess(aAttempt);
         if (eRolloutMode == setaileval::RolloutMode::Observe)
         {
             setaileval::recordObserveSupport(aCellPos, aAttempt.meFunction);

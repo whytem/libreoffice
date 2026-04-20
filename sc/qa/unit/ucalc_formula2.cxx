@@ -713,12 +713,18 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterControlFlowIfDispatch)
     m_pDoc->SetString(ScAddress(0, 3, 0), u"=IF(0;\"yes\";\"no\")"_ustr);
     CPPUNIT_ASSERT_EQUAL(u"no"_ustr, m_pDoc->GetString(ScAddress(0, 3, 0)));
 
-    // Missing else branch: scalar IF(cond) with just then slot.
-    m_pDoc->SetString(ScAddress(0, 4, 0), u"=IF(TRUE();42)"_ustr);
-    ASSERT_DOUBLES_EQUAL(42.0, m_pDoc->GetValue(ScAddress(0, 4, 0)));
+    m_pDoc->SetString(ScAddress(0, 4, 0), u"=IF(\"TRUE\";10;20)"_ustr);
+    ASSERT_DOUBLES_EQUAL(10.0, m_pDoc->GetValue(ScAddress(0, 4, 0)));
 
-    m_pDoc->SetString(ScAddress(0, 5, 0), u"=IF(FALSE();42)"_ustr);
-    CPPUNIT_ASSERT_EQUAL(false, static_cast<bool>(m_pDoc->GetValue(ScAddress(0, 5, 0))));
+    m_pDoc->SetString(ScAddress(0, 5, 0), u"=IF(\"FALSE\";10;20)"_ustr);
+    ASSERT_DOUBLES_EQUAL(20.0, m_pDoc->GetValue(ScAddress(0, 5, 0)));
+
+    // Missing else branch: scalar IF(cond) with just then slot.
+    m_pDoc->SetString(ScAddress(0, 6, 0), u"=IF(TRUE();42)"_ustr);
+    ASSERT_DOUBLES_EQUAL(42.0, m_pDoc->GetValue(ScAddress(0, 6, 0)));
+
+    m_pDoc->SetString(ScAddress(0, 7, 0), u"=IF(FALSE();42)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(false, static_cast<bool>(m_pDoc->GetValue(ScAddress(0, 7, 0))));
 
     // Reference condition — engine now owns svDoubleRef / svSingleRef via
     // `GetBool()` in the scalar fall-through path, and svMatrix (through
@@ -2596,6 +2602,12 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorObserveAndSha
                 aStats.maFunctionObserveCount[static_cast<std::size_t>(
                     setaileval::FunctionKind::Lookup)]
                 >= 20);
+            CPPUNIT_ASSERT(aStats.mnRpnAttemptedTotal >= 20);
+            CPPUNIT_ASSERT(aStats.mnRpnSucceededTotal >= 20);
+            CPPUNIT_ASSERT(
+                aStats.maRpnCategorySucceeded[static_cast<std::size_t>(
+                    setaileval::RpnCategory::Reference)]
+                >= 20);
         }
 
         {
@@ -2610,6 +2622,12 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorObserveAndSha
             CPPUNIT_ASSERT(
                 aStats.maFunctionShadowCompareCount[static_cast<std::size_t>(
                     setaileval::FunctionKind::Lookup)]
+                >= 20);
+            CPPUNIT_ASSERT(aStats.mnRpnAttemptedTotal >= 20);
+            CPPUNIT_ASSERT(aStats.mnRpnSucceededTotal >= 20);
+            CPPUNIT_ASSERT(
+                aStats.maRpnCategorySucceeded[static_cast<std::size_t>(
+                    setaileval::RpnCategory::Reference)]
                 >= 20);
             CPPUNIT_ASSERT_EQUAL(
                 static_cast<sal_uInt64>(0),

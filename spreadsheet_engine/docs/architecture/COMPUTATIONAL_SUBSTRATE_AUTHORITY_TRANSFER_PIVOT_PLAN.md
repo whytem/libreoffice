@@ -275,7 +275,10 @@ Implemented result:
 
 ## Phase 4: Implement the RPN Subsystem in Dependency Order
 
-Status: complete on the current tree
+Status: partial on the current tree
+
+Exit criteria are satisfied, but the broader dependency-ordered migration in
+this phase remains in progress.
 
 ### Goal
 
@@ -341,8 +344,11 @@ Implemented result:
   verifies correct result values
 - exit criteria satisfied: scalar operators are a hot opcode family exercised
   upstream under ambient load through the FormulaEvaluator; the upper seam
-  now consumes the same engine-native RPN contracts as the lower seam;
-  lower-seam pilots are no longer the only execution story
+  now consumes engine-native RPN contracts for binary/unary operators and IF
+  branch planning rather than only lower-seam pilots doing so
+- remaining Phase 4 work stays explicitly open: CHOOSE / IFS / SWITCH /
+  IFERROR / IFNA / LET, broader reference execution, and matrix-frame
+  semantics still have partial upper-seam local logic to retire
 
 ## Phase 5: Ambient Default-On Pilot
 

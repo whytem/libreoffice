@@ -5748,6 +5748,41 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testRpnSubstrateExercisedThroughUp
     CPPUNIT_ASSERT_EQUAL(1.0, m_pDoc->GetValue(ScAddress(3, 0, 0)));
 }
 
+CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testRpnCategoryRootsStayPrecise)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+    using setaileval::RpnCategory;
+
+    m_pDoc->InsertTab(0, u"Test"_ustr);
+    m_pDoc->SetValue(ScAddress(0, 0, 0), 7.0);
+    m_pDoc->SetString(ScAddress(1, 0, 0), u"=A1"_ustr); // B1: reference root
+    m_pDoc->SetString(ScAddress(2, 0, 0), u"=42"_ustr); // C1: general scalar root
+
+    ScFormulaCell* pReferenceFormula = m_pDoc->GetFormulaCell(ScAddress(1, 0, 0));
+    ScFormulaCell* pLiteralFormula = m_pDoc->GetFormulaCell(ScAddress(2, 0, 0));
+    CPPUNIT_ASSERT(pReferenceFormula);
+    CPPUNIT_ASSERT(pLiteralFormula);
+
+    setaileval::resetStats();
+
+    pReferenceFormula->SetDirty();
+    (void)pReferenceFormula->Interpret();
+    pLiteralFormula->SetDirty();
+    (void)pLiteralFormula->Interpret();
+
+    const StatsSnapshot aStats = setaileval::getStatsSnapshot();
+
+    CPPUNIT_ASSERT_MESSAGE(
+        "plain reference roots should contribute to the Reference category",
+        aStats.maRpnCategorySucceeded[static_cast<std::size_t>(RpnCategory::Reference)] > 0);
+    CPPUNIT_ASSERT_MESSAGE(
+        "plain literal roots should contribute to the General category",
+        aStats.maRpnCategorySucceeded[static_cast<std::size_t>(RpnCategory::General)] > 0);
+    CPPUNIT_ASSERT_MESSAGE(
+        "reference/literal scalar roots should not inflate the Operator category",
+        aStats.maRpnCategorySucceeded[static_cast<std::size_t>(RpnCategory::Operator)] == 0);
+}
+
 } // namespace
 
 CPPUNIT_PLUGIN_IMPLEMENT();

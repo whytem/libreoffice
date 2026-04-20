@@ -174,6 +174,8 @@ int main()
 
         const auto aIfTrue = planIfBranch(RpnValue::boolean(true), std::size_t { 0 }, std::size_t { 1 });
         const auto aIfFalse = planIfBranch(RpnValue::boolean(false), std::size_t { 0 }, std::size_t { 1 });
+        const auto aIfTextTrue = planIfBranch(RpnValue::text(u"TRUE"), std::size_t { 0 }, std::size_t { 1 });
+        const auto aIfTextFalse = planIfBranch(RpnValue::text(u"FALSE"), std::size_t { 0 }, std::size_t { 1 });
         const auto aIfBareTrue = planIfBranch(RpnValue::number(1.0), std::nullopt, std::nullopt);
         const auto aIfBareFalse = planIfBranch(RpnValue::number(0.0), std::nullopt, std::nullopt);
         const auto aIfDeferredMatrix = planIfBranch(
@@ -186,6 +188,10 @@ int main()
             || aIfTrue.maValue.mnSlot != 0
             || !aIfFalse || aIfFalse.maValue.meDirective != BranchDirective::TakeSlot
             || aIfFalse.maValue.mnSlot != 1
+            || !aIfTextTrue || aIfTextTrue.maValue.meDirective != BranchDirective::TakeSlot
+            || aIfTextTrue.maValue.mnSlot != 0
+            || !aIfTextFalse || aIfTextFalse.maValue.meDirective != BranchDirective::TakeSlot
+            || aIfTextFalse.maValue.mnSlot != 1
             || !aIfBareTrue
             || aIfBareTrue.maValue.meDirective != BranchDirective::ReturnSyntheticBoolean
             || !aIfBareTrue.maValue.mbSyntheticBool

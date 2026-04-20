@@ -93,10 +93,10 @@ struct BranchPlan
     return aPlan;
 }
 
-// Convert an RpnValue condition into a (bool, error) pair the api::logic
-// helpers expect. Matrix conditions defer via NeedsMatrixMaterialization;
-// reference conditions defer via NeedsReferenceResolution; scalar conditions
-// coerce through the existing ScalarCoercion rules.
+// Convert an RpnValue condition into a boolean using the same scalar-bool
+// coercion rules the evaluator already uses for IF / IFS / SWITCH.
+// Matrix conditions defer via NeedsMatrixMaterialization; reference
+// conditions defer via NeedsReferenceResolution.
 [[nodiscard]] inline RpnCoercionResult<bool> coerceConditionToBoolean(const RpnValue& rCondition)
 {
     if (rCondition.meKind == RpnValueKind::Reference)
@@ -104,13 +104,7 @@ struct BranchPlan
     if (rCondition.meKind == RpnValueKind::Matrix)
         return RpnCoercionResult<bool>::deferred(RpnCoercionReadiness::NeedsMatrixMaterialization);
 
-    const auto aNumber = coerceToNumber(rCondition);
-    if (aNumber.meReadiness != RpnCoercionReadiness::Ready)
-        return RpnCoercionResult<bool>::deferred(aNumber.meReadiness);
-    if (!aNumber)
-        return RpnCoercionResult<bool>::failure(aNumber.meError);
-
-    return RpnCoercionResult<bool>::success(aNumber.maValue != 0.0);
+    return coerceToBoolean(rCondition);
 }
 
 // IF(condition, then?, else?).

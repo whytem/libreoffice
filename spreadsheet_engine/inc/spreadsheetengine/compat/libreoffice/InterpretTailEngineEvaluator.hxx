@@ -166,7 +166,6 @@ enum class RpnCategory : sal_uInt8
 {
     switch (eKind)
     {
-        case FunctionKind::ScalarRoot:
         case FunctionKind::Conversion:
         case FunctionKind::Round:
         case FunctionKind::MathScalar:
@@ -201,6 +200,7 @@ struct EvaluationAttempt
     SvNumFormatType meFormatType = SvNumFormatType::ALL;
     FallbackReason meFallbackReason = FallbackReason::UnsupportedFormulaShape;
     FunctionKind meFunction = FunctionKind::Unknown;
+    RpnCategory meRpnCategory = RpnCategory::General;
 };
 
 struct StatsSnapshot
@@ -5965,6 +5965,38 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     }
 
     return classifyFunction(aFunctionName);
+}
+
+[[nodiscard]] inline RpnCategory classifyRpnCategory(
+    const core::formula::Node& rNode)
+{
+    switch (rNode.meKind)
+    {
+        case core::formula::NodeKind::UnaryOperation:
+        case core::formula::NodeKind::BinaryOperation:
+            return RpnCategory::Operator;
+        case core::formula::NodeKind::CellReference:
+        case core::formula::NodeKind::RangeReference:
+        case core::formula::NodeKind::NamedReference:
+        case core::formula::NodeKind::RangeConstructor:
+        case core::formula::NodeKind::ReferenceList:
+            return RpnCategory::Reference;
+        case core::formula::NodeKind::ArrayConstant:
+            return RpnCategory::Matrix;
+        case core::formula::NodeKind::FunctionCall:
+        {
+            const api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
+            if (aFunctionName == u"IFERROR" || aFunctionName == u"COM.MICROSOFT.IFERROR"
+                || aFunctionName == u"IFNA" || aFunctionName == u"COM.MICROSOFT.IFNA")
+            {
+                return RpnCategory::ControlFlow;
+            }
+
+            return toRpnCategory(classifyFunction(aFunctionName));
+        }
+        default:
+            return RpnCategory::General;
+    }
 }
 
 [[nodiscard]] inline bool isPromotableScalarRootFunctionCall(
@@ -13993,6 +14025,11 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
 
     const auto& rRoot = *aParse.mpRoot;
     const FunctionKind eRootFunction = detail::classifyDelegatedFunctionNode(rRoot);
+    const RpnCategory eRootCategory = detail::classifyRpnCategory(rRoot);
+    const auto finalizeAttempt = [eRootCategory](EvaluationAttempt aAttempt) {
+        aAttempt.meRpnCategory = eRootCategory;
+        return aAttempt;
+    };
     const api::String aRootFunctionName
         = rRoot.meKind == core::formula::NodeKind::FunctionCall
               ? detail::uppercaseAscii(rRoot.maPrimaryText)
@@ -14005,14 +14042,15 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
             const auto aHostValue
                 = spreadsheetengine::compat::libreoffice::readHostDocumentCellValue(rDoc, rFormulaPos);
             if (aHostValue && !aHostValue.maValue.isEmpty())
-                return detail::makeScalarAttempt(eRootFunction, aHostValue.maValue);
+                return finalizeAttempt(detail::makeScalarAttempt(eRootFunction, aHostValue.maValue));
         }
-        return detail::makeErrorResult(eRootFunction, api::Error::VariableExpected);
+        return finalizeAttempt(
+            detail::makeErrorResult(eRootFunction, api::Error::VariableExpected));
     }
     if (rRoot.meKind == core::formula::NodeKind::ErrorLiteral)
     {
-        return detail::makeErrorResult(
-            eRootFunction, detail::mapErrorLiteral(rRoot.maPrimaryText));
+        return finalizeAttempt(
+            detail::makeErrorResult(eRootFunction, detail::mapErrorLiteral(rRoot.maPrimaryText)));
     }
 
     if (rRoot.meKind != core::formula::NodeKind::FunctionCall)
@@ -14022,11 +14060,12 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         {
             detail::recordDiagnosticSample(aScalar.meFallbackReason, rDoc, rFormulaPos,
                 rFormulaSource, aCanonical, rRoot.meKind);
-            return detail::makeUnsupported(eRootFunction, aScalar.meFallbackReason);
+            return finalizeAttempt(
+                detail::makeUnsupported(eRootFunction, aScalar.meFallbackReason));
         }
         if (!aScalar.moValue)
-            return detail::makeErrorResult(eRootFunction, aScalar.meError);
-        return detail::makeScalarAttempt(eRootFunction, *aScalar.moValue);
+            return finalizeAttempt(detail::makeErrorResult(eRootFunction, aScalar.meError));
+        return finalizeAttempt(detail::makeScalarAttempt(eRootFunction, *aScalar.moValue));
     }
 
     const bool bUncompiledFormulaRoot
@@ -14036,11 +14075,13 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
          || bUncompiledFormulaRoot)
         && detail::importedRootUsesVariableExpectedHostTruth(eRootFunction, aRootFunctionName))
     {
-        return detail::makeErrorResult(eRootFunction, api::Error::VariableExpected);
+        return finalizeAttempt(
+            detail::makeErrorResult(eRootFunction, api::Error::VariableExpected));
     }
 
     auto aAttempt = detail::evaluateDelegatedNode(
         rRoot, rDoc, rContext, rFormulaPos, bEmptyStringAsZero, 0, bImportedCanonicalSource);
+    aAttempt.meRpnCategory = eRootCategory;
     if (!aAttempt.mbSupported)
     {
         // The stored-host-value-truth fallback only applies when the formula
@@ -14057,7 +14098,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
             const auto aHostValue
                 = spreadsheetengine::compat::libreoffice::readHostDocumentCellValue(rDoc, rFormulaPos);
             if (aHostValue && !aHostValue.maValue.isEmpty())
-                return detail::makeScalarAttempt(eRootFunction, aHostValue.maValue);
+                return finalizeAttempt(detail::makeScalarAttempt(eRootFunction, aHostValue.maValue));
         }
         detail::recordDiagnosticSample(aAttempt.meFallbackReason, rDoc, rFormulaPos,
             rFormulaSource, aCanonical, rRoot.meKind);
@@ -14238,25 +14279,40 @@ inline void resetStats()
     return aSnapshot;
 }
 
-inline void recordRpnAttempt(FunctionKind eFunction)
+inline void recordRpnAttempt(RpnCategory eCategory)
 {
     auto& rStore = detail::statsStore();
     rStore.mnRpnAttemptedTotal.fetch_add(1);
-    rStore.maRpnCategoryAttempted[static_cast<std::size_t>(toRpnCategory(eFunction))].fetch_add(1);
+    rStore.maRpnCategoryAttempted[static_cast<std::size_t>(eCategory)].fetch_add(1);
 }
 
-inline void recordRpnSuccess(FunctionKind eFunction)
+inline void recordRpnAttempt(const EvaluationAttempt& rAttempt)
+{
+    recordRpnAttempt(rAttempt.meRpnCategory);
+}
+
+inline void recordRpnSuccess(RpnCategory eCategory)
 {
     auto& rStore = detail::statsStore();
     rStore.mnRpnSucceededTotal.fetch_add(1);
-    rStore.maRpnCategorySucceeded[static_cast<std::size_t>(toRpnCategory(eFunction))].fetch_add(1);
+    rStore.maRpnCategorySucceeded[static_cast<std::size_t>(eCategory)].fetch_add(1);
 }
 
-inline void recordRpnDecline(FunctionKind eFunction)
+inline void recordRpnSuccess(const EvaluationAttempt& rAttempt)
+{
+    recordRpnSuccess(rAttempt.meRpnCategory);
+}
+
+inline void recordRpnDecline(RpnCategory eCategory)
 {
     auto& rStore = detail::statsStore();
     rStore.mnRpnDeclinedTotal.fetch_add(1);
-    rStore.maRpnCategoryDeclined[static_cast<std::size_t>(toRpnCategory(eFunction))].fetch_add(1);
+    rStore.maRpnCategoryDeclined[static_cast<std::size_t>(eCategory)].fetch_add(1);
+}
+
+inline void recordRpnDecline(const EvaluationAttempt& rAttempt)
+{
+    recordRpnDecline(rAttempt.meRpnCategory);
 }
 
 inline void recordObserveSupport(FunctionKind eFunction)
