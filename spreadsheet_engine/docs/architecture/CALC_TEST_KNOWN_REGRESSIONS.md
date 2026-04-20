@@ -24,9 +24,9 @@ runs the test and exits non-zero only if the failure set differs from this
 list (i.e., a *new* regression slipped in, or an old one was *unintentionally*
 fixed without the list being updated).
 
-## Failure baseline (2026-04-19, after tdf#156985 KahanSum snap-to-zero fix)
+## Failure baseline (2026-04-19, after ORG.LIBREOFFICE.COLOR canonical mapping fix)
 
-9 tests fail in `CppunitTest_sc_ucalc_formula2`. Total run: 135 tests.
+8 tests fail in `CppunitTest_sc_ucalc_formula2`. Total run: 135 tests.
 
 Previous baseline was 30 tests. Progress so far:
 
@@ -102,15 +102,21 @@ values or false `Err:522` (Circular Reference) on dependency change.
 - `testFuncRefListArraySUBTOTAL`
 - `testFuncTableRef`
 
-### InterpretTail engine evaluator (3)
+### InterpretTail engine evaluator (2)
 
 These directly exercise the seam. Their failure suggests the seam's
-authoritative-with-fallback / math-scalar / statistical-distribution
-paths regressed.
+authoritative-with-fallback / statistical-distribution paths regressed.
 
 - `testInterpretTailEngineEvaluatorAuthoritativeWithFallback`
-- `testInterpretTailEngineEvaluatorMathScalarAuthoritative`
 - `testInterpretTailEngineEvaluatorStatisticalDistributionAuthoritative`
+
+(Cleared: `testInterpretTailEngineEvaluatorMathScalarAuthoritative` —
+`canonicalMathScalarFunctionName` now maps `ORG.LIBREOFFICE.COLOR` to
+`COLOR`. When a user types `=COLOR(1;2;3)` Calc rewrites the stored
+formula source to `=ORG.LIBREOFFICE.COLOR(1;2;3)` (see the ODFF alias
+table in `compiler.cxx`), so the engine saw an unknown function name
+and bailed with `UnsupportedFunction`. Adding the alias matches the
+existing treatment for `ORG.LIBREOFFICE.ROUNDSIG` / `ORG.LIBREOFFICE.RAWSUBTRACT`.)
 
 ### Specific tdf bugs (0)
 

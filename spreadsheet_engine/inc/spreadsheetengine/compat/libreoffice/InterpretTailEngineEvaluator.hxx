@@ -756,6 +756,8 @@ canonicalMathScalarFunctionName(api::StringView rFunctionName)
         return api::StringView(u"ROUNDSIG");
     if (rFunctionName == u"ORG.LIBREOFFICE.RAWSUBTRACT")
         return api::StringView(u"RAWSUBTRACT");
+    if (rFunctionName == u"ORG.LIBREOFFICE.COLOR")
+        return api::StringView(u"COLOR");
 
     return std::nullopt;
 }
