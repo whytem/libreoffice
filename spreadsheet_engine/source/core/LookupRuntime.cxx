@@ -533,7 +533,20 @@ api::ValueResult<api::MatrixSize> resolveMatchIndex(const LookupMaterializer& rM
     if (!aSearchLayout)
         return api::ValueResult<api::MatrixSize>::failure(aSearchLayout.meError);
 
-    const api::MatrixSize nSearchLength = aSearchLayout.maValue.mnLength;
+    // Match legacy `ScQueryCellIteratorDirect` semantics: trailing empty cells
+    // in the search vector are not visited by the iterator, so they should not
+    // extend `oResolvedIndex` past the last real value. Without this, a text
+    // lookup over `1,2,..,9,B,B,C,<empty>` for `Charlie` would treat the
+    // trailing empty as "less than Charlie" and resolve to its index, off by
+    // one from the true last text-less-than-lookup. Empty lookups still
+    // require visibility into trailing empties to find them, mirroring
+    // `preserveTrailingEmptiesForExtendedMatch`.
+    api::MatrixSize nSearchLength = aSearchLayout.maValue.mnLength;
+    if (!rLookup.isEmpty())
+    {
+        nSearchLength = trimTrailingEmptyLookupLength(
+            rMaterializer, rSearchInput, aSearchLayout.maValue.meOrientation, nSearchLength);
+    }
 
     auto isExactMatch = [&](const api::CellValue& rCandidate) {
         return isExactLookupMatch(rLookup, rCandidate, eSearchType);

@@ -24,9 +24,9 @@ runs the test and exits non-zero only if the failure set differs from this
 list (i.e., a *new* regression slipped in, or an old one was *unintentionally*
 fixed without the list being updated).
 
-## Failure baseline (2026-04-19, after ORG.LIBREOFFICE.COLOR canonical mapping fix)
+## Failure baseline (2026-04-19, after MATCH trailing-empty trim fix)
 
-8 tests fail in `CppunitTest_sc_ucalc_formula2`. Total run: 135 tests.
+6 tests fail in `CppunitTest_sc_ucalc_formula2`. Total run: 135 tests.
 
 Previous baseline was 30 tests. Progress so far:
 
@@ -91,16 +91,31 @@ now correctly consume the cached value; live calc no longer shadows it).
 - `testFormulaDepTrackingDeleteCol`
 - `testIterations`
 
-### Function evaluation (4)
+### Function evaluation (2)
 
 Likely root cause: legacy fallback paths regressed during retirement +
 relocation episodes; recalc/observe interaction with the seam returns wrong
 values or false `Err:522` (Circular Reference) on dependency change.
 
-- `testFuncIF`
-- `testFuncMATCH`
 - `testFuncRefListArraySUBTOTAL`
 - `testFuncTableRef`
+
+(Cleared: `testFuncMATCH` — `selookup::resolveMatchIndex` (the unified
+runtime that both engine and legacy `ScMatchOp` now share) lacked the
+trailing-empty trim that legacy `ScQueryCellIteratorDirect` enforced
+implicitly. The horizontal MATCH formula `=MATCH(O2;A1:M1;1)` over data
+filling only `A1:L1` left `M1` empty; in the linear text-lookup walk an
+empty trailing cell (`compareFoldedText("", "Charlie") < 0`) extended
+`oResolvedIndex` past the last real value `C` at column L (12), returning
+13 instead of the expected 12. `resolveMatchIndex` now applies
+`trimTrailingEmptyLookupLength` (matching the existing
+`preserveTrailingEmptiesForExtendedMatch` carve-out for empty-lookup
+queries) so trailing empties no longer absorb the resolved index.)
+
+(Cleared incidentally: `testFuncIF` — was passing in isolation already; the
+full-suite verification after the MATCH fix confirmed it no longer trips
+the gate. Likely state-dependent on prior test ordering rather than tied to
+this commit.)
 
 ### InterpretTail engine evaluator (2)
 
