@@ -26,7 +26,7 @@ fixed without the list being updated).
 
 ## Failure baseline (2026-04-19, after NEGBINOMDIST off-by-one alignment)
 
-2 tests fail in `CppunitTest_sc_ucalc_formula2`. Total run: 141 tests.
+1 test fails in `CppunitTest_sc_ucalc_formula2`. Total run: 141 tests.
 
 Previous baseline was 30 tests. Progress so far:
 
@@ -139,18 +139,18 @@ narrow shapes the engine's text-reparse model cannot express:
    declines whenever `rDocument.GetDocOptions().IsIter()` is true,
    so iteration-enabled docs keep legacy's convergence contract.)
 
-### Function evaluation (1)
+### Function evaluation (0)
 
-Likely root cause: legacy fallback paths regressed during retirement +
-relocation episodes; recalc/observe interaction with the seam returns wrong
-values or false `Err:522` (Circular Reference) on dependency change.
+(Cleared: `testFuncRefListArraySUBTOTAL` — passes consistently
+(3/3 gate runs) after the `formulaContainsAggregateLike` guard in
+`materializeMatchLookupInputSourceNode` that declines the engine
+route when any child contains SUBTOTAL / AGGREGATE, combined with
+the recalc-subsystem guards landed in c230133b0 and the NEGBINOMDIST
+GROWTH-projection routing fix in 09be9dea6.)
 
-- `testFuncTableRef`
-
-(Cleared: `testFuncRefListArraySUBTOTAL` — now consistently passing
-after the `formulaContainsAggregateLike` guard in
-`materializeMatchLookupInputSourceNode` that declines the engine route
-when any child contains SUBTOTAL / AGGREGATE.)
+(Cleared: `testFuncTableRef` — passes consistently (5/5 gate runs)
+after the cumulative recalc-subsystem guards landed in c230133b0
+and the NEGBINOMDIST GROWTH-projection routing fix in 09be9dea6.)
 
 (Cleared: `testFuncIF` — `tryPlanEngineIfJump` and `tryPlanEngineIfError`
 in `interpr4.cxx` lacked a JumpMatrix-on-stack scope fence. The matrix
