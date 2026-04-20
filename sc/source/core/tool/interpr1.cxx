@@ -6975,11 +6975,6 @@ void ScInterpreter::DBIterator( ScIterFunc eFunc )
     PushDouble( fRes );
 }
 
-void ScInterpreter::ScDBSum()
-{
-    DBIterator( ifSUM );
-}
-
 void ScInterpreter::ScDBCount()
 {
     bool bMissingField = true;
@@ -7066,26 +7061,6 @@ void ScInterpreter::ScDBCount2()
     }
     else
         PushIllegalParameter();
-}
-
-void ScInterpreter::ScDBAverage()
-{
-    DBIterator( ifAVERAGE );
-}
-
-void ScInterpreter::ScDBMax()
-{
-    DBIterator( ifMAX );
-}
-
-void ScInterpreter::ScDBMin()
-{
-    DBIterator( ifMIN );
-}
-
-void ScInterpreter::ScDBProduct()
-{
-    DBIterator( ifPRODUCT );
 }
 
 void ScInterpreter::GetDBStVarParams( std::vector<double>& rValues )

@@ -13664,7 +13664,7 @@ StackVar ScInterpreter::Interpret()
                     case ocDBSum            :
                         if (!tryPlanEngineDatabaseAggregate(
                                 sequery::CriteriaAggregateKind::Sum))
-                            ScDBSum();
+                            DBIterator(ifSUM);
                         break;
                     case ocDBCount          :
                         if (!tryPlanEngineDatabaseAggregate(
@@ -13679,7 +13679,7 @@ StackVar ScInterpreter::Interpret()
                     case ocDBAverage        :
                         if (!tryPlanEngineDatabaseAggregate(
                                 sequery::CriteriaAggregateKind::Average))
-                            ScDBAverage();
+                            DBIterator(ifAVERAGE);
                         break;
                     case ocDBGet            :
                         if (!tryPlanEngineDatabaseGet())
@@ -13688,17 +13688,17 @@ StackVar ScInterpreter::Interpret()
                     case ocDBMax            :
                         if (!tryPlanEngineDatabaseAggregate(
                                 sequery::CriteriaAggregateKind::Max))
-                            ScDBMax();
+                            DBIterator(ifMAX);
                         break;
                     case ocDBMin            :
                         if (!tryPlanEngineDatabaseAggregate(
                                 sequery::CriteriaAggregateKind::Min))
-                            ScDBMin();
+                            DBIterator(ifMIN);
                         break;
                     case ocDBProduct        :
                         if (!tryPlanEngineDatabaseAggregate(
                                 sequery::CriteriaAggregateKind::Product))
-                            ScDBProduct();
+                            DBIterator(ifPRODUCT);
                         break;
                     case ocDBStdDev         :
                         if (!tryPlanEngineDatabaseVariance(

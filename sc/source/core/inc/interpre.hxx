@@ -707,14 +707,9 @@ public:
     std::unique_ptr<ScDBQueryParamBase> GetDBParams( bool& rMissingField );
 
     void DBIterator( ScIterFunc );
-    void ScDBSum();
     void ScDBCount();
     void ScDBCount2();
-    void ScDBAverage();
     void ScDBGet();
-    void ScDBMax();
-    void ScDBMin();
-    void ScDBProduct();
     void GetDBStVarParams( std::vector<double>& rValues );
     void ScDBStdDev();
     void ScDBStdDevP();
