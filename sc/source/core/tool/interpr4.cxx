@@ -5161,103 +5161,6 @@ StackVar ScInterpreter::Interpret()
                         },
                         "family-local default-on financial rate family reached ScInterpreter");
                 };
-                const auto pushLegacyNpv = [&]() {
-                    warnIfLegacyRateFamilyReached(u"NPV");
-                    nFuncFmtType = SvNumFormatType::CURRENCY;
-                    short nParamCount = GetByte();
-                    if (!MustHaveParamCountMin(nParamCount, 2))
-                        return;
-
-                    KahanSum fVal = 0.0;
-                    ReverseStack(nParamCount);
-                    if (nGlobalError == FormulaError::NONE)
-                    {
-                        double fCount = 1.0;
-                        const double fRate = GetDouble();
-                        --nParamCount;
-                        size_t nRefInList = 0;
-                        ScRange aRange;
-                        while (nParamCount-- > 0)
-                        {
-                            switch (GetStackType())
-                            {
-                                case svDouble:
-                                {
-                                    fVal += GetDouble() / pow(1.0 + fRate, fCount);
-                                    fCount++;
-                                }
-                                break;
-                                case svSingleRef:
-                                {
-                                    ScAddress aAdr;
-                                    PopSingleRef(aAdr);
-                                    ScRefCellValue aCell(mrDoc, aAdr);
-                                    if (!aCell.hasEmptyValue() && aCell.hasNumeric())
-                                    {
-                                        const double fCellVal = GetCellValue(aAdr, aCell);
-                                        fVal += fCellVal / pow(1.0 + fRate, fCount);
-                                        fCount++;
-                                    }
-                                }
-                                break;
-                                case svDoubleRef:
-                                case svRefList:
-                                {
-                                    FormulaError nErr = FormulaError::NONE;
-                                    double fCellVal = 0.0;
-                                    PopDoubleRef(aRange, nParamCount, nRefInList);
-                                    ScHorizontalValueIterator aValIter(mrDoc, aRange);
-                                    while ((nErr == FormulaError::NONE)
-                                           && aValIter.GetNext(fCellVal, nErr))
-                                    {
-                                        fVal += fCellVal / pow(1.0 + fRate, fCount);
-                                        fCount++;
-                                    }
-                                    if (nErr != FormulaError::NONE)
-                                        SetError(nErr);
-                                }
-                                break;
-                                case svMatrix:
-                                case svExternalSingleRef:
-                                case svExternalDoubleRef:
-                                {
-                                    ScMatrixRef pMat = GetMatrix();
-                                    if (pMat)
-                                    {
-                                        SCSIZE nC = 0;
-                                        SCSIZE nR = 0;
-                                        pMat->GetDimensions(nC, nR);
-                                        if (nC == 0 || nR == 0)
-                                        {
-                                            PushIllegalArgument();
-                                            return;
-                                        }
-
-                                        for (SCSIZE j = 0; j < nC; j++)
-                                        {
-                                            for (SCSIZE k = 0; k < nR; ++k)
-                                            {
-                                                if (!pMat->IsValue(j, k))
-                                                {
-                                                    PushIllegalArgument();
-                                                    return;
-                                                }
-                                                const double fX = pMat->GetDouble(j, k);
-                                                fVal += fX / pow(1.0 + fRate, fCount);
-                                                fCount++;
-                                            }
-                                        }
-                                    }
-                                }
-                                break;
-                                default:
-                                    SetError(FormulaError::IllegalParameter);
-                                    break;
-                            }
-                        }
-                    }
-                    PushDouble(fVal.get());
-                };
                 const auto pushLegacyIrr = [&]() {
                     warnIfLegacyRateFamilyReached(u"IRR");
                     nFuncFmtType = SvNumFormatType::PERCENT;
@@ -15001,7 +14904,105 @@ StackVar ScInterpreter::Interpret()
                         warnIfLegacyNumericAggregateReached(u"PRODUCT");
                         seinterpcompatdispatch::Dispatcher::aggregateProduct(*this);
                         break;
-                    case ocNPV              : pushLegacyNpv();          break;
+                    case ocNPV              :
+                        [&]() {
+                            warnIfLegacyRateFamilyReached(u"NPV");
+                            nFuncFmtType = SvNumFormatType::CURRENCY;
+                            short nParamCount = GetByte();
+                            if (!MustHaveParamCountMin(nParamCount, 2))
+                                return;
+
+                            KahanSum fVal = 0.0;
+                            ReverseStack(nParamCount);
+                            if (nGlobalError == FormulaError::NONE)
+                            {
+                                double fCount = 1.0;
+                                const double fRate = GetDouble();
+                                --nParamCount;
+                                size_t nRefInList = 0;
+                                ScRange aRange;
+                                while (nParamCount-- > 0)
+                                {
+                                    switch (GetStackType())
+                                    {
+                                        case svDouble:
+                                        {
+                                            fVal += GetDouble() / pow(1.0 + fRate, fCount);
+                                            fCount++;
+                                        }
+                                        break;
+                                        case svSingleRef:
+                                        {
+                                            ScAddress aAdr;
+                                            PopSingleRef(aAdr);
+                                            ScRefCellValue aCell(mrDoc, aAdr);
+                                            if (!aCell.hasEmptyValue() && aCell.hasNumeric())
+                                            {
+                                                const double fCellVal = GetCellValue(aAdr, aCell);
+                                                fVal += fCellVal / pow(1.0 + fRate, fCount);
+                                                fCount++;
+                                            }
+                                        }
+                                        break;
+                                        case svDoubleRef:
+                                        case svRefList:
+                                        {
+                                            FormulaError nErr = FormulaError::NONE;
+                                            double fCellVal = 0.0;
+                                            PopDoubleRef(aRange, nParamCount, nRefInList);
+                                            ScHorizontalValueIterator aValIter(mrDoc, aRange);
+                                            while ((nErr == FormulaError::NONE)
+                                                   && aValIter.GetNext(fCellVal, nErr))
+                                            {
+                                                fVal += fCellVal / pow(1.0 + fRate, fCount);
+                                                fCount++;
+                                            }
+                                            if (nErr != FormulaError::NONE)
+                                                SetError(nErr);
+                                        }
+                                        break;
+                                        case svMatrix:
+                                        case svExternalSingleRef:
+                                        case svExternalDoubleRef:
+                                        {
+                                            ScMatrixRef pMat = GetMatrix();
+                                            if (pMat)
+                                            {
+                                                SCSIZE nC = 0;
+                                                SCSIZE nR = 0;
+                                                pMat->GetDimensions(nC, nR);
+                                                if (nC == 0 || nR == 0)
+                                                {
+                                                    PushIllegalArgument();
+                                                    return;
+                                                }
+
+                                                for (SCSIZE j = 0; j < nC; j++)
+                                                {
+                                                    for (SCSIZE k = 0; k < nR; ++k)
+                                                    {
+                                                        if (!pMat->IsValue(j, k))
+                                                        {
+                                                            PushIllegalArgument();
+                                                            return;
+                                                        }
+                                                        const double fX = pMat->GetDouble(j, k);
+                                                        fVal += fX / pow(1.0 + fRate, fCount);
+                                                        fCount++;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        break;
+                                        default:
+                                            SetError(FormulaError::IllegalParameter);
+                                            break;
+                                    }
+                                }
+                            }
+                            PushDouble(fVal.get());
+                        }();
+                        break;
                     case ocIRR              : pushLegacyIrr();          break;
                     case ocMIRR             : pushLegacyMirr();         break;
                     case ocISPMT            :
