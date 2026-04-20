@@ -13124,8 +13124,8 @@ StackVar ScInterpreter::Interpret()
                         warnIfLegacyNumericAggregateReached(u"SUMSQ");
                         seinterpcompatdispatch::Dispatcher::aggregateSumSq(*this);
                         break;
-                    case ocSumX2MY2         : ScSumX2MY2();                 break;
-                    case ocSumX2DY2         : ScSumX2DY2();                 break;
+                    case ocSumX2MY2         : CalculateSumX2MY2SumX2DY2(false); break;
+                    case ocSumX2DY2         : CalculateSumX2MY2SumX2DY2(true);  break;
                     case ocSumXMY2          : ScSumXMY2();                  break;
                     case ocRawSubtract      :
                     {

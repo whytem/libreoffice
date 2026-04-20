@@ -1406,10 +1406,6 @@ void ScInterpreter::ScPow()
     }
 }
 
-void ScInterpreter::ScSumX2MY2()
-{
-    CalculateSumX2MY2SumX2DY2(false);
-}
 void ScInterpreter::CalculateSumX2MY2SumX2DY2(bool _bSumX2DY2)
 {
     if ( !MustHaveParamCount( GetByte(), 2 ) )
@@ -1449,11 +1445,6 @@ void ScInterpreter::CalculateSumX2MY2SumX2DY2(bool _bSumX2DY2)
                     fSum -= fVal * fVal;
             }
     PushDouble(fSum.get());
-}
-
-void ScInterpreter::ScSumX2DY2()
-{
-    CalculateSumX2MY2SumX2DY2(true);
 }
 
 void ScInterpreter::ScSumXMY2()

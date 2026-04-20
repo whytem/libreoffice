@@ -780,8 +780,6 @@ public:
     void ScMatMult();
     void ScMatRef();
     ScMatrixRef MatConcat(const ScMatrixRef& pMat1, const ScMatrixRef& pMat2);
-    void ScSumX2MY2();
-    void ScSumX2DY2();
     void ScSumXMY2();
     bool CalculateSkew(KahanSum& fSum, double& fCount, std::vector<double>& values);
     void CalculateSlopeIntercept(bool bSlope);
