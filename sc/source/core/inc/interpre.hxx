@@ -756,7 +756,6 @@ public:
 
     // matrix functions
     void ScMatValue();
-    void ScMatInv();
     void ScMatRef();
     ScMatrixRef MatConcat(const ScMatrixRef& pMat1, const ScMatrixRef& pMat2);
     void ScSumXMY2();

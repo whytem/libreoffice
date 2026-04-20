@@ -9187,34 +9187,71 @@ StackVar ScInterpreter::Interpret()
                                 .mnMatrixEngineDeclinedCount);
                         return false;
                     }
-                    // Scope fence (Phase C): only admit in-memory
-                    // svMatrix tokens. Range-input MINVERSE still
-                    // defers: it needs the reference-to-matrix
-                    // materialization contract.
+                    // Scope fence: admit in-memory svMatrix tokens
+                    // plus svSingleRef / svDoubleRef range tokens via
+                    // the Phase D host-facade materialization
+                    // primitive. svRefList still defers.
                     const FormulaToken* pTok = pStack[sp - 1];
-                    if (!pTok || pTok->GetType() != svMatrix)
+                    if (!pTok
+                        || (pTok->GetType() != svMatrix
+                            && pTok->GetType() != svSingleRef
+                            && pTok->GetType() != svDoubleRef))
                     {
                         addDispatchRuntimeStat(
                             interpreterDispatchRuntimeStatsStore()
                                 .mnMatrixEngineDeclinedCount);
                         return false;
                     }
-                    ScMatrix* pSourceMat
-                        = const_cast<FormulaToken*>(pTok)->GetMatrix();
-                    if (!pSourceMat)
+                    std::optional<serpn::MatrixOperand> oOperand;
+                    if (pTok->GetType() == svMatrix)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
-                        return false;
+                        ScMatrix* pSourceMat
+                            = const_cast<FormulaToken*>(pTok)->GetMatrix();
+                        if (!pSourceMat)
+                        {
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnMatrixEngineDeclinedCount);
+                            return false;
+                        }
+                        oOperand = convertMatrixRefToMatrixOperand(*pSourceMat);
                     }
-                    auto oOperand = convertMatrixRefToMatrixOperand(*pSourceMat);
+                    else
+                    {
+                        oOperand = materializeRangeTokenToMatrixOperand(pTok);
+                    }
                     if (!oOperand)
                     {
                         addDispatchRuntimeStat(
                             interpreterDispatchRuntimeStatsStore()
                                 .mnMatrixEngineDeclinedCount);
                         return false;
+                    }
+                    // Legacy ScMatInv pushes NoValue (#N/A) when the
+                    // source matrix contains non-numeric cells, whereas
+                    // planMatrixInverse surfaces that case as
+                    // IllegalArgument. Pre-check so the retired
+                    // ocMatInv dispatch preserves the legacy diagnostic
+                    // signal.
+                    auto hasNonNumericCell
+                        = [](const serpn::MatrixOperand& rOp) {
+                              for (const auto& rCell : rOp.maValues)
+                              {
+                                  if (rCell.meKind
+                                      == spreadsheetengine::api::CellValueKind::Text)
+                                      return true;
+                              }
+                              return false;
+                          };
+                    if (hasNonNumericCell(*oOperand))
+                    {
+                        sp -= 1;
+                        nGlobalError = FormulaError::NONE;
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnMatrixEngineSucceededCount);
+                        PushNoValue();
+                        return true;
                     }
                     const auto aPlan = serpn::planMatrixInverse(*oOperand);
                     if (aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
@@ -9231,7 +9268,7 @@ StackVar ScInterpreter::Interpret()
                             .mnMatrixEngineSucceededCount);
                     if (!aPlan)
                     {
-                        // Singular / non-numeric matrix surfaces as
+                        // Singular / dim-mismatch matrix surfaces as
                         // IllegalArgument -> #VALUE!, matching the
                         // legacy PushIllegalArgument path in ScMatInv.
                         PushError(selibreoffice::toFormulaError(aPlan.meError));
@@ -15699,7 +15736,10 @@ StackVar ScInterpreter::Interpret()
                         break;
                     case ocMatInv:
                         if (!tryPlanEngineMatrixInverse())
-                            ScMatInv();
+                        {
+                            OSL_FAIL("engine-backed MINVERSE declined ocMatInv");
+                            PushIllegalParameter();
+                        }
                         break;
                     case ocMatMult:
                         if (!tryPlanEngineMatrixMultiply())
