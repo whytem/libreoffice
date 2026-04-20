@@ -155,6 +155,9 @@ Current standing-corpus gap signals:
 
 - `interpret_tail_live_unique_unseen_formula_cells=21`
 - top unseen unknown-surface root remains `parse_failure` with `12` unseen cells
+- second visible unseen root is `operator:+` with `6` unseen cells
+- the expanded unknown-surface census now reports only `3` additional unseen
+  cells outside the top printed root list
 
 Required step before any fallback deletion:
 
@@ -171,6 +174,41 @@ This keeps the wave honest: it is not enough to reduce lambda count if the
 same functions still own a meaningful share of the remaining live
 authoritative-match gap.
 
+### Phase 0 Inventory Result
+
+Phase 0 is now complete on the current standing baseline.
+
+Classification result:
+
+- Wave A owned live-unique unseen cells: `0`
+  - `interpret_tail_live_unique_function_text_utility_unseen_formula_cells=0`
+  - `interpret_tail_live_unique_function_information_predicate_unseen_formula_cells=0`
+- Wave B owned live-unique unseen cells: `0`
+  - `interpret_tail_live_unique_function_value_unseen_formula_cells=0`
+  - `interpret_tail_live_unique_function_datevalue_unseen_formula_cells=0`
+  - `interpret_tail_live_unique_function_timevalue_unseen_formula_cells=0`
+  - `interpret_tail_live_unique_function_numbervalue_unseen_formula_cells=0`
+  - `interpret_tail_live_unique_function_formula_text_unseen_formula_cells=0`
+
+The remaining `21` live-unique unseen cells are therefore out of scope for
+this retirement wave on the standing corpus:
+
+- `12` are `parse_failure` rows from malformed logical formulas in
+  `logical/not.fods`, for example `=NOT(0)NOT(0)` and its siblings
+- `6` are `operator:+` rows currently rooted in non-wave shapes such as
+  `ORG.OPENOFFICE.CURRENT()`, `ORG.OPENOFFICE.STYLE(...)`, and range/matrix
+  arithmetic like `=[.I5:.I6]+1`
+- `3` remain in the long unknown-surface tail beyond the top printed roots;
+  by current function-family accounting they are also outside Wave A / Wave B
+
+Operational consequence:
+
+- this wave does not need additional authoritative-match widening before
+  retirement to close a standing corpus parity gap
+- the next blocking work for Wave A / Wave B is exercised engine-first runtime
+  on the relevant text/info and parsing/inspection dispatch paths, followed by
+  fallback deletion
+
 ## Execution Order
 
 ### Phase 0: Gap Inventory
@@ -178,6 +216,11 @@ authoritative-match gap.
 - refresh the standing corpus samples for the remaining `21` unseen cells
 - classify which misses belong to Wave A / Wave B
 - add or tighten focused tests for those shapes
+
+Status:
+
+- complete on the current standing baseline; no live-unique unseen cells are
+  owned by Wave A / Wave B
 
 ### Phase 1: Pure Text/Info Admission Tightening
 

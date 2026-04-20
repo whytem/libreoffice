@@ -495,8 +495,10 @@ unknown-surface tail.
 Top unseen unknown-surface roots:
 
 - `parse_failure`: `14` formula cells, `12` unseen
+- `operator:+`: `19` formula cells, `6` unseen
 - `root:array_constant`: `10` formula cells, `0` unseen
 - `COM.MICROSOFT.COVARIANCE.P`: `7` formula cells, `0` unseen
+- additional unseen unknown-surface tail beyond the printed roots: `3` cells
 
 The unknown-root samples made the last residual `operator:+` band legible:
 those `34` unseen cells were imported `TODAY() + n` date-offset formulas from
@@ -504,6 +506,18 @@ those `34` unseen cells were imported `TODAY() + n` date-offset formulas from
 `TODAY()` as a scalar child inside promoted scalar-root expressions, which is
 why that bucket disappears from the live unknown-surface table without widening
 root `TODAY()` into a new global default-on family.
+
+Phase-0 classification for the new text/info retirement wave is now complete:
+
+- `text_utility`, `information_predicate`, `value`, `datevalue`, `timevalue`,
+  `numbervalue`, and `formula_text` each show `0` live-unique unseen cells
+- the remaining `21` live-unique unseen cells are therefore outside that wave
+- `parse_failure` is a malformed logical-formula pocket from `logical/not.fods`
+  (`=NOT(0)NOT(0)` and siblings), not a text/parsing retirement gap
+- the remaining visible `operator:+` rows are rooted in
+  `ORG.OPENOFFICE.CURRENT()`, `ORG.OPENOFFICE.STYLE(...)`, and range/matrix
+  arithmetic shapes, again outside the pure text/info and parsing/inspection
+  wave
 
 Updated next routing policy:
 

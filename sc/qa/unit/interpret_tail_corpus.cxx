@@ -2350,7 +2350,7 @@ void printTopUnknownRootInventory(
 }
 
 void printTopUnknownRootSurfaceInventory(
-    std::string_view aPrefix, const ObserveSurfaceInventory& rInventory, std::size_t nLimit = 10)
+    std::string_view aPrefix, const ObserveSurfaceInventory& rInventory, std::size_t nLimit = 20)
 {
     using UnknownRootInventoryEntry = ObserveSurfaceInventory::UnknownRootInventoryEntry;
     struct RankedUnknownRoot
@@ -2375,10 +2375,35 @@ void printTopUnknownRootSurfaceInventory(
             return rLeft.maLabel < rRight.maLabel;
         });
 
+    sal_uInt64 nOtherFormulaCells = 0;
+    sal_uInt64 nOtherFallbackFormulaCells = 0;
+    sal_uInt64 nOtherUnseenFormulaCells = 0;
+    sal_uInt64 nOtherUnsupportedFunctionFormulaCells = 0;
+    std::size_t nOtherRootCount = 0;
     if (aEntries.size() > nLimit)
+    {
+        for (std::size_t nIndex = nLimit; nIndex < aEntries.size(); ++nIndex)
+        {
+            nOtherFormulaCells += aEntries[nIndex].maEntry.mnFormulaCells;
+            nOtherFallbackFormulaCells += aEntries[nIndex].maEntry.mnFallbackFormulaCells;
+            nOtherUnseenFormulaCells += aEntries[nIndex].maEntry.mnUnseenFormulaCells;
+            nOtherUnsupportedFunctionFormulaCells
+                += aEntries[nIndex].maEntry.mnUnsupportedFunctionFormulaCells;
+            ++nOtherRootCount;
+        }
         aEntries.resize(nLimit);
+    }
 
     std::cout << aPrefix << "_top_unknown_surface_root_count=" << aEntries.size() << '\n';
+    std::cout << aPrefix << "_top_unknown_surface_root_other_count=" << nOtherRootCount << '\n';
+    std::cout << aPrefix << "_top_unknown_surface_root_other_formula_cells=" << nOtherFormulaCells
+              << '\n';
+    std::cout << aPrefix << "_top_unknown_surface_root_other_fallback_formula_cells="
+              << nOtherFallbackFormulaCells << '\n';
+    std::cout << aPrefix << "_top_unknown_surface_root_other_unseen_formula_cells="
+              << nOtherUnseenFormulaCells << '\n';
+    std::cout << aPrefix << "_top_unknown_surface_root_other_unsupported_function_formula_cells="
+              << nOtherUnsupportedFunctionFormulaCells << '\n';
     for (std::size_t nIndex = 0; nIndex < aEntries.size(); ++nIndex)
     {
         const auto& rEntry = aEntries[nIndex];
