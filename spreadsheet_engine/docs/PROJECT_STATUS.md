@@ -45,7 +45,7 @@ This is the deletion-gating number for the standing replay corpus:
 - `interp4_dispatch_legacy_lambda_count=45`
 - `interp4_dispatch_legacy_dispatch_target_count=62`
 - `interp4_dispatch_legacy_call_count=80`
-- `interp4_dispatch_engine_attempt_count=71`
+- `interp4_dispatch_engine_attempt_count=81`
 - `interp4_dispatch_engine_attempted_total=0`
 - `interp4_dispatch_engine_succeeded_total=0`
 - `interp4_dispatch_engine_declined_total=0`
@@ -353,9 +353,33 @@ PushMatrix directly through `convertMatrixOperandToMatrixRef`,
 matching the legacy behavior; the allocator lifecycle lands
 with Phase 5B when the shape-reshaping family needs it, and it
 is documented up-front that `#SPILL!` on collision is NEW
-behavior not a migration of existing behavior. Phase 5B
-(HSTACK / VSTACK / CHOOSECOLS / CHOOSEROWS / EXPAND / TOCOL /
-TOROW / WRAPCOLS / WRAPROWS / TEXTSPLIT) remains a follow-up.
+behavior not a migration of existing behavior.
+
+Phase 5B has now landed ten shape-reshaping admissions covering
+the full dynamic-array family: `ocHStack`, `ocVStack`,
+`ocChooseCols`, `ocChooseRows`, `ocExpand`, `ocToCol`, `ocToRow`,
+`ocWrapCols`, `ocWrapRows`, and `ocTextSplit` each try a
+`sespill::plan*` planner before falling back to the legacy
+`ScHorizontalOrVerticalStack` / `ScChooseColsOrRows` / `ScExpand`
+/ `ScToColOrRow` / `ScWrapColsOrRows` / `ScTextSplit` body.  The
+new planners (`planHStackOrVStack`, `planChooseColsOrRows`,
+`planExpand`, `planToColOrRow`, `planWrapColsOrRows`,
+`planTextSplit`) are pure functions over `MatrixOperand`;
+geometry delegates to the existing `searray` helpers
+(`appendStackDimensions`, `planChooseResultDimensions`,
+`planExpandDimensions`, `planFlattenOutputDimensions`,
+`planWrapOutputDimensions`, `wrapDestination`).  Scope fence
+mirrors Phase 5A: every matrix argument must arrive as an svMatrix
+token; numeric options must be scalar svDouble / svMissing; string
+options for EXPAND / WRAPCOLS / WRAPROWS / TEXTSPLIT pad values are
+scalar svString.  Range inputs decline and defer to legacy pending
+the Phase D reference-to-matrix materialization contract.
+TEXTSPLIT's delimiter matching uses an engine-local ASCII
+case-folding fallback when `bMatchMode` is set; the legacy
+ScGlobal CharClass Unicode fold remains accessible through the
+legacy decline path for workbooks that need full Unicode semantics.
+`interp4_dispatch_engine_attempt_count` moves from `71` to `81`
+with the ten admissions.
 
 The current value reflects the restored original `Sc*` names after backing out
 earlier rename-only metric compression, and the quarantine audit currently
