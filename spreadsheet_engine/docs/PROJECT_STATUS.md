@@ -42,7 +42,7 @@ This is the deletion-gating number for the standing replay corpus:
 - `interpret_tail_live_authoritative_match_total=50382`
 - `interpret_tail_live_authoritative_fallback_total=4`
 - `known_regressions_baseline=0`
-- `legacy_interpreter_subroutine_count=63`
+- `legacy_interpreter_subroutine_count=61`
 - `interp4_dispatch_legacy_lambda_count=42`
 - `interp4_dispatch_legacy_dispatch_target_count=62`
 - `interp4_dispatch_legacy_call_count=80`
