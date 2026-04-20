@@ -702,8 +702,6 @@ public:
 
     void DBIterator( ScIterFunc );
     void ScDBCount();
-    void ScDBCount2();
-    void ScDBGet();
     void GetDBStVarParams( std::vector<double>& rValues );
     void ScIndirect();
     void ScAddressFunc();

@@ -2996,41 +2996,6 @@ svl::SharedString ScInterpreter::GetStringFromDouble( double fVal )
     return mrStrPool.intern(mrContext.NFGetInputLineString(fVal, nIndex));
 }
 
-void ScInterpreter::ScDBGet()
-{
-    bool bMissingField = false;
-    std::unique_ptr<ScDBQueryParamBase> pQueryParam( GetDBParams(bMissingField) );
-    if (!pQueryParam)
-    {
-        // Failed to create query param.
-        PushIllegalParameter();
-        return;
-    }
-
-    pQueryParam->mbSkipString = false;
-    ScDBQueryDataIterator aValIter(mrDoc, mrContext, std::move(pQueryParam));
-    ScDBQueryDataIterator::Value aValue;
-    if (!aValIter.GetFirst(aValue) || aValue.mnError != FormulaError::NONE)
-    {
-        // No match found.
-        PushNoValue();
-        return;
-    }
-
-    ScDBQueryDataIterator::Value aValNext;
-    if (aValIter.GetNext(aValNext) && aValNext.mnError == FormulaError::NONE)
-    {
-        // There should be only one unique match.
-        PushIllegalArgument();
-        return;
-    }
-
-    if (aValue.mbIsNumber)
-        PushDouble(aValue.mfValue);
-    else
-        PushString(aValue.maString);
-}
-
 void ScInterpreter::ScExternal()
 {
     sal_uInt8 nParamCount = GetByte();
@@ -11025,6 +10990,79 @@ StackVar ScInterpreter::Interpret()
                         aValues, bSample, bStdDev));
                 };
 
+                // Legacy fallback for ocDBGet after the engine admission
+                // declines. Collapses the retired ScDBGet() body into
+                // this lambda: resolve DB params, enforce single-match
+                // uniqueness, then push the matching field value
+                // (numeric or string).
+                const auto evaluateLegacyDBGet = [&]() {
+                    bool bMissingField = false;
+                    std::unique_ptr<ScDBQueryParamBase> pQueryParam(
+                        GetDBParams(bMissingField));
+                    if (!pQueryParam)
+                    {
+                        PushIllegalParameter();
+                        return;
+                    }
+                    pQueryParam->mbSkipString = false;
+                    ScDBQueryDataIterator aValIter(
+                        mrDoc, mrContext, std::move(pQueryParam));
+                    ScDBQueryDataIterator::Value aValue;
+                    if (!aValIter.GetFirst(aValue)
+                        || aValue.mnError != FormulaError::NONE)
+                    {
+                        PushNoValue();
+                        return;
+                    }
+                    ScDBQueryDataIterator::Value aValNext;
+                    if (aValIter.GetNext(aValNext)
+                        && aValNext.mnError == FormulaError::NONE)
+                    {
+                        PushIllegalArgument();
+                        return;
+                    }
+                    if (aValue.mbIsNumber)
+                        PushDouble(aValue.mfValue);
+                    else
+                        PushString(aValue.maString);
+                };
+
+                // Legacy fallback for ocDBCount2 (DCOUNTA): counts every
+                // matching record whose target field is non-empty,
+                // including strings. Collapses the retired ScDBCount2()
+                // body into this lambda.
+                const auto evaluateLegacyDBCount2 = [&]() {
+                    bool bMissingField = true;
+                    std::unique_ptr<ScDBQueryParamBase> pQueryParam(
+                        GetDBParams(bMissingField));
+                    if (!pQueryParam)
+                    {
+                        PushIllegalParameter();
+                        return;
+                    }
+                    if (!pQueryParam->IsValidFieldIndex())
+                    {
+                        SetError(FormulaError::NoValue);
+                        return;
+                    }
+                    sal_uLong nCount = 0;
+                    pQueryParam->mbSkipString = false;
+                    ScDBQueryDataIterator aValIter(
+                        mrDoc, mrContext, std::move(pQueryParam));
+                    ScDBQueryDataIterator::Value aValue;
+                    if (aValIter.GetFirst(aValue)
+                        && aValue.mnError == FormulaError::NONE)
+                    {
+                        do
+                        {
+                            nCount++;
+                        } while (aValIter.GetNext(aValue)
+                                 && aValue.mnError == FormulaError::NONE);
+                    }
+                    SetError(aValue.mnError);
+                    PushDouble(nCount);
+                };
+
                 // Batch 3 tail ocDBGet admission. 3-arg shape shared
                 // with DB aggregate / variance helpers: iterates the
                 // criteria grid, enforces uniqueness, and pushes the
@@ -14859,7 +14897,7 @@ StackVar ScInterpreter::Interpret()
                     case ocDBCount2         :
                         if (!tryPlanEngineDatabaseAggregate(
                                 sequery::CriteriaAggregateKind::Count2))
-                            ScDBCount2();
+                            evaluateLegacyDBCount2();
                         break;
                     case ocDBAverage        :
                         if (!tryPlanEngineDatabaseAggregate(
@@ -14868,7 +14906,7 @@ StackVar ScInterpreter::Interpret()
                         break;
                     case ocDBGet            :
                         if (!tryPlanEngineDatabaseGet())
-                            ScDBGet();
+                            evaluateLegacyDBGet();
                         break;
                     case ocDBMax            :
                         if (!tryPlanEngineDatabaseAggregate(

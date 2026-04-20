@@ -6534,36 +6534,6 @@ void ScInterpreter::ScDBCount()
         PushIllegalParameter();
 }
 
-void ScInterpreter::ScDBCount2()
-{
-    bool bMissingField = true;
-    std::unique_ptr<ScDBQueryParamBase> pQueryParam( GetDBParams(bMissingField) );
-    if (pQueryParam)
-    {
-        if (!pQueryParam->IsValidFieldIndex())
-        {
-            SetError(FormulaError::NoValue);
-            return;
-        }
-        sal_uLong nCount = 0;
-        pQueryParam->mbSkipString = false;
-        ScDBQueryDataIterator aValIter(mrDoc, mrContext, std::move(pQueryParam));
-        ScDBQueryDataIterator::Value aValue;
-        if ( aValIter.GetFirst(aValue) && aValue.mnError == FormulaError::NONE )
-        {
-            do
-            {
-                nCount++;
-            }
-            while ( aValIter.GetNext(aValue) && aValue.mnError == FormulaError::NONE );
-        }
-        SetError(aValue.mnError);
-        PushDouble( nCount );
-    }
-    else
-        PushIllegalParameter();
-}
-
 void ScInterpreter::GetDBStVarParams( std::vector<double>& rValues )
 {
     rValues.clear();
