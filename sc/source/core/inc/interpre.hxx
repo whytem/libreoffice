@@ -661,7 +661,6 @@ private:
     void IterateParametersIfs( double(*ResultFunc)( const sc::ParamIfsResult& rRes ) );
     void ScLookup();
     void ScXLookup();
-    void ScSort();
     void ScSortBy();
     void ScTextSplit();
     void ScLet();

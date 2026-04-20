@@ -8804,7 +8804,13 @@ StackVar ScInterpreter::Interpret()
                         = nParamCount >= 2 ? pStack[sp - (nParamCount - 1)] : nullptr;
                     const FormulaToken* pSourceTok = pStack[sp - nParamCount];
 
-                    if (!pSourceTok || pSourceTok->GetType() != svMatrix)
+                    // Scope fence: admit svMatrix directly plus
+                    // svSingleRef / svDoubleRef via the Phase D
+                    // host-facade materialization primitive.
+                    if (!pSourceTok
+                        || (pSourceTok->GetType() != svMatrix
+                            && pSourceTok->GetType() != svSingleRef
+                            && pSourceTok->GetType() != svDoubleRef))
                     {
                         pushSpillEngineDecline();
                         return false;
@@ -8828,13 +8834,22 @@ StackVar ScInterpreter::Interpret()
                         return false;
                     }
 
-                    ScMatrix* pSourceMat = const_cast<FormulaToken*>(pSourceTok)->GetMatrix();
-                    if (!pSourceMat)
+                    std::optional<serpn::MatrixOperand> oOperand;
+                    if (pSourceTok->GetType() == svMatrix)
                     {
-                        pushSpillEngineDecline();
-                        return false;
+                        ScMatrix* pSourceMat
+                            = const_cast<FormulaToken*>(pSourceTok)->GetMatrix();
+                        if (!pSourceMat)
+                        {
+                            pushSpillEngineDecline();
+                            return false;
+                        }
+                        oOperand = convertMatrixRefToMatrixOperand(*pSourceMat);
                     }
-                    auto oOperand = convertMatrixRefToMatrixOperand(*pSourceMat);
+                    else
+                    {
+                        oOperand = materializeRangeTokenToMatrixOperand(pSourceTok);
+                    }
                     if (!oOperand)
                     {
                         pushSpillEngineDecline();
@@ -13256,7 +13271,10 @@ StackVar ScInterpreter::Interpret()
                         break;
                     case ocSort             :
                         if (!tryPlanEngineSpillSort())
-                            ScSort();
+                        {
+                            OSL_FAIL("engine-backed SORT declined ocSort");
+                            PushIllegalParameter();
+                        }
                         break;
                     case ocSortBy           :
                         if (!tryPlanEngineSpillSortBy())
