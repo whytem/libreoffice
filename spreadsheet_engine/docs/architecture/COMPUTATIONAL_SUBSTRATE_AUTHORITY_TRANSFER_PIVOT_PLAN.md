@@ -114,6 +114,8 @@ Implemented result:
 
 ## Phase 1: Freeze the Wrong Kind of Progress
 
+Status: complete on the current tree
+
 ### Goal
 
 Stop spending engineering effort on work that only expands scaffolding below
@@ -138,6 +140,18 @@ the seam.
   `interp4_dispatch_engine_attempt_count`
 - every lower-seam execution change is justified by deletion, parity closure,
   or subsystem construction
+
+Implemented result:
+
+- the freeze rule is now recorded in
+  [COMPUTATIONAL_SUBSTRATE_RPN_EVALUATOR_INITIATIVE.md](COMPUTATIONAL_SUBSTRATE_RPN_EVALUATOR_INITIATIVE.md)
+  and [CLOSE_OUT_PLAN.md](CLOSE_OUT_PLAN.md)
+- every surviving lower-seam `tryPushEngine*` site in
+  [interpr4.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr4.cxx)
+  now carries an explicit `PIVOT_ALLOW_LOWER_SEAM_ADMISSION:` rationale marker
+- `testLowerSeamEngineAttemptsCarryPivotRationale` in
+  [interpret_tail_corpus.cxx](/home/ubuntu/repos/libreoffice/sc/qa/unit/interpret_tail_corpus.cxx)
+  enforces that annotation rule in CI
 
 ## Phase 2: Finish the Host-Boundary Audit
 

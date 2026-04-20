@@ -13826,6 +13826,7 @@ StackVar ScInterpreter::Interpret()
                         }
                         break;
                     case ocAdd              :
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: subsystem-primitive
                         if (!tryPushEngineScalarBinaryOp(serpn::BinaryScalarOperator::Add))
                         {
                             warnIfLegacyScalarRootReached(u"ADD");
@@ -13833,6 +13834,7 @@ StackVar ScInterpreter::Interpret()
                         }
                         break;
                     case ocSub              :
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: subsystem-primitive
                         if (!tryPushEngineScalarBinaryOp(
                                 serpn::BinaryScalarOperator::Subtract))
                         {
@@ -13841,23 +13843,28 @@ StackVar ScInterpreter::Interpret()
                         }
                         break;
                     case ocMul              :
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: subsystem-primitive
                         if (!tryPushEngineScalarBinaryOp(
                                 serpn::BinaryScalarOperator::Multiply))
                             ScMul();
                         break;
                     case ocDiv              :
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: subsystem-primitive
                         if (!tryPushEngineScalarBinaryOp(serpn::BinaryScalarOperator::Divide))
                             ScDiv();
                         break;
                     case ocAmpersand        :
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: subsystem-primitive
                         if (!tryPushEngineScalarBinaryOp(serpn::BinaryScalarOperator::Concat))
                             ScAmpersand();
                         break;
                     case ocPow              :
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: subsystem-primitive
                         if (!tryPushEngineScalarBinaryOp(serpn::BinaryScalarOperator::Power))
                             ScPow();
                         break;
                     case ocEqual            :
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: subsystem-primitive
                         if (!tryPushEngineScalarBinaryOp(serpn::BinaryScalarOperator::Equal))
                         {
                             warnIfLegacyScalarRootReached(u"EQUAL");
@@ -13868,6 +13875,7 @@ StackVar ScInterpreter::Interpret()
                         }
                         break;
                     case ocNotEqual         :
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: subsystem-primitive
                         if (!tryPushEngineScalarBinaryOp(
                                 serpn::BinaryScalarOperator::NotEqual))
                         {
@@ -13879,6 +13887,7 @@ StackVar ScInterpreter::Interpret()
                         }
                         break;
                     case ocLess             :
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: subsystem-primitive
                         if (!tryPushEngineScalarBinaryOp(serpn::BinaryScalarOperator::Less))
                         {
                             warnIfLegacyScalarRootReached(u"LESS");
@@ -13889,6 +13898,7 @@ StackVar ScInterpreter::Interpret()
                         }
                         break;
                     case ocGreater          :
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: subsystem-primitive
                         if (!tryPushEngineScalarBinaryOp(
                                 serpn::BinaryScalarOperator::Greater))
                         {
@@ -13900,6 +13910,7 @@ StackVar ScInterpreter::Interpret()
                         }
                         break;
                     case ocLessEqual        :
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: subsystem-primitive
                         if (!tryPushEngineScalarBinaryOp(
                                 serpn::BinaryScalarOperator::LessEqual))
                         {
@@ -13911,6 +13922,7 @@ StackVar ScInterpreter::Interpret()
                         }
                         break;
                     case ocGreaterEqual     :
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: subsystem-primitive
                         if (!tryPushEngineScalarBinaryOp(
                                 serpn::BinaryScalarOperator::GreaterEqual))
                         {
@@ -13941,6 +13953,7 @@ StackVar ScInterpreter::Interpret()
                         break;
                     case ocIntersect        : ScIntersect();                break;
                     case ocRange            :
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: parity-gap
                         if (!tryPushEngineBadLiteralRangeOpcode()
                             && !tryPushEngineRangeReference())
                         {
@@ -14528,6 +14541,7 @@ StackVar ScInterpreter::Interpret()
                         break;
                     case ocIsEmpty          :
                     {
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
                         if (!tryPushEngineInformationPredicate(u"ISBLANK"))
                         {
                             warnInformationPredicateDispatch(u"ISBLANK");
@@ -14537,6 +14551,7 @@ StackVar ScInterpreter::Interpret()
                     }
                     break;
                     case ocIsString         :
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
                         if (!tryPushEngineInformationPredicate(u"ISTEXT"))
                         {
                             warnInformationPredicateDispatch(u"ISTEXT");
@@ -14545,6 +14560,7 @@ StackVar ScInterpreter::Interpret()
                         }
                         break;
                     case ocIsNonString      :
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
                         if (!tryPushEngineInformationPredicate(u"ISNONTEXT"))
                         {
                             warnInformationPredicateDispatch(u"ISNONTEXT");
@@ -14648,6 +14664,7 @@ StackVar ScInterpreter::Interpret()
                     break;
                     case ocIsValue          :
                     {
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
                         if (!tryPushEngineInformationPredicate(u"ISNUMBER"))
                         {
                             warnInformationPredicateDispatch(u"ISNUMBER");
@@ -14657,6 +14674,7 @@ StackVar ScInterpreter::Interpret()
                     }
                     break;
                     case ocIsFormula        :
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
                         if (!tryPushEngineFormulaInspectionFunction(u"ISFORMULA"))
                         {
                             warnInformationPredicateDispatch(u"ISFORMULA");
@@ -14665,6 +14683,7 @@ StackVar ScInterpreter::Interpret()
                         }
                         break;
                     case ocFormula          :
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
                         if (!tryPushEngineFormulaInspectionFunction(u"FORMULA"))
                         {
                             warnIfLegacyDispatchReached(
@@ -14679,6 +14698,7 @@ StackVar ScInterpreter::Interpret()
                         break;
                     case ocIsNA             :
                     {
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
                         if (!tryPushEngineInformationPredicate(u"ISNA"))
                         {
                             warnInformationPredicateDispatch(u"ISNA");
@@ -14688,6 +14708,7 @@ StackVar ScInterpreter::Interpret()
                     }
                     break;
                     case ocIsErr            :
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
                         if (!tryPushEngineInformationPredicate(u"ISERR"))
                         {
                             warnInformationPredicateDispatch(u"ISERR");
@@ -14696,6 +14717,7 @@ StackVar ScInterpreter::Interpret()
                         }
                         break;
                     case ocIsError          :
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
                         if (!tryPushEngineInformationPredicate(u"ISERROR"))
                         {
                             warnInformationPredicateDispatch(u"ISERROR");
@@ -14713,6 +14735,7 @@ StackVar ScInterpreter::Interpret()
                         break;
                     case ocN                : ScN();                    break;
                     case ocGetDateValue     :
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
                         if (!tryPushEngineTextParsingFunction(u"DATEVALUE", 1))
                         {
                             warnIfLegacyDispatchReached(
@@ -14727,6 +14750,7 @@ StackVar ScInterpreter::Interpret()
                         }
                         break;
                     case ocGetTimeValue     :
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
                         if (!tryPushEngineTextParsingFunction(u"TIMEVALUE", 1))
                         {
                             warnIfLegacyDispatchReached(
@@ -14741,6 +14765,7 @@ StackVar ScInterpreter::Interpret()
                         }
                         break;
                     case ocCode             :
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
                         if (!tryPushEngineTextUtility(u"CODE"))
                         {
                             warnTextUtilityDispatch(u"CODE");
@@ -14749,6 +14774,7 @@ StackVar ScInterpreter::Interpret()
                         }
                         break;
                     case ocTrim             :
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
                         if (!tryPushEngineTextUtility(u"TRIM"))
                         {
                             warnTextUtilityDispatch(u"TRIM");
@@ -14778,6 +14804,7 @@ StackVar ScInterpreter::Interpret()
                             });
                         break;
                     case ocLen              :
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
                         if (!tryPushEngineTextUtility(u"LEN"))
                         {
                             warnTextUtilityDispatch(u"LEN");
@@ -14852,6 +14879,7 @@ StackVar ScInterpreter::Interpret()
                         }();
                         break;
                     case ocClean            :
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
                         if (!tryPushEngineTextUtility(u"CLEAN"))
                         {
                             warnTextUtilityDispatch(u"CLEAN");
@@ -14860,6 +14888,7 @@ StackVar ScInterpreter::Interpret()
                         }
                         break;
                     case ocValue            :
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
                         if (!tryPushEngineTextParsingFunction(u"VALUE", 1))
                         {
                             warnTextUtilityDispatch(u"VALUE");
@@ -14870,6 +14899,7 @@ StackVar ScInterpreter::Interpret()
                     case ocNumberValue      :
                     {
                         const sal_uInt8 nParamCount = GetByte();
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
                         if (!tryPushEngineTextParsingFunction(u"NUMBERVALUE", nParamCount))
                         {
                             warnTextUtilityDispatch(u"NUMBERVALUE");
@@ -14879,6 +14909,7 @@ StackVar ScInterpreter::Interpret()
                     }
                     break;
                     case ocChar             :
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
                         if (!tryPushEngineTextUtility(u"CHAR"))
                         {
                             warnTextUtilityDispatch(u"CHAR");
@@ -16901,6 +16932,7 @@ StackVar ScInterpreter::Interpret()
                     break;
                     case ocNoName           : PushError(FormulaError::NoName); break;
                     case ocBad              :
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
                         if (!tryPushEngineBadLiteralError())
                         {
                             OSL_FAIL("engine-backed root error literal declined ocBad");
@@ -17524,6 +17556,7 @@ StackVar ScInterpreter::Interpret()
                     case ocBahtText         : pushLegacyBahtText();     break;
                     case ocGetPivotData     : ScGetPivotData();             break;
                     case ocJis              :
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
                         if (!tryPushEngineTextUtility(u"JIS"))
                         {
                             warnTextUtilityDispatch(u"JIS");
@@ -17532,6 +17565,7 @@ StackVar ScInterpreter::Interpret()
                         }
                         break;
                     case ocAsc              :
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
                         if (!tryPushEngineTextUtility(u"ASC"))
                         {
                             warnTextUtilityDispatch(u"ASC");
@@ -17550,6 +17584,7 @@ StackVar ScInterpreter::Interpret()
                     case ocFindB            : pushLegacyFindB();        break;
                     case ocSearchB          : pushLegacySearchB();      break;
                     case ocUnicode          :
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
                         if (!tryPushEngineTextUtility(u"UNICODE"))
                         {
                             warnTextUtilityDispatch(u"UNICODE");
@@ -17558,6 +17593,7 @@ StackVar ScInterpreter::Interpret()
                         }
                         break;
                     case ocUnichar          :
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
                         if (!tryPushEngineTextUtility(u"UNICHAR"))
                         {
                             warnTextUtilityDispatch(u"UNICHAR");

@@ -77,11 +77,17 @@ For this initiative, the project should use the following working rules:
   path is engine-owned and the relocated legacy surface also falls
 - no new `pushLegacy*` lambdas should be added for families the engine does
   not already own at the root
+- no new lower-seam `tryPushEngine*` admission should land in
+  `ScInterpreter::Interpret()` unless it is explicitly deletion-backed,
+  required as an RPN subsystem primitive, or closes a measured parity gap
 - if a family is not yet engine-authoritative, leaving it as
   `ScInterpreter::ScXxx()` is preferable to growing `Interpret()`
 - every surviving `pushLegacy*` path must remain quarantine-warned
 - a static rise in `interp4_dispatch_engine_attempt_count` is not by itself
   migration progress unless the live or full-legacy runtime counters move
+- every surviving lower-seam `tryPushEngine*` admission site must carry an
+  explicit pivot rationale marker in source so review and CI can distinguish
+  deletion-backed work from new scaffolding
 - the next success metric is meaningful reduction in
   `interp4_dispatch_legacy_lambda_count`, not just another drop in
   `legacy_interpreter_subroutine_count`

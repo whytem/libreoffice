@@ -44,6 +44,14 @@ that do not yet exist. Each of Phases B–F adds one such substrate and
 the admissions it unlocks; they are independent of each other and can
 run in parallel worktrees.
 
+Freeze rule for the pivot:
+
+- no new lower-seam `tryPushEngine*` admission should land in
+  `ScInterpreter::Interpret()` unless it is deletion-backed, introduces a
+  required RPN subsystem primitive, or closes a measured parity gap
+- every surviving lower-seam admission site should carry an explicit pivot
+  rationale marker in source so the policy is reviewable and CI-checkable
+
 ## Phase A — Text/Info Retirement Wave
 
 Status: complete on the current tree.

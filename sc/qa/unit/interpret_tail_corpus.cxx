@@ -303,6 +303,8 @@ struct Interp4LegacyLambdaInventory
 struct Interp4EngineDispatchInventory
 {
     std::size_t mnAttemptCaseCount = 0;
+    std::size_t mnPolicyAnnotatedAttemptCount = 0;
+    std::vector<std::size_t> maMissingPolicyLineNumbers;
 };
 
 std::filesystem::path repoRootPath()
@@ -530,21 +532,38 @@ Interp4LegacyLambdaInventory countInterp4LegacyLambdas()
 
 Interp4EngineDispatchInventory countInterp4EngineDispatchAttempts()
 {
-    const std::filesystem::path aRepoRoot
-        = std::filesystem::path(SPREADSHEETENGINE_TEST_ROOT).parent_path();
-    const std::filesystem::path aSourcePath
-        = aRepoRoot / "sc" / "source" / "core" / "tool" / "interpr4.cxx";
-
-    std::ifstream aStream(aSourcePath);
+    std::ifstream aStream(repoRootPath() / "sc" / "source" / "core" / "tool" / "interpr4.cxx");
     if (!aStream.is_open())
         return {};
 
     Interp4EngineDispatchInventory aInventory;
     static const std::regex aAttemptPattern(R"(\bif\s*\(!tryPushEngine[A-Za-z0-9_]*\s*\()");
+    static constexpr std::string_view aPolicyMarker = "PIVOT_ALLOW_LOWER_SEAM_ADMISSION:";
+    std::vector<std::string> aLines;
     for (std::string aLine; std::getline(aStream, aLine);)
+        aLines.push_back(aLine);
+
+    for (std::size_t nLine = 0; nLine < aLines.size(); ++nLine)
     {
+        const std::string& aLine = aLines[nLine];
         if (std::regex_search(aLine, aAttemptPattern))
+        {
             ++aInventory.mnAttemptCaseCount;
+            const std::size_t nStart = (nLine > 3) ? (nLine - 3) : 0;
+            bool bAnnotated = false;
+            for (std::size_t nLookback = nStart; nLookback <= nLine; ++nLookback)
+            {
+                if (aLines[nLookback].find(aPolicyMarker) != std::string::npos)
+                {
+                    bAnnotated = true;
+                    break;
+                }
+            }
+            if (bAnnotated)
+                ++aInventory.mnPolicyAnnotatedAttemptCount;
+            else
+                aInventory.maMissingPolicyLineNumbers.push_back(nLine + 1);
+        }
     }
     return aInventory;
 }
@@ -2633,6 +2652,10 @@ void printLiveAuthoritativeSummary(
               << rLegacyLambdaInventory.mnDispatchCallCount << '\n';
     std::cout << "interp4_dispatch_engine_attempt_count="
               << rEngineDispatchInventory.mnAttemptCaseCount << '\n';
+    std::cout << "interp4_dispatch_engine_policy_annotated_attempt_count="
+              << rEngineDispatchInventory.mnPolicyAnnotatedAttemptCount << '\n';
+    std::cout << "interp4_dispatch_engine_policy_missing_attempt_count="
+              << rEngineDispatchInventory.maMissingPolicyLineNumbers.size() << '\n';
     std::cout << "interp4_dispatch_engine_attempted_total="
               << rLiveDispatchRuntimeStats.mnEngineAttemptedCount << '\n';
     std::cout << "interp4_dispatch_engine_succeeded_total="
@@ -5115,6 +5138,15 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testProjectStatusOwnsCanonicalDash
     assertProjectStatusCanonicalDashboard();
 }
 
+CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testLowerSeamEngineAttemptsCarryPivotRationale)
+{
+    const Interp4EngineDispatchInventory aInventory = countInterp4EngineDispatchAttempts();
+    CPPUNIT_ASSERT_EQUAL(aInventory.mnAttemptCaseCount, aInventory.mnPolicyAnnotatedAttemptCount);
+    CPPUNIT_ASSERT_MESSAGE(
+        "all lower-seam engine-attempt sites should carry an explicit pivot rationale",
+        aInventory.maMissingPolicyLineNumbers.empty());
+}
+
 CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
 {
     if (!envEnabled("SPREADSHEET_ENGINE_INTERPRET_TAIL_CORPUS_STATS"))
@@ -5415,6 +5447,8 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
     const auto aEngineDispatchInventory = countInterp4EngineDispatchAttempts();
     CPPUNIT_ASSERT_MESSAGE("interp4 engine attempt metric should scan interpr4.cxx",
         aEngineDispatchInventory.mnAttemptCaseCount > 0);
+    CPPUNIT_ASSERT_EQUAL(std::size_t(0),
+        aEngineDispatchInventory.maMissingPolicyLineNumbers.size());
     CPPUNIT_ASSERT_EQUAL_MESSAGE(
         "core-forced full-legacy engine dispatch accounting should stay balanced",
         aCoreForcedSeamDisabledDispatchRuntimeStats.mnEngineAttemptedCount,
