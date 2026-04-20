@@ -12,6 +12,8 @@
 
 #include <spreadsheetengine/api/Logic.hxx>
 #include <spreadsheetengine/runtime/ReferenceText.hxx>
+#include <spreadsheetengine/runtime/RpnControlFlow.hxx>
+#include <spreadsheetengine/runtime/RpnValue.hxx>
 
 #include "FormulaEvaluatorUtils.hxx"
 
@@ -311,45 +313,38 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateSpecialForm(
 
     if (rFunctionName == u"IF")
     {
+        namespace serpn = spreadsheetengine::core::rpn;
+
         if (rNode.maChildren.empty() || rNode.maChildren.size() > 3)
             return detail::makeFailure(api::Error::IllegalArgument);
 
         EvaluationResult aCondition
             = detail::ensureScalarValue(*this, evaluateNode(*rNode.maChildren[0], rCurrentAddress));
-        bool bCondition = false;
-        bool bConditionError = false;
-        api::Error eConditionError = api::Error::None;
-        if (!aCondition)
-        {
-            bConditionError = true;
-            eConditionError = aCondition.meError;
-        }
-        else
-        {
-            const auto aBool = detail::coerceToBoolean(aCondition.maValue.maValue);
-            if (!aBool)
-            {
-                bConditionError = true;
-                eConditionError = aBool.meError;
-            }
-            else
-                bCondition = aBool.maValue;
-        }
 
-        const auto eAction = api::logic::selectIfBranch(
-            bCondition, bConditionError, rNode.maChildren.size() >= 2, rNode.maChildren.size() >= 3);
-        switch (eAction)
+        const serpn::RpnValue aConditionRpn
+            = aCondition ? serpn::RpnValue::fromCellValue(aCondition.maValue.maValue)
+                         : serpn::RpnValue::error(aCondition.meError);
+
+        const auto aPlan = serpn::planIfBranch(
+            aConditionRpn,
+            rNode.maChildren.size() >= 2 ? std::optional(std::size_t(1)) : std::nullopt,
+            rNode.maChildren.size() >= 3 ? std::optional(std::size_t(2)) : std::nullopt);
+
+        if (aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
+            return detail::makeFailure(api::Error::IllegalArgument);
+
+        const auto& rBranch = aPlan.maValue;
+        switch (rBranch.meDirective)
         {
-            case api::logic::IfBranchAction::PropagateError:
-                return detail::makeFailure(eConditionError);
-            case api::logic::IfBranchAction::ThenPath:
-                return evaluateNode(*rNode.maChildren[1], rCurrentAddress);
-            case api::logic::IfBranchAction::ElsePath:
-                return evaluateNode(*rNode.maChildren[2], rCurrentAddress);
-            case api::logic::IfBranchAction::ReturnTrue:
-                return detail::makeScalarResult(api::CellValue::boolean(true));
-            case api::logic::IfBranchAction::ReturnFalse:
-                return detail::makeScalarResult(api::CellValue::boolean(false));
+            case serpn::BranchDirective::PropagateError:
+                return detail::makeFailure(rBranch.meError);
+            case serpn::BranchDirective::TakeSlot:
+                return evaluateNode(*rNode.maChildren[rBranch.mnSlot], rCurrentAddress);
+            case serpn::BranchDirective::ReturnSyntheticBoolean:
+                return detail::makeScalarResult(
+                    api::CellValue::boolean(rBranch.mbSyntheticBool));
+            default:
+                return detail::makeFailure(api::Error::IllegalArgument);
         }
     }
 

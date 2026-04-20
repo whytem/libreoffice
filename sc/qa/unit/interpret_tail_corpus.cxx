@@ -5709,6 +5709,45 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testInterpretTailRpnCountersNonZer
         aStats.mnRpnAttemptedTotal == aStats.mnRpnSucceededTotal + aStats.mnRpnDeclinedTotal);
 }
 
+CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testRpnSubstrateExercisedThroughUpperSeam)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+    using setaileval::RpnCategory;
+
+    m_pDoc->InsertTab(0, u"Test"_ustr);
+    m_pDoc->SetValue(ScAddress(0, 0, 0), 1.0); // A1=1
+    m_pDoc->SetValue(ScAddress(1, 0, 0), 2.0); // B1=2
+    m_pDoc->SetString(ScAddress(2, 0, 0), u"=A1+B1"_ustr); // C1: operator
+    m_pDoc->SetString(ScAddress(3, 0, 0), u"=IF(A1>0;A1;-A1)"_ustr); // D1: control flow
+
+    ScFormulaCell* pOperatorFormula = m_pDoc->GetFormulaCell(ScAddress(2, 0, 0));
+    ScFormulaCell* pIfFormula = m_pDoc->GetFormulaCell(ScAddress(3, 0, 0));
+    CPPUNIT_ASSERT(pOperatorFormula);
+    CPPUNIT_ASSERT(pIfFormula);
+
+    setaileval::resetStats();
+
+    pOperatorFormula->SetDirty();
+    (void)pOperatorFormula->Interpret();
+    pIfFormula->SetDirty();
+    (void)pIfFormula->Interpret();
+
+    const StatsSnapshot aStats = setaileval::getStatsSnapshot();
+
+    CPPUNIT_ASSERT_MESSAGE(
+        "RPN succeeded counter should be non-zero after operator + IF evaluation",
+        aStats.mnRpnSucceededTotal > 0);
+    CPPUNIT_ASSERT_MESSAGE(
+        "Operator RPN category should be exercised through the upper seam",
+        aStats.maRpnCategorySucceeded[static_cast<std::size_t>(RpnCategory::Operator)] > 0);
+    CPPUNIT_ASSERT_MESSAGE(
+        "ControlFlow RPN category should be exercised through the upper seam",
+        aStats.maRpnCategorySucceeded[static_cast<std::size_t>(RpnCategory::ControlFlow)] > 0);
+
+    CPPUNIT_ASSERT_EQUAL(3.0, m_pDoc->GetValue(ScAddress(2, 0, 0)));
+    CPPUNIT_ASSERT_EQUAL(1.0, m_pDoc->GetValue(ScAddress(3, 0, 0)));
+}
+
 } // namespace
 
 CPPUNIT_PLUGIN_IMPLEMENT();

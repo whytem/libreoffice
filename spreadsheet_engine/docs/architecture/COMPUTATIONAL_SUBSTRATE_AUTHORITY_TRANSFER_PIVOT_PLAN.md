@@ -275,6 +275,8 @@ Implemented result:
 
 ## Phase 4: Implement the RPN Subsystem in Dependency Order
 
+Status: complete on the current tree
+
 ### Goal
 
 Build the engine-native execution substrate in the order that unlocks real
@@ -313,6 +315,34 @@ authority transfer.
 - at least one hot opcode family is exercised upstream under ambient load
 - lower-seam pilots are no longer the only execution story
 - new leaf migrations consume engine-native contracts instead of Calc-local state
+
+Implemented result:
+
+- `evaluateBinaryOperationNode` in
+  [FormulaEvaluatorOperators.cxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/source/core/FormulaEvaluatorOperators.cxx)
+  now delegates all 12 binary scalar operators (arithmetic, comparison,
+  concatenation) to `serpn::evaluateBinaryScalarOperator` from
+  [RpnOperators.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/runtime/RpnOperators.hxx)
+- `evaluateUnaryOperationNode` now delegates to
+  `serpn::evaluateUnaryNumericOperator`
+- the duplicate local `evaluateNumericComparison` and
+  `evaluateStringComparison` functions have been removed from the AST
+  evaluator — the RPN substrate is now the single owner of those semantics
+- the IF handler in
+  [FormulaEvaluatorSpecialForms.cxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/source/core/FormulaEvaluatorSpecialForms.cxx)
+  now delegates condition planning to `rpn::planIfBranch` from
+  [RpnControlFlow.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/runtime/RpnControlFlow.hxx),
+  replacing the inline `selectIfBranch` call with the full RPN coercion +
+  branch-planning path
+- `testRpnSubstrateExercisedThroughUpperSeam` in
+  [interpret_tail_corpus.cxx](/home/ubuntu/repos/libreoffice/sc/qa/unit/interpret_tail_corpus.cxx)
+  enforces that both the Operator and ControlFlow RPN categories show
+  non-zero succeeded counters after upstream formula evaluation, and
+  verifies correct result values
+- exit criteria satisfied: scalar operators are a hot opcode family exercised
+  upstream under ambient load through the FormulaEvaluator; the upper seam
+  now consumes the same engine-native RPN contracts as the lower seam;
+  lower-seam pilots are no longer the only execution story
 
 ## Phase 5: Ambient Default-On Pilot
 

@@ -9,53 +9,35 @@
 
 #include "FormulaEvaluatorInternals.hxx"
 
+#include <spreadsheetengine/runtime/RpnOperators.hxx>
+#include <spreadsheetengine/runtime/RpnValue.hxx>
+
 namespace spreadsheetengine::core::eval
 {
 namespace
 {
 
-[[nodiscard]] bool evaluateNumericComparison(
-    double fLeft, double fRight, formula::BinaryOperator eOperator)
-{
-    switch (eOperator)
-    {
-        case formula::BinaryOperator::Equal:
-            return fp::approxEqual(fLeft, fRight);
-        case formula::BinaryOperator::NotEqual:
-            return !fp::approxEqual(fLeft, fRight);
-        case formula::BinaryOperator::Less:
-            return fLeft < fRight;
-        case formula::BinaryOperator::LessEqual:
-            return fLeft < fRight || fp::approxEqual(fLeft, fRight);
-        case formula::BinaryOperator::Greater:
-            return fLeft > fRight;
-        case formula::BinaryOperator::GreaterEqual:
-            return fLeft > fRight || fp::approxEqual(fLeft, fRight);
-        default:
-            return false;
-    }
-}
+namespace serpn = spreadsheetengine::core::rpn;
 
-[[nodiscard]] bool evaluateStringComparison(
-    api::StringView rLeft, api::StringView rRight, formula::BinaryOperator eOperator)
+[[nodiscard]] constexpr serpn::BinaryScalarOperator toBinaryScalarOperator(
+    formula::BinaryOperator eOp)
 {
-    switch (eOperator)
+    switch (eOp)
     {
-        case formula::BinaryOperator::Equal:
-            return rLeft == rRight;
-        case formula::BinaryOperator::NotEqual:
-            return rLeft != rRight;
-        case formula::BinaryOperator::Less:
-            return rLeft < rRight;
-        case formula::BinaryOperator::LessEqual:
-            return rLeft <= rRight;
-        case formula::BinaryOperator::Greater:
-            return rLeft > rRight;
-        case formula::BinaryOperator::GreaterEqual:
-            return rLeft >= rRight;
-        default:
-            return false;
+        case formula::BinaryOperator::Add:          return serpn::BinaryScalarOperator::Add;
+        case formula::BinaryOperator::Subtract:     return serpn::BinaryScalarOperator::Subtract;
+        case formula::BinaryOperator::Multiply:     return serpn::BinaryScalarOperator::Multiply;
+        case formula::BinaryOperator::Divide:       return serpn::BinaryScalarOperator::Divide;
+        case formula::BinaryOperator::Power:        return serpn::BinaryScalarOperator::Power;
+        case formula::BinaryOperator::Concat:       return serpn::BinaryScalarOperator::Concat;
+        case formula::BinaryOperator::Equal:        return serpn::BinaryScalarOperator::Equal;
+        case formula::BinaryOperator::NotEqual:     return serpn::BinaryScalarOperator::NotEqual;
+        case formula::BinaryOperator::Less:         return serpn::BinaryScalarOperator::Less;
+        case formula::BinaryOperator::LessEqual:    return serpn::BinaryScalarOperator::LessEqual;
+        case formula::BinaryOperator::Greater:      return serpn::BinaryScalarOperator::Greater;
+        case formula::BinaryOperator::GreaterEqual: return serpn::BinaryScalarOperator::GreaterEqual;
     }
+    return serpn::BinaryScalarOperator::Add;
 }
 
 } // namespace
@@ -116,14 +98,15 @@ EvaluationResult Evaluator::evaluateUnaryOperationNode(
     if (!aChild)
         return makeStoredReplayOrFailure(rNode, rCurrentAddress, aChild.meError);
 
-    const auto aNumber = coerceToNumber(aChild.maValue.maValue);
-    if (!aNumber)
-        return makeStoredReplayOrFailure(rNode, rCurrentAddress, aNumber.meError);
+    const auto eOp = rNode.meUnaryOperator == formula::UnaryOperator::Minus
+                         ? serpn::UnaryNumericOperator::Minus
+                         : serpn::UnaryNumericOperator::Plus;
+    const auto aResult
+        = serpn::evaluateUnaryNumericOperator(eOp, serpn::RpnValue::fromCellValue(aChild.maValue.maValue));
+    if (!aResult)
+        return makeStoredReplayOrFailure(rNode, rCurrentAddress, aResult.meError);
 
-    const double fValue = rNode.meUnaryOperator == formula::UnaryOperator::Minus
-                              ? -aNumber.maValue
-                              : aNumber.maValue;
-    return makeScalarResult(api::CellValue::number(fValue));
+    return makeScalarResult(aResult.maValue.maScalar);
 }
 
 EvaluationResult Evaluator::evaluateBinaryOperationNode(
@@ -151,96 +134,19 @@ EvaluationResult Evaluator::evaluateBinaryOperationNode(
         return aRight;
     }
 
-    if (rNode.meBinaryOperator == formula::BinaryOperator::Concat)
-    {
-        const auto aLeftText = coerceToString(aLeft.maValue.maValue);
-        if (!aLeftText)
-            return makeFailure(aLeftText.meError);
-        const auto aRightText = coerceToString(aRight.maValue.maValue);
-        if (!aRightText)
-            return makeFailure(aRightText.meError);
+    const auto aLeftRpn = serpn::RpnValue::fromCellValue(aLeft.maValue.maValue);
+    const auto aRightRpn = serpn::RpnValue::fromCellValue(aRight.maValue.maValue);
+    const auto aResult = serpn::evaluateBinaryScalarOperator(
+        toBinaryScalarOperator(rNode.meBinaryOperator), aLeftRpn, aRightRpn);
 
-        api::String aValue = aLeftText.maValue;
-        aValue += aRightText.maValue;
-        return makeScalarResult(api::CellValue::text(aValue));
-    }
-
-    if (rNode.meBinaryOperator == formula::BinaryOperator::Equal
-        || rNode.meBinaryOperator == formula::BinaryOperator::NotEqual
-        || rNode.meBinaryOperator == formula::BinaryOperator::Less
-        || rNode.meBinaryOperator == formula::BinaryOperator::LessEqual
-        || rNode.meBinaryOperator == formula::BinaryOperator::Greater
-        || rNode.meBinaryOperator == formula::BinaryOperator::GreaterEqual)
-    {
-        if (aLeft.maValue.maValue.isText() && aRight.maValue.maValue.isText())
-        {
-            return makeScalarResult(api::CellValue::boolean(evaluateStringComparison(
-                aLeft.maValue.maValue.maString, aRight.maValue.maValue.maString,
-                rNode.meBinaryOperator)));
-        }
-
-        const auto aLeftNumber = coerceToNumber(aLeft.maValue.maValue);
-        if (!aLeftNumber)
-        {
-            if (const auto oStored = replayStoredBinaryResult())
-                return *oStored;
-            return makeFailure(aLeftNumber.meError);
-        }
-
-        const auto aRightNumber = coerceToNumber(aRight.maValue.maValue);
-        if (!aRightNumber)
-        {
-            if (const auto oStored = replayStoredBinaryResult())
-                return *oStored;
-            return makeFailure(aRightNumber.meError);
-        }
-
-        return makeScalarResult(api::CellValue::boolean(evaluateNumericComparison(
-            aLeftNumber.maValue, aRightNumber.maValue, rNode.meBinaryOperator)));
-    }
-
-    const auto aLeftNumber = coerceToNumber(aLeft.maValue.maValue);
-    if (!aLeftNumber)
+    if (!aResult)
     {
         if (const auto oStored = replayStoredBinaryResult())
             return *oStored;
-        return makeFailure(aLeftNumber.meError);
+        return makeFailure(aResult.meError);
     }
 
-    const auto aRightNumber = coerceToNumber(aRight.maValue.maValue);
-    if (!aRightNumber)
-    {
-        if (const auto oStored = replayStoredBinaryResult())
-            return *oStored;
-        return makeFailure(aRightNumber.meError);
-    }
-
-    switch (rNode.meBinaryOperator)
-    {
-        case formula::BinaryOperator::Add:
-            return makeScalarResult(api::CellValue::number(
-                fp::approxAdd(aLeftNumber.maValue, aRightNumber.maValue)));
-        case formula::BinaryOperator::Subtract:
-            return makeScalarResult(api::CellValue::number(
-                fp::approxSub(aLeftNumber.maValue, aRightNumber.maValue)));
-        case formula::BinaryOperator::Multiply:
-            return makeScalarResult(
-                api::CellValue::number(aLeftNumber.maValue * aRightNumber.maValue));
-        case formula::BinaryOperator::Divide:
-            if (aRightNumber.maValue == 0.0)
-            {
-                if (const auto oStored = replayStoredBinaryResult())
-                    return *oStored;
-                return makeFailure(api::Error::DivisionByZero);
-            }
-            return makeScalarResult(
-                api::CellValue::number(aLeftNumber.maValue / aRightNumber.maValue));
-        case formula::BinaryOperator::Power:
-            return makeScalarResult(api::CellValue::number(
-                std::pow(aLeftNumber.maValue, aRightNumber.maValue)));
-        default:
-            return makeFailure(api::Error::IllegalArgument);
-    }
+    return makeScalarResult(aResult.maValue.maScalar);
 }
 
 } // namespace spreadsheetengine::core::eval

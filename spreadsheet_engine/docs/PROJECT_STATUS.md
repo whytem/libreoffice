@@ -125,8 +125,14 @@ also complete: [HOST_FACADE_CONTRACTS.md](architecture/HOST_FACADE_CONTRACTS.md)
 and
 [COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md](architecture/COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md)
 now give the project one explicit host-contract inventory for the remaining
-legacy surface. Phase 3 is now complete: upstream `InterpretTail -> RpnEvaluator` counters
-are wired and observation is default-on in all builds.
+legacy surface. Phases 3 and 4 are now complete: upstream
+`InterpretTail -> RpnEvaluator` counters are wired and observation is
+default-on in all builds. The FormulaEvaluator (AST walker used by the upper
+seam) now delegates binary/unary operators to `serpn::evaluateBinaryScalarOperator`
+/ `serpn::evaluateUnaryNumericOperator` and IF condition planning to
+`rpn::planIfBranch`, eliminating the duplicated inline implementations and
+making the upstream path exercise the same engine-native RPN contracts as the
+lower seam.
 
 Batch 1 of the five-batch RPN evaluator plan has now landed its substrate
 (`runtime/RpnControlFlow.hxx`) and six explicit admissions:
