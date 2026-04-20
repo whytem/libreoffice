@@ -9092,38 +9092,96 @@ StackVar ScInterpreter::Interpret()
                             .mnSpillEngineAttemptedCount);
 
                     const sal_uInt8 nParamCount = pCur->GetByte();
-                    if (nParamCount != 2 || sp < 2)
+                    if (nParamCount < 2 || nParamCount > 3 || sp < nParamCount)
                     {
                         pushSpillEngineDecline();
                         return false;
                     }
-                    const FormulaToken* pMaskTok = pStack[sp - 1];
-                    const FormulaToken* pSourceTok = pStack[sp - 2];
-                    if (!pSourceTok || pSourceTok->GetType() != svMatrix
-                        || !pMaskTok || pMaskTok->GetType() != svMatrix)
+                    const FormulaToken* pNotFoundTok
+                        = nParamCount == 3 ? pStack[sp - 1] : nullptr;
+                    const FormulaToken* pMaskTok
+                        = pStack[sp - (nParamCount == 3 ? 2 : 1)];
+                    const FormulaToken* pSourceTok
+                        = pStack[sp - nParamCount];
+                    // Scope fence: admit svMatrix directly plus
+                    // svSingleRef / svDoubleRef via the Phase D
+                    // host-facade materialization primitive for both
+                    // source and mask operands.
+                    const auto isAdmissibleSource = [](const FormulaToken* pTok) {
+                        return pTok
+                               && (pTok->GetType() == svMatrix
+                                   || pTok->GetType() == svSingleRef
+                                   || pTok->GetType() == svDoubleRef);
+                    };
+                    if (!isAdmissibleSource(pSourceTok)
+                        || !isAdmissibleSource(pMaskTok))
                     {
                         pushSpillEngineDecline();
                         return false;
                     }
-                    ScMatrix* pSourceMat = const_cast<FormulaToken*>(pSourceTok)->GetMatrix();
-                    ScMatrix* pMaskMat = const_cast<FormulaToken*>(pMaskTok)->GetMatrix();
-                    if (!pSourceMat || !pMaskMat)
-                    {
-                        pushSpillEngineDecline();
-                        return false;
-                    }
-                    auto oSource = convertMatrixRefToMatrixOperand(*pSourceMat);
-                    auto oMask = convertMatrixRefToMatrixOperand(*pMaskMat);
+                    const auto toOperand
+                        = [&](const FormulaToken* pTok) {
+                              if (pTok->GetType() == svMatrix)
+                              {
+                                  ScMatrix* pMat
+                                      = const_cast<FormulaToken*>(pTok)->GetMatrix();
+                                  if (!pMat)
+                                      return std::optional<serpn::MatrixOperand>{};
+                                  return convertMatrixRefToMatrixOperand(*pMat);
+                              }
+                              return materializeRangeTokenToMatrixOperand(pTok);
+                          };
+                    auto oSource = toOperand(pSourceTok);
+                    auto oMask = toOperand(pMaskTok);
                     if (!oSource || !oMask)
                     {
                         pushSpillEngineDecline();
                         return false;
                     }
+                    // Guard against 2D masks so we surface the legacy
+                    // FormulaError::NoValue signal rather than declining.
+                    if (oMask->maDimensions.mnColumns > 1
+                        && oMask->maDimensions.mnRows > 1)
+                    {
+                        sp -= nParamCount;
+                        nGlobalError = FormulaError::NONE;
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnSpillEngineSucceededCount);
+                        PushError(FormulaError::NoValue);
+                        return true;
+                    }
                     const auto aPlan = sespill::planFilter(*oSource, *oMask);
                     if (std::holds_alternative<sespill::SpillError>(aPlan))
                     {
-                        pushSpillEngineDecline();
-                        return false;
+                        const auto eError
+                            = std::get<sespill::SpillError>(aPlan);
+                        sp -= nParamCount;
+                        nGlobalError = FormulaError::NONE;
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnSpillEngineSucceededCount);
+                        if (eError == sespill::SpillError::OutOfBounds)
+                        {
+                            // All-false mask: legacy surfaced the 3-arg
+                            // if_empty value or FormulaError::NestedArray.
+                            if (pNotFoundTok
+                                && pNotFoundTok->GetType() != svMissing
+                                && pNotFoundTok->GetType() != svEmptyCell)
+                            {
+                                PushTokenRef(
+                                    formula::FormulaConstTokenRef(pNotFoundTok));
+                            }
+                            else
+                            {
+                                PushError(FormulaError::NestedArray);
+                            }
+                            return true;
+                        }
+                        // InvalidShape or other planner-side failure:
+                        // mirror legacy's IllegalParameter surfacing.
+                        PushError(FormulaError::IllegalParameter);
+                        return true;
                     }
                     const auto& rFilterResult = std::get<serpn::MatrixOperand>(aPlan);
                     ScMatrixRef pFilterResultMat = convertMatrixOperandToMatrixRef(rFilterResult);
@@ -13089,7 +13147,10 @@ StackVar ScInterpreter::Interpret()
                     case ocRandbetweenNV    : ScRandbetween();              break;
                     case ocFilter           :
                         if (!tryPlanEngineSpillFilter())
-                            ScFilter();
+                        {
+                            OSL_FAIL("engine-backed FILTER declined ocFilter");
+                            PushIllegalParameter();
+                        }
                         break;
                     case ocSort             :
                         if (!tryPlanEngineSpillSort())
