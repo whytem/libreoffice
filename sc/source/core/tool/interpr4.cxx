@@ -4871,7 +4871,7 @@ StackVar ScInterpreter::Interpret()
                 const auto tryBuildEngineTextInfoReferenceOperand =
                     [&](const FormulaToken& rToken)
                     -> std::optional<spreadsheetengine::api::CellValue> {
-                    if (mrDoc.m_TableOpList.empty() == false || pJumpMatrix)
+                    if (mrDoc.m_TableOpList.empty() == false)
                         return std::nullopt;
 
                     const FormulaError nSavedError = nGlobalError;
@@ -4929,6 +4929,38 @@ StackVar ScInterpreter::Interpret()
                             }
 
                             return buildFromCellAddress(aAddress);
+                        }
+                        case svExternalSingleRef:
+                        case svExternalDoubleRef:
+                        case svMatrix:
+                        {
+                            if (pJumpMatrix)
+                            {
+                                restoreInterpreterState();
+                                return std::nullopt;
+                            }
+
+                            double fValue = 0.0;
+                            svl::SharedString aString;
+                            const ScMatValType nType = GetDoubleOrStringFromMatrix(fValue, aString);
+                            const FormulaError eMatrixError = nGlobalError;
+                            restoreInterpreterState();
+                            if (eMatrixError != FormulaError::NONE)
+                            {
+                                return std::optional<spreadsheetengine::api::CellValue>(
+                                    spreadsheetengine::api::CellValue::error(
+                                        selibreoffice::toApiError(eMatrixError)));
+                            }
+                            if (nType == ScMatValType::Empty)
+                                return spreadsheetengine::api::CellValue::empty();
+                            if (ScMatrix::IsBooleanType(nType))
+                            {
+                                return spreadsheetengine::api::CellValue::boolean(fValue != 0.0);
+                            }
+                            if (ScMatrix::IsValueType(nType))
+                                return spreadsheetengine::api::CellValue::number(fValue);
+                            return spreadsheetengine::api::CellValue::text(
+                                selibreoffice::toApiString(aString.getString()));
                         }
                         default:
                             restoreInterpreterState();

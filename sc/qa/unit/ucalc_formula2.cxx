@@ -1893,7 +1893,10 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterTextInfoDispatch)
     m_pDoc->SetString(ScAddress(1, 8, 0), u"=JIS(\"AB\")"_ustr);
     CPPUNIT_ASSERT_EQUAL(u"ＡＢ"_ustr, m_pDoc->GetString(ScAddress(1, 8, 0)));
 
-    m_pDoc->SetString(ScAddress(6, 0, 0), u"=ISBLANK(B10)"_ustr);
+    m_pDoc->SetString(ScAddress(1, 9, 0), u"=LEN({\"ab\"})"_ustr);
+    ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(1, 9, 0)));
+
+    m_pDoc->SetString(ScAddress(6, 0, 0), u"=ISBLANK(B11)"_ustr);
     CPPUNIT_ASSERT_EQUAL(true, static_cast<bool>(m_pDoc->GetValue(ScAddress(6, 0, 0))));
 
     m_pDoc->SetString(ScAddress(6, 1, 0), u"=ISTEXT(C1)"_ustr);
@@ -1913,6 +1916,12 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterTextInfoDispatch)
 
     m_pDoc->SetString(ScAddress(6, 6, 0), u"=ISERROR(F1)"_ustr);
     CPPUNIT_ASSERT_EQUAL(true, static_cast<bool>(m_pDoc->GetValue(ScAddress(6, 6, 0))));
+
+    m_pDoc->SetString(ScAddress(6, 7, 0), u"=ISTEXT({\"x\"})"_ustr);
+    CPPUNIT_ASSERT_EQUAL(true, static_cast<bool>(m_pDoc->GetValue(ScAddress(6, 7, 0))));
+
+    m_pDoc->SetString(ScAddress(6, 8, 0), u"=ISNUMBER({42})"_ustr);
+    CPPUNIT_ASSERT_EQUAL(true, static_cast<bool>(m_pDoc->GetValue(ScAddress(6, 8, 0))));
 
     ScMarkData aMark(m_pDoc->GetSheetLimits());
     aMark.SelectOneTable(0);

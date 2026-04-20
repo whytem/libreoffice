@@ -238,7 +238,8 @@ Status:
 - the engine-first path is intentionally narrow:
   - direct scalar tokens are admitted
   - scalarized single-cell references are admitted
-  - matrix / jump-matrix / table-op shapes still decline to legacy
+  - non-jump scalar matrix and external-matrix-backed shapes are admitted
+  - jump-matrix and table-op shapes still decline to legacy
 - the focused Calc runtime gate is now
   [testSharedInterpreterTextInfoDispatch](/home/ubuntu/repos/libreoffice/sc/qa/unit/ucalc_formula2.cxx),
   which proves both:

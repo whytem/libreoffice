@@ -531,6 +531,9 @@ Phase 1 is now underway:
 
 - [testSharedInterpreterTextInfoDispatch](/home/ubuntu/repos/libreoffice/sc/qa/unit/ucalc_formula2.cxx)
   proves engine-first success for the safe Wave-A unary shapes
+- that Phase-1 surface now includes non-jump scalar matrix and
+  external-matrix-backed operands in addition to direct scalars and
+  scalarized single-cell references
 - the same focused lane also proves deliberate decline on a matrix shape, so
   the classic fallback boundary remains explicit instead of accidental
 - no fallback deletion is claimed yet, so `interp4_dispatch_legacy_lambda_count`
