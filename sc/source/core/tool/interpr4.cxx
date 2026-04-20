@@ -5665,52 +5665,6 @@ StackVar ScInterpreter::Interpret()
                         oResult->append(sStr.subView(nPos, sStr.getLength() - nPos));
                     PushString(oResult ? oResult->makeStringAndClear() : sStr);
                 };
-                const auto pushLegacySearch = [&]() {
-                    warnTextUtilityDispatch(u"SEARCH");
-                    sal_uInt8 nParamCount = GetByte();
-                    if (!MustHaveParamCount(nParamCount, 2, 3))
-                        return;
-
-                    sal_Int32 nStart;
-                    if (nParamCount == 3)
-                    {
-                        nStart = GetStringPositionArgument();
-                        if (nStart < 1)
-                        {
-                            PushIllegalArgument();
-                            return;
-                        }
-                    }
-                    else
-                        nStart = 1;
-                    OUString sStr = GetString().getString();
-                    OUString SearchStr = GetString().getString();
-                    sal_Int32 nPos = nStart - 1;
-                    sal_Int32 nEndPos = sStr.getLength();
-                    if (nPos >= nEndPos)
-                        PushNoValue();
-                    else
-                    {
-                        utl::SearchParam::SearchType eSearchType
-                            = DetectSearchType(SearchStr, mrDoc);
-                        utl::SearchParam sPar(SearchStr, eSearchType, false, '~', false);
-                        utl::TextSearch sT(sPar, ScGlobal::getCharClass());
-                        bool bBool = sT.SearchForward(sStr, &nPos, &nEndPos);
-                        if (!bBool)
-                            PushNoValue();
-                        else
-                        {
-                            sal_Int32 nIdx = 0;
-                            sal_Int32 nCnt = 0;
-                            while (nIdx < nPos)
-                            {
-                                sStr.iterateCodePoints(&nIdx);
-                                ++nCnt;
-                            }
-                            PushDouble(static_cast<double>(nCnt + 1));
-                        }
-                    }
-                };
                 const auto pushLegacyRegex = [&]() {
                     warnTextUtilityDispatch(u"REGEX");
                     const sal_uInt8 nParamCount = GetByte();
@@ -15606,7 +15560,54 @@ StackVar ScInterpreter::Interpret()
                         break;
                     case ocLeft             : pushLegacyLeftRight(false);   break;
                     case ocRight            : pushLegacyLeftRight(true);    break;
-                    case ocSearch           : pushLegacySearch();       break;
+                    case ocSearch           :
+                        [&]() {
+                            warnTextUtilityDispatch(u"SEARCH");
+                            sal_uInt8 nParamCount = GetByte();
+                            if (!MustHaveParamCount(nParamCount, 2, 3))
+                                return;
+
+                            sal_Int32 nStart;
+                            if (nParamCount == 3)
+                            {
+                                nStart = GetStringPositionArgument();
+                                if (nStart < 1)
+                                {
+                                    PushIllegalArgument();
+                                    return;
+                                }
+                            }
+                            else
+                                nStart = 1;
+                            OUString sStr = GetString().getString();
+                            OUString SearchStr = GetString().getString();
+                            sal_Int32 nPos = nStart - 1;
+                            sal_Int32 nEndPos = sStr.getLength();
+                            if (nPos >= nEndPos)
+                                PushNoValue();
+                            else
+                            {
+                                utl::SearchParam::SearchType eSearchType
+                                    = DetectSearchType(SearchStr, mrDoc);
+                                utl::SearchParam sPar(SearchStr, eSearchType, false, '~', false);
+                                utl::TextSearch sT(sPar, ScGlobal::getCharClass());
+                                bool bBool = sT.SearchForward(sStr, &nPos, &nEndPos);
+                                if (!bBool)
+                                    PushNoValue();
+                                else
+                                {
+                                    sal_Int32 nIdx = 0;
+                                    sal_Int32 nCnt = 0;
+                                    while (nIdx < nPos)
+                                    {
+                                        sStr.iterateCodePoints(&nIdx);
+                                        ++nCnt;
+                                    }
+                                    PushDouble(static_cast<double>(nCnt + 1));
+                                }
+                            }
+                        }();
+                        break;
                     case ocMid              :
                         [&]() {
                             warnTextUtilityDispatch(u"MID");
