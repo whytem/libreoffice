@@ -7075,78 +7075,6 @@ StackVar ScInterpreter::Interpret()
                               "family-local default-on information predicate reached "
                               "ScInterpreter");
                       };
-                const auto pushLegacyIsValue = [&]() {
-                    warnInformationPredicateDispatch(u"ISNUMBER");
-                    nFuncFmtType = SvNumFormatType::LOGICAL;
-                    bool bRes = false;
-                    switch (GetRawStackType())
-                    {
-                        case svDouble:
-                            Pop();
-                            bRes = true;
-                            break;
-                        case svDoubleRef:
-                        case svSingleRef:
-                        {
-                            ScAddress aAdr;
-                            if (!PopDoubleRefOrSingleRef(aAdr))
-                                break;
-                            ScRefCellValue aCell(mrDoc, aAdr);
-                            if (GetCellErrCode(aCell) == FormulaError::NONE)
-                            {
-                                switch (aCell.getType())
-                                {
-                                    case CELLTYPE_VALUE:
-                                        bRes = true;
-                                        break;
-                                    case CELLTYPE_FORMULA:
-                                        bRes = (aCell.getFormula()->IsValue()
-                                                && !aCell.getFormula()->IsEmpty());
-                                        break;
-                                    default:
-                                        break;
-                                }
-                            }
-                        }
-                        break;
-                        case svExternalSingleRef:
-                        {
-                            ScExternalRefCache::TokenRef pToken;
-                            PopExternalSingleRef(pToken);
-                            if (nGlobalError == FormulaError::NONE && pToken->GetType() == svDouble)
-                                bRes = true;
-                        }
-                        break;
-                        case svExternalDoubleRef:
-                        case svMatrix:
-                        {
-                            ScMatrixRef pMat = GetMatrix();
-                            if (!pMat)
-                                break;
-                            if (!pJumpMatrix)
-                            {
-                                if (pMat->GetErrorIfNotString(0, 0) == FormulaError::NONE)
-                                    bRes = pMat->IsValue(0, 0);
-                            }
-                            else
-                            {
-                                SCSIZE nCols, nRows, nC, nR;
-                                pMat->GetDimensions(nCols, nRows);
-                                pJumpMatrix->GetPos(nC, nR);
-                                if (nC < nCols && nR < nRows
-                                    && pMat->GetErrorIfNotString(nC, nR) == FormulaError::NONE)
-                                {
-                                    bRes = pMat->IsValue(nC, nR);
-                                }
-                            }
-                        }
-                        break;
-                        default:
-                            Pop();
-                    }
-                    nGlobalError = FormulaError::NONE;
-                    PushInt(int(bRes));
-                };
                 const auto pushLegacyIsFormula = [&]() {
                     warnInformationPredicateDispatch(u"ISFORMULA");
                     nFuncFmtType = SvNumFormatType::LOGICAL;
@@ -14551,7 +14479,80 @@ StackVar ScInterpreter::Interpret()
                         PushInt(int(bRes));
                     }
                     break;
-                    case ocIsValue          : pushLegacyIsValue();          break;
+                    case ocIsValue          :
+                    {
+                        warnInformationPredicateDispatch(u"ISNUMBER");
+                        nFuncFmtType = SvNumFormatType::LOGICAL;
+                        bool bRes = false;
+                        switch (GetRawStackType())
+                        {
+                            case svDouble:
+                                Pop();
+                                bRes = true;
+                                break;
+                            case svDoubleRef:
+                            case svSingleRef:
+                            {
+                                ScAddress aAdr;
+                                if (!PopDoubleRefOrSingleRef(aAdr))
+                                    break;
+                                ScRefCellValue aCell(mrDoc, aAdr);
+                                if (GetCellErrCode(aCell) == FormulaError::NONE)
+                                {
+                                    switch (aCell.getType())
+                                    {
+                                        case CELLTYPE_VALUE:
+                                            bRes = true;
+                                            break;
+                                        case CELLTYPE_FORMULA:
+                                            bRes = (aCell.getFormula()->IsValue()
+                                                    && !aCell.getFormula()->IsEmpty());
+                                            break;
+                                        default:
+                                            break;
+                                    }
+                                }
+                            }
+                            break;
+                            case svExternalSingleRef:
+                            {
+                                ScExternalRefCache::TokenRef pToken;
+                                PopExternalSingleRef(pToken);
+                                if (nGlobalError == FormulaError::NONE && pToken->GetType() == svDouble)
+                                    bRes = true;
+                            }
+                            break;
+                            case svExternalDoubleRef:
+                            case svMatrix:
+                            {
+                                ScMatrixRef pMat = GetMatrix();
+                                if (!pMat)
+                                    break;
+                                if (!pJumpMatrix)
+                                {
+                                    if (pMat->GetErrorIfNotString(0, 0) == FormulaError::NONE)
+                                        bRes = pMat->IsValue(0, 0);
+                                }
+                                else
+                                {
+                                    SCSIZE nCols, nRows, nC, nR;
+                                    pMat->GetDimensions(nCols, nRows);
+                                    pJumpMatrix->GetPos(nC, nR);
+                                    if (nC < nCols && nR < nRows
+                                        && pMat->GetErrorIfNotString(nC, nR) == FormulaError::NONE)
+                                    {
+                                        bRes = pMat->IsValue(nC, nR);
+                                    }
+                                }
+                            }
+                            break;
+                            default:
+                                Pop();
+                        }
+                        nGlobalError = FormulaError::NONE;
+                        PushInt(int(bRes));
+                    }
+                    break;
                     case ocIsFormula        : pushLegacyIsFormula();        break;
                     case ocFormula          : pushLegacyFormulaText();      break;
                     case ocIsNA             : pushLegacyIsNA();             break;
