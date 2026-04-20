@@ -14880,9 +14880,14 @@ StackVar ScInterpreter::Interpret()
                         seinterpcompatdispatch::Dispatcher::statisticalSkew(*this, true);
                         break;
                     case ocModalValue:
+                        warnIfLegacyStatisticalDistributionReached(u"MODE");
+                        seinterpcompatdispatch::Dispatcher::statisticalMode(
+                            *this, true, /*bSmallest*/ true);
+                        break;
                     case ocModalValue_MS:
                         warnIfLegacyStatisticalDistributionReached(u"MODE.SNGL");
-                        seinterpcompatdispatch::Dispatcher::statisticalMode(*this, true);
+                        seinterpcompatdispatch::Dispatcher::statisticalMode(
+                            *this, true, /*bSmallest*/ false);
                         break;
                     case ocModalValue_Multi:
                         warnIfLegacyStatisticalDistributionReached(u"MODE.MULT");

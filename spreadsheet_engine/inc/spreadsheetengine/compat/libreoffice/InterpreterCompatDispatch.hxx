@@ -402,7 +402,7 @@ struct Dispatcher
         pushCalcMathValueResult(rCalc, aResult);
     }
 
-    static void statisticalMode(ScInterpreter& rCalc, bool bSingle)
+    static void statisticalMode(ScInterpreter& rCalc, bool bSingle, bool bSmallest = false)
     {
         sal_uInt8 nParamCount = GetByte();
         if (!MustHaveParamCountMin(nParamCount, 1))
@@ -421,7 +421,15 @@ struct Dispatcher
             return;
         }
         if (bSingle)
-            PushDouble(aModes.maValue.front());
+        {
+            // MODE (classical) returns the smallest tied mode;
+            // MODE.SNGL returns the first-in-input-order mode.
+            if (bSmallest)
+                PushDouble(*std::min_element(
+                    aModes.maValue.begin(), aModes.maValue.end()));
+            else
+                PushDouble(aModes.maValue.front());
+        }
         else
         {
             ScMatrixRef pResMatrix = GetNewMat(1, aModes.maValue.size(), true);
