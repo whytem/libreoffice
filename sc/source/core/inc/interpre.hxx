@@ -681,7 +681,6 @@ private:
     void ScChooseColsOrRows(bool bCols);
     void ScToColOrRow(bool bCol);
     void ScWrapColsOrRows(bool bCols);
-    void ScTakeOrDrop(bool bTake);
     void ScHorizontalOrVerticalStack(bool bHorizontal);
 
 public:
