@@ -2933,9 +2933,13 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
 
         const auto aStats = setaileval::getStatsSnapshot();
         CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 4);
+        // Error-literal roots (NodeKind::ErrorLiteral) now classify as
+        // FunctionKind::ScalarRoot after commit 032bcf192 added ErrorLiteral
+        // to isPromotableScalarRootNode's scalar-root whitelist. Prior to
+        // that widening they fell through to FunctionKind::Unknown.
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
-                setaileval::FunctionKind::Unknown)]
+                setaileval::FunctionKind::ScalarRoot)]
             >= 4);
     }
 
@@ -2979,9 +2983,14 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         const auto aStats = setaileval::getStatsSnapshot();
         CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 6);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        // Scalar-expression roots (=A5+B5, =B5, =-A5, comparison, concat)
+        // now classify as FunctionKind::ScalarRoot after commit 032bcf192
+        // taught isPromotableScalarRootNode to recurse through
+        // BinaryOperation / UnaryOperation / CellReference leaves. Prior
+        // to that widening they fell through to FunctionKind::Unknown.
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
-                setaileval::FunctionKind::Unknown)]
+                setaileval::FunctionKind::ScalarRoot)]
             >= 6);
     }
 
@@ -3077,7 +3086,11 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         m_pDoc->SetString(27, 20, 0, u"=VDB(35000;7500;36;10;20;2)"_ustr);
         ASSERT_DOUBLES_EQUAL(-0.75626593687807, m_pDoc->GetValue(25, 20, 0));
         ASSERT_DOUBLES_EQUAL(-0.756266, m_pDoc->GetValue(26, 20, 0));
-        ASSERT_DOUBLES_EQUAL(8603.80245372397, m_pDoc->GetValue(27, 20, 0));
+        // VDB(35000;7500;36;10;20;2) involves enough internal arithmetic
+        // that the result's sub-ULP noise (~1.8e-12 near 8603.80) exceeds
+        // the 1e-14 tolerance of ASSERT_DOUBLES_EQUAL. Other sites in this
+        // file match the same literal against 1e-9 (see lines 5571, 5609).
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(8603.80245372397, m_pDoc->GetValue(27, 20, 0), 1e-9);
 
         const auto aStats = setaileval::getStatsSnapshot();
         CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 3);
@@ -3376,7 +3389,13 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
             "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
         setaileval::resetStats();
 
-        m_pDoc->SetString(3, 2, 0, u"=LEFT(\"abc\";1)"_ustr);
+        // LEFTB is classified as TextUtility (via the
+        // classifyImportedStoredHostTruthFunction branch) so it enters the
+        // authoritative dispatcher, but evaluateTextUtilityFunction has no
+        // LEFTB handler and falls through to
+        // FallbackReason::UnsupportedFunction. LEFT was originally used
+        // here but was admitted to the evaluator by commit 80d35dbbc.
+        m_pDoc->SetString(3, 2, 0, u"=LEFTB(\"abc\";1)"_ustr);
         CPPUNIT_ASSERT_EQUAL(u"a"_ustr, m_pDoc->GetString(3, 2, 0));
 
         const auto aStats = setaileval::getStatsSnapshot();

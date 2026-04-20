@@ -24,9 +24,9 @@ runs the test and exits non-zero only if the failure set differs from this
 list (i.e., a *new* regression slipped in, or an old one was *unintentionally*
 fixed without the list being updated).
 
-## Failure baseline (2026-04-20, after isImportedCachedFormulaCell tightening + ocTableRef NamedReference fence)
+## Failure baseline (2026-04-20, after testInterpretTailEngineEvaluatorAuthoritativeWithFallback test-expectation refresh)
 
-1 test fails in `CppunitTest_sc_ucalc_formula2`. Total run: 141 tests.
+0 tests fail in `CppunitTest_sc_ucalc_formula2`. Total run: 141 tests.
 
 Previous baseline was 30 tests. Progress so far:
 
@@ -202,12 +202,34 @@ empty trailing cell (`compareFoldedText("", "Charlie") < 0`) extended
 `preserveTrailingEmptiesForExtendedMatch` carve-out for empty-lookup
 queries) so trailing empties no longer absorb the resolved index.)
 
-### InterpretTail engine evaluator (1)
+### InterpretTail engine evaluator (0)
 
-These directly exercise the seam. Their failure suggests the seam's
-authoritative-with-fallback / statistical-distribution paths regressed.
-
-- `testInterpretTailEngineEvaluatorAuthoritativeWithFallback`
+(Cleared: `testInterpretTailEngineEvaluatorAuthoritativeWithFallback` —
+four sub-block test expectations lagged behind engine widenings and
+needed refreshing; no actual engine regression. (1) The error-literal
+root sub-block (`=of:#N/A`, `=[.OF:.ERR]:502`, `=of:chyba:511`,
+`=of:Err:504`) asserted `FunctionKind::Unknown >= 4`, but commit
+`032bcf192` added `NodeKind::ErrorLiteral` to
+`isPromotableScalarRootNode`'s scalar-root whitelist, so these now
+classify as `FunctionKind::ScalarRoot`. (2) The scalar-expression root
+sub-block (`=A5+B5`, `=B5`, `=-A5`, `=A5=B6`, `=A5<B7`, `="A"&"B"`)
+similarly asserted `FunctionKind::Unknown >= 6`, but the same commit
+taught `isPromotableScalarRootNode` to recurse through
+`BinaryOperation` / `UnaryOperation` / `CellReference` /
+`StringLiteral` leaves — so these now also classify as
+`FunctionKind::ScalarRoot`. (3) The VDB result assertion used
+`ASSERT_DOUBLES_EQUAL` (macro with 1e-14 tolerance) for
+`VDB(35000;7500;36;10;20;2) ≈ 8603.80`, but a single ULP near that
+magnitude is already ~1.8e-12, so the tolerance is sub-ULP and
+unresolvable; switched to explicit `CPPUNIT_ASSERT_DOUBLES_EQUAL(...,
+1e-9)` to match the other two VDB assertions in the same file
+(lines 5571, 5609). (4) A LEFT-fallback sub-block asserted that
+`=LEFT("abc";1)` triggers a `FallbackReason::UnsupportedFunction`,
+but commit `80d35dbbc` admitted LEFT to the TextUtility family, so
+that assertion was stale; switched to `=LEFTB("abc";1)`, which still
+classifies as TextUtility (via `classifyImportedStoredHostTruthFunction`)
+but has no handler in `evaluateTextUtilityFunction` and falls through
+to `UnsupportedFunction`.)
 
 (Cleared: `testInterpretTailEngineEvaluatorMathScalarAuthoritative` —
 `canonicalMathScalarFunctionName` now maps `ORG.LIBREOFFICE.COLOR` to
