@@ -24,7 +24,7 @@ runs the test and exits non-zero only if the failure set differs from this
 list (i.e., a *new* regression slipped in, or an old one was *unintentionally*
 fixed without the list being updated).
 
-## Failure baseline (2026-04-19, after MATCH trailing-empty trim fix)
+## Failure baseline (2026-04-19, after IF matrix-frame fence fix)
 
 6 tests fail in `CppunitTest_sc_ucalc_formula2`. Total run: 135 tests.
 
@@ -100,6 +100,23 @@ values or false `Err:522` (Circular Reference) on dependency change.
 - `testFuncRefListArraySUBTOTAL`
 - `testFuncTableRef`
 
+(Cleared: `testFuncIF` — `tryPlanEngineIfJump` and `tryPlanEngineIfError`
+in `interpr4.cxx` lacked a JumpMatrix-on-stack scope fence. The matrix
+formula `=IF({1;0};IF(1;23);42)` makes the outer `IF` build a JumpMatrix
+on the stack; for each per-cell iteration the inner `IF(1;23)` is then
+dispatched with that JumpMatrix sitting immediately below the scalar
+condition `1`. Legacy `ScIfJump` runs `MatrixJumpConditionToMatrix`
+first, which (when `IsInArrayContext()` and `GetStackType(2) ==
+svJumpMatrix`) coerces the scalar condition to a 1x1 matrix and creates
+a nested JumpMatrix so the outer iteration receives a matrix-shaped
+result for the current cell. The engine's scalar fast path skipped that
+conversion and emitted a plain `aCode.Jump`, leaving the outer
+JumpMatrix without a result for row 0 (Expected: 23, Actual: 0). Both
+tryPlanEngine* lambdas now decline to legacy whenever
+`GetStackType(2) == svJumpMatrix`, which preserves the matrix-frame
+JumpMatrix protocol while still routing scalar IF/IFERROR/IFNA outside
+matrix frames through `planIfBranch` / `planIfErrorBranch`.)
+
 (Cleared: `testFuncMATCH` — `selookup::resolveMatchIndex` (the unified
 runtime that both engine and legacy `ScMatchOp` now share) lacked the
 trailing-empty trim that legacy `ScQueryCellIteratorDirect` enforced
@@ -111,11 +128,6 @@ empty trailing cell (`compareFoldedText("", "Charlie") < 0`) extended
 `trimTrailingEmptyLookupLength` (matching the existing
 `preserveTrailingEmptiesForExtendedMatch` carve-out for empty-lookup
 queries) so trailing empties no longer absorb the resolved index.)
-
-(Cleared incidentally: `testFuncIF` — was passing in isolation already; the
-full-suite verification after the MATCH fix confirmed it no longer trips
-the gate. Likely state-dependent on prior test ordering rather than tied to
-this commit.)
 
 ### InterpretTail engine evaluator (2)
 
