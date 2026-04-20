@@ -207,10 +207,15 @@ Implemented result:
   - `missing`
   - `intentionally unsupported`
 - [COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md](COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md)
-  now points to that contract inventory as the concrete Phase 2 artifact
+  now carries the exhaustive symbol-level inventory that maps every remaining
+  `Sc*` method and `pushLegacy*` lambda to named host-service IDs
 - the remaining legacy surface is now grouped against named contracts rather
   than loose narrative categories, which gives Phase 3 and Phase 4 concrete
   contract targets instead of reopening the audit
+- `testHostFacadeContractsInventoryPresent` in
+  [interpret_tail_corpus.cxx](/home/ubuntu/repos/libreoffice/sc/qa/unit/interpret_tail_corpus.cxx)
+  now fails if the host-boundary docs stop covering the remaining legacy
+  surface or the four required contract-status markers
 
 ## Phase 3: Build the Upstream RPN Entry Point
 
