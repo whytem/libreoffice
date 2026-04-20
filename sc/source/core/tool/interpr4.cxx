@@ -7886,6 +7886,48 @@ StackVar ScInterpreter::Interpret()
                             oCriterion = serpn::RpnValue::text(
                                 pCriterionTok->GetString().getString());
                             break;
+                        case svSingleRef:
+                        {
+                            // Resolve the single cell to its stored scalar
+                            // value (number or text) via the host. Skip
+                            // when the resolved cell is the formula cell
+                            // itself to avoid self-reference.
+                            const ScSingleRefData& rRef
+                                = *pCriterionTok->GetSingleRef();
+                            const ScAddress aAbs = rRef.toAbs(mrDoc, aPos);
+                            if (aAbs == aPos)
+                            {
+                                addDispatchRuntimeStat(
+                                    interpreterDispatchRuntimeStatsStore()
+                                        .mnCriteriaEngineDeclinedCount);
+                                return false;
+                            }
+                            ScRefCellValue aCell(mrDoc, aAbs);
+                            if (aCell.hasEmptyValue() || aCell.isEmpty())
+                            {
+                                oCriterion = serpn::RpnValue::empty();
+                            }
+                            else if (aCell.hasString())
+                            {
+                                svl::SharedString aStr;
+                                GetCellString(aStr, aCell);
+                                oCriterion = serpn::RpnValue::text(
+                                    aStr.getString());
+                            }
+                            else if (aCell.hasNumeric())
+                            {
+                                oCriterion = serpn::RpnValue::number(
+                                    GetCellValue(aAbs, aCell));
+                            }
+                            else
+                            {
+                                addDispatchRuntimeStat(
+                                    interpreterDispatchRuntimeStatsStore()
+                                        .mnCriteriaEngineDeclinedCount);
+                                return false;
+                            }
+                            break;
+                        }
                         default:
                             addDispatchRuntimeStat(
                                 interpreterDispatchRuntimeStatsStore()
