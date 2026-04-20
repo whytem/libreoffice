@@ -660,9 +660,6 @@ private:
             const std::function<void( SCSIZE i, double fCurrent )>& MatOpFunc, bool bDoMatOp );
     void IterateParameters( ScIterFunc, bool bTextAsZero = false );
     void GetStVarParams( bool bTextAsZero, double(*VarResult)( double fVal, size_t nValCount ) );
-    void ScColumns();
-    void ScRows();
-    void ScSheets();
     void ScColumn();
     void ScRow();
     void ScSheet();

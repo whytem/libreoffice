@@ -7719,9 +7719,15 @@ StackVar ScInterpreter::Interpret()
                     return true;
                 };
                 // Batch 2 second admission: span-count COLUMNS / ROWS /
-                // SHEETS. Covers single-argument svSingleRef and svDoubleRef;
-                // anything else (multi-arg, matrices, external refs) defers
-                // to legacy.
+                // SHEETS. Phase G1 widens the scope fence to cover every
+                // shape legacy ScColumns / ScRows / ScSheets handled:
+                //   - no-argument SHEETS (workbook sheet count)
+                //   - multi-argument accumulation (sum over each operand)
+                //   - svSingleRef / svExternalSingleRef (span 1 on axis)
+                //   - svDoubleRef / svExternalDoubleRef (span from range)
+                //   - svMatrix (matrix dimensions — COLUMNS/ROWS only;
+                //     legacy ScSheets did not accept svMatrix so we raise
+                //     IllegalParameter there to match)
                 const auto tryPlanEngineSpanCount
                     = [&](serpn::SpanCountKind eKind) -> bool {
                     addDispatchRuntimeStat(
@@ -7729,15 +7735,29 @@ StackVar ScInterpreter::Interpret()
                             .mnReferenceEngineAttemptedCount);
 
                     const sal_uInt8 nParamCount = pCur->GetByte();
-                    if (nParamCount != 1 || !sp)
+
+                    // SHEETS with no argument returns the workbook's
+                    // sheet count via the engine's workbookSheetCount
+                    // primitive; the equivalent path in legacy ScSheets
+                    // short-circuits the accumulator loop.
+                    if (nParamCount == 0)
                     {
+                        if (eKind != serpn::SpanCountKind::Sheets)
+                        {
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnReferenceEngineDeclinedCount);
+                            return false;
+                        }
+                        const auto aCount = serefexec::workbookSheetCount(mrDoc);
                         addDispatchRuntimeStat(
                             interpreterDispatchRuntimeStatsStore()
-                                .mnReferenceEngineDeclinedCount);
-                        return false;
+                                .mnReferenceEngineSucceededCount);
+                        PushDouble(aCount.maValue);
+                        return true;
                     }
-                    const FormulaToken* pTop = pStack[sp - 1];
-                    if (!pTop)
+
+                    if (sp < nParamCount)
                     {
                         addDispatchRuntimeStat(
                             interpreterDispatchRuntimeStatsStore()
@@ -7745,76 +7765,139 @@ StackVar ScInterpreter::Interpret()
                         return false;
                     }
 
-                    spreadsheetengine::api::ResolvedReference aResolved;
-                    if (pTop->GetType() == svSingleRef)
+                    double fValue = 0.0;
+                    int nRemaining = nParamCount;
+                    while (nGlobalError == FormulaError::NONE && nRemaining > 0)
                     {
-                        ScAddress aAdr;
-                        PopSingleRef(aAdr);
-                        if (nGlobalError != FormulaError::NONE)
+                        --nRemaining;
+                        const StackVar eType = GetStackType();
+                        switch (eType)
                         {
-                            addDispatchRuntimeStat(
-                                interpreterDispatchRuntimeStatsStore()
-                                    .mnReferenceEngineDeclinedCount);
-                            return false;
+                            case svSingleRef:
+                                PopError();
+                                fValue += 1.0;
+                                break;
+                            case svExternalSingleRef:
+                                PopError();
+                                fValue += 1.0;
+                                break;
+                            case svDoubleRef:
+                            {
+                                ScRange aRange;
+                                PopDoubleRef(aRange);
+                                spreadsheetengine::api::ResolvedReference aResolved;
+                                aResolved.maRange.maStart = {
+                                    static_cast<spreadsheetengine::api::SheetId>(
+                                        aRange.aStart.Tab()),
+                                    static_cast<spreadsheetengine::api::ColumnIndex>(
+                                        aRange.aStart.Col()),
+                                    static_cast<spreadsheetengine::api::RowIndex>(
+                                        aRange.aStart.Row())
+                                };
+                                aResolved.maRange.maEnd = {
+                                    static_cast<spreadsheetengine::api::SheetId>(
+                                        aRange.aEnd.Tab()),
+                                    static_cast<spreadsheetengine::api::ColumnIndex>(
+                                        aRange.aEnd.Col()),
+                                    static_cast<spreadsheetengine::api::RowIndex>(
+                                        aRange.aEnd.Row())
+                                };
+                                const auto aPlan = serpn::planSpanCount(
+                                    serpn::RpnValue::reference(aResolved), eKind,
+                                    /*bMultiplyAcrossSheets*/
+                                    eKind != serpn::SpanCountKind::Sheets);
+                                if (!aPlan
+                                    || aPlan.meReadiness
+                                           != serpn::RpnCoercionReadiness::Ready)
+                                {
+                                    SetError(selibreoffice::toFormulaError(aPlan.meError));
+                                }
+                                else
+                                {
+                                    fValue += aPlan.maValue;
+                                }
+                                break;
+                            }
+                            case svExternalDoubleRef:
+                            {
+                                sal_uInt16 nFileId;
+                                OUString aTabName;
+                                ScComplexRefData aRef;
+                                PopExternalDoubleRef(nFileId, aTabName, aRef);
+                                const ScRange aAbs = aRef.toAbs(mrDoc, aPos);
+                                spreadsheetengine::api::ResolvedReference aResolved;
+                                aResolved.maRange.maStart = {
+                                    static_cast<spreadsheetengine::api::SheetId>(
+                                        aAbs.aStart.Tab()),
+                                    static_cast<spreadsheetengine::api::ColumnIndex>(
+                                        aAbs.aStart.Col()),
+                                    static_cast<spreadsheetengine::api::RowIndex>(
+                                        aAbs.aStart.Row())
+                                };
+                                aResolved.maRange.maEnd = {
+                                    static_cast<spreadsheetengine::api::SheetId>(
+                                        aAbs.aEnd.Tab()),
+                                    static_cast<spreadsheetengine::api::ColumnIndex>(
+                                        aAbs.aEnd.Col()),
+                                    static_cast<spreadsheetengine::api::RowIndex>(
+                                        aAbs.aEnd.Row())
+                                };
+                                const auto aPlan = serpn::planSpanCount(
+                                    serpn::RpnValue::reference(aResolved), eKind,
+                                    /*bMultiplyAcrossSheets*/
+                                    eKind != serpn::SpanCountKind::Sheets);
+                                if (!aPlan
+                                    || aPlan.meReadiness
+                                           != serpn::RpnCoercionReadiness::Ready)
+                                {
+                                    SetError(selibreoffice::toFormulaError(aPlan.meError));
+                                }
+                                else
+                                {
+                                    fValue += aPlan.maValue;
+                                }
+                                break;
+                            }
+                            case svMatrix:
+                            {
+                                if (eKind == serpn::SpanCountKind::Sheets)
+                                {
+                                    // Legacy ScSheets has no svMatrix branch.
+                                    PopError();
+                                    SetError(FormulaError::IllegalParameter);
+                                    break;
+                                }
+                                ScMatrixRef pMat = PopMatrix();
+                                const auto aCount = serefexec::countMatrixAxisSpan(
+                                    pMat,
+                                    eKind == serpn::SpanCountKind::Columns
+                                        ? serefexec::ReferenceAxis::Column
+                                        : serefexec::ReferenceAxis::Row);
+                                if (!aCount)
+                                    SetError(selibreoffice::toFormulaError(aCount.meError));
+                                else
+                                    fValue += aCount.maValue;
+                                break;
+                            }
+                            default:
+                                PopError();
+                                SetError(FormulaError::IllegalParameter);
+                                break;
                         }
-                        aResolved.maRange.maStart = {
-                            static_cast<spreadsheetengine::api::SheetId>(aAdr.Tab()),
-                            static_cast<spreadsheetengine::api::ColumnIndex>(aAdr.Col()),
-                            static_cast<spreadsheetengine::api::RowIndex>(aAdr.Row())
-                        };
-                        aResolved.maRange.maEnd = aResolved.maRange.maStart;
-                    }
-                    else if (pTop->GetType() == svDoubleRef)
-                    {
-                        SCCOL nCol1, nCol2;
-                        SCROW nRow1, nRow2;
-                        SCTAB nTab1, nTab2;
-                        PopDoubleRef(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2);
-                        if (nGlobalError != FormulaError::NONE)
-                        {
-                            addDispatchRuntimeStat(
-                                interpreterDispatchRuntimeStatsStore()
-                                    .mnReferenceEngineDeclinedCount);
-                            return false;
-                        }
-                        aResolved.maRange.maStart = {
-                            static_cast<spreadsheetengine::api::SheetId>(nTab1),
-                            static_cast<spreadsheetengine::api::ColumnIndex>(nCol1),
-                            static_cast<spreadsheetengine::api::RowIndex>(nRow1)
-                        };
-                        aResolved.maRange.maEnd = {
-                            static_cast<spreadsheetengine::api::SheetId>(nTab2),
-                            static_cast<spreadsheetengine::api::ColumnIndex>(nCol2),
-                            static_cast<spreadsheetengine::api::RowIndex>(nRow2)
-                        };
-                    }
-                    else
-                    {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnReferenceEngineDeclinedCount);
-                        return false;
                     }
 
-                    // Cross-sheet ranges multiply the axis span by the sheet
-                    // span (e.g. COLUMNS(Sheet1.A1:Sheet3.B2) = 2*3 = 6),
-                    // matching legacy Calc semantics for COLUMNS / ROWS.
-                    const auto aPlan = serpn::planSpanCount(
-                        serpn::RpnValue::reference(aResolved), eKind,
-                        /*bMultiplyAcrossSheets*/ true);
-                    if (!aPlan
-                        || aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
+                    // Drain any remaining operands the abbreviated loop left
+                    // on the stack after hitting an early error.
+                    while (nRemaining > 0)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnReferenceEngineDeclinedCount);
-                        return false;
+                        --nRemaining;
+                        PopError();
                     }
 
                     addDispatchRuntimeStat(
                         interpreterDispatchRuntimeStatsStore()
                             .mnReferenceEngineSucceededCount);
-                    PushDouble(aPlan.maValue);
+                    PushDouble(fValue);
                     return true;
                 };
 
@@ -14298,15 +14381,24 @@ StackVar ScInterpreter::Interpret()
                     break;
                     case ocColumns          :
                         if (!tryPlanEngineSpanCount(serpn::SpanCountKind::Columns))
-                            ScColumns();
+                        {
+                            OSL_FAIL("engine-backed COLUMNS declined ocColumns");
+                            PushIllegalParameter();
+                        }
                         break;
                     case ocRows             :
                         if (!tryPlanEngineSpanCount(serpn::SpanCountKind::Rows))
-                            ScRows();
+                        {
+                            OSL_FAIL("engine-backed ROWS declined ocRows");
+                            PushIllegalParameter();
+                        }
                         break;
                     case ocSheets           :
                         if (!tryPlanEngineSpanCount(serpn::SpanCountKind::Sheets))
-                            ScSheets();
+                        {
+                            OSL_FAIL("engine-backed SHEETS declined ocSheets");
+                            PushIllegalParameter();
+                        }
                         break;
                     case ocColumn           :
                         if (!tryPlanEngineAxisOrdinal(serpn::AxisOrdinalKind::Column))
