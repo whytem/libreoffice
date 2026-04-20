@@ -9479,19 +9479,33 @@ StackVar ScInterpreter::Interpret()
                     }
                     const FormulaToken* pSourceTok
                         = pStack[sp - nParamCount];
-                    if (!pSourceTok || pSourceTok->GetType() != svMatrix)
+                    // Scope fence: admit svMatrix directly plus
+                    // svSingleRef / svDoubleRef via the Phase D
+                    // host-facade materialization primitive.
+                    if (!pSourceTok
+                        || (pSourceTok->GetType() != svMatrix
+                            && pSourceTok->GetType() != svSingleRef
+                            && pSourceTok->GetType() != svDoubleRef))
                     {
                         pushSpillEngineDecline();
                         return false;
                     }
-                    ScMatrix* pSourceMat
-                        = const_cast<FormulaToken*>(pSourceTok)->GetMatrix();
-                    if (!pSourceMat)
+                    std::optional<serpn::MatrixOperand> oSource;
+                    if (pSourceTok->GetType() == svMatrix)
                     {
-                        pushSpillEngineDecline();
-                        return false;
+                        ScMatrix* pSourceMat
+                            = const_cast<FormulaToken*>(pSourceTok)->GetMatrix();
+                        if (!pSourceMat)
+                        {
+                            pushSpillEngineDecline();
+                            return false;
+                        }
+                        oSource = convertMatrixRefToMatrixOperand(*pSourceMat);
                     }
-                    auto oSource = convertMatrixRefToMatrixOperand(*pSourceMat);
+                    else
+                    {
+                        oSource = materializeRangeTokenToMatrixOperand(pSourceTok);
+                    }
                     if (!oSource)
                     {
                         pushSpillEngineDecline();
@@ -9512,30 +9526,41 @@ StackVar ScInterpreter::Interpret()
                             aSelections.push_back(
                                 static_cast<sal_Int32>(pTok->GetDouble()));
                         }
-                        else if (pTok->GetType() == svMatrix)
+                        else if (pTok->GetType() == svMatrix
+                                 || pTok->GetType() == svSingleRef
+                                 || pTok->GetType() == svDoubleRef)
                         {
-                            ScMatrix* pIdxMat
-                                = const_cast<FormulaToken*>(pTok)->GetMatrix();
-                            if (!pIdxMat)
+                            std::optional<serpn::MatrixOperand> oIdx;
+                            if (pTok->GetType() == svMatrix)
+                            {
+                                ScMatrix* pIdxMat
+                                    = const_cast<FormulaToken*>(pTok)->GetMatrix();
+                                if (!pIdxMat)
+                                {
+                                    pushSpillEngineDecline();
+                                    return false;
+                                }
+                                oIdx = convertMatrixRefToMatrixOperand(*pIdxMat);
+                            }
+                            else
+                            {
+                                oIdx = materializeRangeTokenToMatrixOperand(pTok);
+                            }
+                            if (!oIdx)
                             {
                                 pushSpillEngineDecline();
                                 return false;
                             }
-                            SCSIZE nIdxCols = 0, nIdxRows = 0;
-                            pIdxMat->GetDimensions(nIdxCols, nIdxRows);
-                            for (SCSIZE c = 0; c < nIdxCols; ++c)
+                            for (const auto& rCell : oIdx->maValues)
                             {
-                                for (SCSIZE r = 0; r < nIdxRows; ++r)
+                                if (rCell.meKind
+                                    != spreadsheetengine::api::CellValueKind::Number)
                                 {
-                                    if (pIdxMat->IsStringOrEmpty(c, r))
-                                    {
-                                        pushSpillEngineDecline();
-                                        return false;
-                                    }
-                                    aSelections.push_back(
-                                        static_cast<sal_Int32>(
-                                            pIdxMat->GetDouble(c, r)));
+                                    pushSpillEngineDecline();
+                                    return false;
                                 }
+                                aSelections.push_back(
+                                    static_cast<sal_Int32>(rCell.mfNumber));
                             }
                         }
                         else
@@ -13023,11 +13048,17 @@ StackVar ScInterpreter::Interpret()
                         break;
                     case ocChooseCols       :
                         if (!tryPlanEngineSpillChooseColsOrRows(/*bCols*/ true))
-                            ScChooseColsOrRows(true);
+                        {
+                            OSL_FAIL("engine-backed CHOOSECOLS declined ocChooseCols");
+                            PushIllegalParameter();
+                        }
                         break;
                     case ocChooseRows       :
                         if (!tryPlanEngineSpillChooseColsOrRows(/*bCols*/ false))
-                            ScChooseColsOrRows(false);
+                        {
+                            OSL_FAIL("engine-backed CHOOSEROWS declined ocChooseRows");
+                            PushIllegalParameter();
+                        }
                         break;
                     case ocAdd              :
                         if (!tryPushEngineScalarBinaryOp(serpn::BinaryScalarOperator::Add))
