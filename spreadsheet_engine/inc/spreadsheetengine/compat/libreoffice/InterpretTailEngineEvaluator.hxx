@@ -58,6 +58,7 @@
 #include <spreadsheetengine/runtime/DateTimeParse.hxx>
 #include <spreadsheetengine/runtime/DateTimeParts.hxx>
 #include <spreadsheetengine/runtime/FinancialRuntime.hxx>
+#include <spreadsheetengine/runtime/KahanSum.hxx>
 #include <spreadsheetengine/runtime/ConversionRuntime.hxx>
 #include <spreadsheetengine/runtime/NumeralConversion.hxx>
 #include <spreadsheetengine/runtime/MathAggregate.hxx>
@@ -8283,7 +8284,12 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
 
         const auto& rValues = *aValues.moValue;
         if (aFunctionName == u"SUM")
-            return makeNumericAttempt(std::accumulate(rValues.begin(), rValues.end(), 0.0));
+        {
+            spreadsheetengine::core::fp::KahanSum aSum;
+            for (double fValue : rValues)
+                aSum += fValue;
+            return makeNumericAttempt(aSum.get());
+        }
 
         if (aFunctionName == u"PRODUCT")
         {
@@ -8295,33 +8301,37 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
 
         if (aFunctionName == u"SUMSQ")
         {
-            double fTotal = 0.0;
+            spreadsheetengine::core::fp::KahanSum aSum;
             for (double fValue : rValues)
-                fTotal += fValue * fValue;
-            return makeNumericAttempt(fTotal);
+                aSum += fValue * fValue;
+            return makeNumericAttempt(aSum.get());
         }
 
         if (aFunctionName == u"AVERAGE")
         {
             if (rValues.empty())
                 return makeErrorAttempt(api::Error::DivisionByZero);
-            const double fTotal = std::accumulate(rValues.begin(), rValues.end(), 0.0);
-            return makeNumericAttempt(fTotal / static_cast<double>(rValues.size()));
+            spreadsheetengine::core::fp::KahanSum aSum;
+            for (double fValue : rValues)
+                aSum += fValue;
+            return makeNumericAttempt(aSum.get() / static_cast<double>(rValues.size()));
         }
 
         if (aFunctionName == u"DEVSQ")
         {
             if (rValues.empty())
                 return makeNumericAttempt(0.0);
-            const double fMean = std::accumulate(rValues.begin(), rValues.end(), 0.0)
-                                 / static_cast<double>(rValues.size());
-            double fDeviation = 0.0;
+            spreadsheetengine::core::fp::KahanSum aMeanSum;
+            for (double fValue : rValues)
+                aMeanSum += fValue;
+            const double fMean = aMeanSum.get() / static_cast<double>(rValues.size());
+            spreadsheetengine::core::fp::KahanSum aDeviation;
             for (double fValue : rValues)
             {
                 const double fDelta = fValue - fMean;
-                fDeviation += fDelta * fDelta;
+                aDeviation += fDelta * fDelta;
             }
-            return makeNumericAttempt(fDeviation);
+            return makeNumericAttempt(aDeviation.get());
         }
 
         if (rValues.empty())
