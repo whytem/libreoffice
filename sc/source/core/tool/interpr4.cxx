@@ -7161,57 +7161,6 @@ StackVar ScInterpreter::Interpret()
                     nGlobalError = FormulaError::NONE;
                     PushInt(int(bRes));
                 };
-                const auto pushLegacyIsRef = [&]() {
-                    warnInformationPredicateDispatch(u"ISREF");
-                    nFuncFmtType = SvNumFormatType::LOGICAL;
-                    bool bRes = false;
-                    switch (GetStackType())
-                    {
-                        case svSingleRef:
-                        {
-                            ScAddress aAdr;
-                            PopSingleRef(aAdr);
-                            if (nGlobalError == FormulaError::NONE)
-                                bRes = true;
-                        }
-                        break;
-                        case svDoubleRef:
-                        {
-                            ScRange aRange;
-                            PopDoubleRef(aRange);
-                            if (nGlobalError == FormulaError::NONE)
-                                bRes = true;
-                        }
-                        break;
-                        case svRefList:
-                        {
-                            FormulaConstTokenRef x = PopToken();
-                            if (nGlobalError == FormulaError::NONE)
-                                bRes = !x->GetRefList()->empty();
-                        }
-                        break;
-                        case svExternalSingleRef:
-                        {
-                            ScExternalRefCache::TokenRef pToken;
-                            PopExternalSingleRef(pToken);
-                            if (nGlobalError == FormulaError::NONE)
-                                bRes = true;
-                        }
-                        break;
-                        case svExternalDoubleRef:
-                        {
-                            ScExternalRefCache::TokenArrayRef pArray;
-                            PopExternalDoubleRef(pArray);
-                            if (nGlobalError == FormulaError::NONE)
-                                bRes = true;
-                        }
-                        break;
-                        default:
-                            Pop();
-                    }
-                    nGlobalError = FormulaError::NONE;
-                    PushInt(int(bRes));
-                };
                 const auto pushLegacyIsValue = [&]() {
                     warnInformationPredicateDispatch(u"ISNUMBER");
                     nFuncFmtType = SvNumFormatType::LOGICAL;
@@ -14547,7 +14496,59 @@ StackVar ScInterpreter::Interpret()
                     case ocIsLogical        : pushLegacyIsLogical();        break;
                     case ocType             : ScType();                 break;
                     case ocCell             : ScCell();                     break;
-                    case ocIsRef            : pushLegacyIsRef();            break;
+                    case ocIsRef            :
+                    {
+                        warnInformationPredicateDispatch(u"ISREF");
+                        nFuncFmtType = SvNumFormatType::LOGICAL;
+                        bool bRes = false;
+                        switch (GetStackType())
+                        {
+                            case svSingleRef:
+                            {
+                                ScAddress aAdr;
+                                PopSingleRef(aAdr);
+                                if (nGlobalError == FormulaError::NONE)
+                                    bRes = true;
+                            }
+                            break;
+                            case svDoubleRef:
+                            {
+                                ScRange aRange;
+                                PopDoubleRef(aRange);
+                                if (nGlobalError == FormulaError::NONE)
+                                    bRes = true;
+                            }
+                            break;
+                            case svRefList:
+                            {
+                                FormulaConstTokenRef x = PopToken();
+                                if (nGlobalError == FormulaError::NONE)
+                                    bRes = !x->GetRefList()->empty();
+                            }
+                            break;
+                            case svExternalSingleRef:
+                            {
+                                ScExternalRefCache::TokenRef pToken;
+                                PopExternalSingleRef(pToken);
+                                if (nGlobalError == FormulaError::NONE)
+                                    bRes = true;
+                            }
+                            break;
+                            case svExternalDoubleRef:
+                            {
+                                ScExternalRefCache::TokenArrayRef pArray;
+                                PopExternalDoubleRef(pArray);
+                                if (nGlobalError == FormulaError::NONE)
+                                    bRes = true;
+                            }
+                            break;
+                            default:
+                                Pop();
+                        }
+                        nGlobalError = FormulaError::NONE;
+                        PushInt(int(bRes));
+                    }
+                    break;
                     case ocIsValue          : pushLegacyIsValue();          break;
                     case ocIsFormula        : pushLegacyIsFormula();        break;
                     case ocFormula          : pushLegacyFormulaText();      break;
