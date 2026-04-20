@@ -1844,6 +1844,120 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterBadLiteralDispatch)
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterTextInfoDispatch)
+{
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    ScopedEnvironmentOverride aMode(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+    ScopedEnvironmentOverride aForceCalculation("SC_FORCE_CALCULATION", "core");
+    ScopedEnvironmentOverride aDisableAuthorityWhileOff(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF", "0");
+
+    m_pDoc->InsertTab(0, u"TextInfoDispatch"_ustr);
+    resetScInterpreterDispatchRuntimeStats();
+    resetScInterpreterReachabilityStats();
+    resetScInterpreterClassicOpcodeRuntimeStats();
+
+    m_pDoc->SetString(ScAddress(0, 0, 0), u"\tab"_ustr);
+    m_pDoc->SetString(ScAddress(2, 0, 0), u"text"_ustr);
+    m_pDoc->SetValue(ScAddress(3, 0, 0), 42.0);
+    m_pDoc->SetString(ScAddress(4, 0, 0), u"=NA()"_ustr);
+    m_pDoc->SetString(ScAddress(5, 0, 0), u"=1/0"_ustr);
+    m_pDoc->SetString(ScAddress(2, 1, 0), u"ab"_ustr);
+    m_pDoc->SetString(ScAddress(2, 2, 0), u"x"_ustr);
+
+    m_pDoc->SetString(ScAddress(1, 0, 0), u"=CODE(\"A\")"_ustr);
+    ASSERT_DOUBLES_EQUAL(65.0, m_pDoc->GetValue(ScAddress(1, 0, 0)));
+
+    m_pDoc->SetString(ScAddress(1, 1, 0), u"=TRIM(\"  a   b  \")"_ustr);
+    CPPUNIT_ASSERT_EQUAL(u"a b"_ustr, m_pDoc->GetString(ScAddress(1, 1, 0)));
+
+    m_pDoc->SetString(ScAddress(1, 2, 0), u"=LEN(\"ab\")"_ustr);
+    ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(1, 2, 0)));
+
+    m_pDoc->SetString(ScAddress(1, 3, 0), u"=CLEAN(A1)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(u"ab"_ustr, m_pDoc->GetString(ScAddress(1, 3, 0)));
+
+    m_pDoc->SetString(ScAddress(1, 4, 0), u"=CHAR(65)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(u"A"_ustr, m_pDoc->GetString(ScAddress(1, 4, 0)));
+
+    m_pDoc->SetString(ScAddress(1, 5, 0), u"=UNICODE(\"A\")"_ustr);
+    ASSERT_DOUBLES_EQUAL(65.0, m_pDoc->GetValue(ScAddress(1, 5, 0)));
+
+    m_pDoc->SetString(ScAddress(1, 6, 0), u"=UNICHAR(65)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(u"A"_ustr, m_pDoc->GetString(ScAddress(1, 6, 0)));
+
+    m_pDoc->SetString(ScAddress(1, 7, 0), u"=ASC(\"ＡＢ\")"_ustr);
+    CPPUNIT_ASSERT_EQUAL(u"AB"_ustr, m_pDoc->GetString(ScAddress(1, 7, 0)));
+
+    m_pDoc->SetString(ScAddress(1, 8, 0), u"=JIS(\"AB\")"_ustr);
+    CPPUNIT_ASSERT_EQUAL(u"ＡＢ"_ustr, m_pDoc->GetString(ScAddress(1, 8, 0)));
+
+    m_pDoc->SetString(ScAddress(6, 0, 0), u"=ISBLANK(B10)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(true, static_cast<bool>(m_pDoc->GetValue(ScAddress(6, 0, 0))));
+
+    m_pDoc->SetString(ScAddress(6, 1, 0), u"=ISTEXT(C1)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(true, static_cast<bool>(m_pDoc->GetValue(ScAddress(6, 1, 0))));
+
+    m_pDoc->SetString(ScAddress(6, 2, 0), u"=ISNONTEXT(D1)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(true, static_cast<bool>(m_pDoc->GetValue(ScAddress(6, 2, 0))));
+
+    m_pDoc->SetString(ScAddress(6, 3, 0), u"=ISNUMBER(D1)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(true, static_cast<bool>(m_pDoc->GetValue(ScAddress(6, 3, 0))));
+
+    m_pDoc->SetString(ScAddress(6, 4, 0), u"=ISNA(E1)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(true, static_cast<bool>(m_pDoc->GetValue(ScAddress(6, 4, 0))));
+
+    m_pDoc->SetString(ScAddress(6, 5, 0), u"=ISERR(F1)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(true, static_cast<bool>(m_pDoc->GetValue(ScAddress(6, 5, 0))));
+
+    m_pDoc->SetString(ScAddress(6, 6, 0), u"=ISERROR(F1)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(true, static_cast<bool>(m_pDoc->GetValue(ScAddress(6, 6, 0))));
+
+    ScMarkData aMark(m_pDoc->GetSheetLimits());
+    aMark.SelectOneTable(0);
+    m_pDoc->InsertMatrixFormula(8, 0, 8, 1, aMark, u"=LEN(C2:C3)"_ustr);
+    ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(8, 0, 0)));
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(8, 1, 0)));
+
+    const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
+    const std::string aDispatchStatsLabel
+        = "text_info_attempted="
+          + std::to_string(aDispatchStats.mnTextInfoEngineAttemptedCount)
+          + " succeeded="
+          + std::to_string(aDispatchStats.mnTextInfoEngineSucceededCount)
+          + " declined="
+          + std::to_string(aDispatchStats.mnTextInfoEngineDeclinedCount);
+    CPPUNIT_ASSERT_MESSAGE("text/info dispatch should attempt engine evaluation: "
+                               + aDispatchStatsLabel,
+                           aDispatchStats.mnTextInfoEngineAttemptedCount > 0);
+    CPPUNIT_ASSERT_MESSAGE("text/info dispatch should succeed through the engine path: "
+                               + aDispatchStatsLabel,
+                           aDispatchStats.mnTextInfoEngineSucceededCount > 0);
+    CPPUNIT_ASSERT_MESSAGE("text/info dispatch should still decline matrix shapes: "
+                               + aDispatchStatsLabel,
+                           aDispatchStats.mnTextInfoEngineDeclinedCount > 0);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("text/info dispatch accounting should stay balanced: "
+                                     + aDispatchStatsLabel,
+                                 aDispatchStats.mnTextInfoEngineAttemptedCount,
+                                 aDispatchStats.mnTextInfoEngineSucceededCount
+                                     + aDispatchStats.mnTextInfoEngineDeclinedCount);
+
+    const auto aReachabilityStats = getScInterpreterReachabilityStatsSnapshot();
+    CPPUNIT_ASSERT_MESSAGE(
+        "text/info dispatch test should still reach classic ScInterpreter::Interpret()",
+        aReachabilityStats.mnClassicInterpretCount > 0);
+
+    const auto aClassicOpcodeStats = getScInterpreterClassicOpcodeRuntimeStatsSnapshot();
+    CPPUNIT_ASSERT_MESSAGE("text/info dispatch test should record LEN in the classic census",
+                           aClassicOpcodeStats.maOpcodeCounts[static_cast<std::size_t>(ocLen)] > 0);
+    CPPUNIT_ASSERT_MESSAGE(
+        "text/info dispatch test should record ISBLANK in the classic census",
+        aClassicOpcodeStats.maOpcodeCounts[static_cast<std::size_t>(ocIsEmpty)] > 0);
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterSpillEngineDispatch)
 {
     sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);

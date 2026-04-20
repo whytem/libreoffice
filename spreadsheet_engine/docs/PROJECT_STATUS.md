@@ -97,7 +97,15 @@ interpreter no longer coexists with an alternate Calc implementation for root
 error literals. The remaining highest-leverage interpreter surface is now the
 text/info cluster in [interpr4.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr4.cxx):
 `26` text-utility lambdas, `7` information-predicate lambdas, and a smaller
-parsing/inspection tail that already leans on engine/shared helpers.
+parsing/inspection tail that already leans on engine/shared helpers. The first
+Phase-1 text/info admission-tightening slice is now landed for the Wave-A
+unary direct cases: classic `Interpret()` tries the standalone engine first
+for `CODE`, `TRIM`, `CLEAN`, `LEN`, `CHAR`, `UNICODE`, `UNICHAR`, `ASC`,
+`JIS`, `ISBLANK`, `ISTEXT`, `ISNONTEXT`, `ISNUMBER`, `ISNA`, `ISERR`, and
+`ISERROR` when the operand is a direct scalar token or a scalarized
+single-cell reference. Matrix / jump-matrix / table-op shapes still decline
+intentionally to legacy, so this is runtime exercise and admission tightening,
+not retirement yet.
 
 Batch 1 of the five-batch RPN evaluator plan has now landed its substrate
 (`runtime/RpnControlFlow.hxx`) and six explicit admissions:
@@ -518,6 +526,15 @@ Phase-0 classification for the new text/info retirement wave is now complete:
   `ORG.OPENOFFICE.CURRENT()`, `ORG.OPENOFFICE.STYLE(...)`, and range/matrix
   arithmetic shapes, again outside the pure text/info and parsing/inspection
   wave
+
+Phase 1 is now underway:
+
+- [testSharedInterpreterTextInfoDispatch](/home/ubuntu/repos/libreoffice/sc/qa/unit/ucalc_formula2.cxx)
+  proves engine-first success for the safe Wave-A unary shapes
+- the same focused lane also proves deliberate decline on a matrix shape, so
+  the classic fallback boundary remains explicit instead of accidental
+- no fallback deletion is claimed yet, so `interp4_dispatch_legacy_lambda_count`
+  remains the honest retirement gate for the next step
 
 Updated next routing policy:
 

@@ -228,6 +228,26 @@ Status:
 - keep legacy fallback only where the engine explicitly declines
 - add runtime/accounting checks for exercised engine-first paths
 
+Status:
+
+- underway on the current tree
+- the first dispatch slice is now landed for the Wave-A unary direct cases:
+  `CODE`, `TRIM`, `CLEAN`, `LEN`, `CHAR`, `UNICODE`, `UNICHAR`, `ASC`,
+  `JIS`, `ISBLANK`, `ISTEXT`, `ISNONTEXT`, `ISNUMBER`, `ISNA`, `ISERR`,
+  and `ISERROR`
+- the engine-first path is intentionally narrow:
+  - direct scalar tokens are admitted
+  - scalarized single-cell references are admitted
+  - matrix / jump-matrix / table-op shapes still decline to legacy
+- the focused Calc runtime gate is now
+  [testSharedInterpreterTextInfoDispatch](/home/ubuntu/repos/libreoffice/sc/qa/unit/ucalc_formula2.cxx),
+  which proves both:
+  - engine-first success on Wave-A scalar shapes
+  - deliberate legacy fallback on at least one matrix shape
+- no retirement is claimed yet in this phase: the corresponding
+  `pushLegacy*` helpers and direct Calc cases remain until the exercised
+  runtime path is broader and the fallback can be deleted honestly
+
 ### Phase 2: Pure Text/Info Retirement
 
 - delete `pushLegacyIsEmpty`
