@@ -7180,10 +7180,6 @@ StackVar ScInterpreter::Interpret()
                     nGlobalError = FormulaError::NONE;
                     PushInt(nRes);
                 };
-                const auto pushLegacyIsString = [&](bool bInvert) {
-                    warnInformationPredicateDispatch(bInvert ? u"ISNONTEXT" : u"ISTEXT");
-                    PushInt(int(bInvert ? !IsString() : IsString()));
-                };
                 const auto pushLegacyIsLogical = [&]() {
                     warnInformationPredicateDispatch(u"ISLOGICAL");
                     bool bRes = false;
@@ -7560,10 +7556,6 @@ StackVar ScInterpreter::Interpret()
                     }
                     nGlobalError = FormulaError::NONE;
                     PushInt(int(bRes));
-                };
-                const auto pushLegacyIsEvenOdd = [&](bool bOdd) {
-                    warnInformationPredicateDispatch(bOdd ? u"ISODD" : u"ISEVEN");
-                    PushInt(int(bOdd ? !IsEven() : IsEven()));
                 };
                 const auto warnLogicalDispatch = [&](std::u16string_view rFunctionName) {
                     warnIfLegacyDispatchReached(
@@ -11786,8 +11778,14 @@ StackVar ScInterpreter::Interpret()
                         PushDouble(semath::inverseFisherTransform(GetDouble()));
                         break;
                     case ocIsEmpty          : pushLegacyIsEmpty();          break;
-                    case ocIsString         : pushLegacyIsString(false);    break;
-                    case ocIsNonString      : pushLegacyIsString(true);     break;
+                    case ocIsString         :
+                        warnInformationPredicateDispatch(u"ISTEXT");
+                        PushInt(int(IsString()));
+                        break;
+                    case ocIsNonString      :
+                        warnInformationPredicateDispatch(u"ISNONTEXT");
+                        PushInt(int(!IsString()));
+                        break;
                     case ocIsLogical        : pushLegacyIsLogical();        break;
                     case ocType             : ScType();                 break;
                     case ocCell             : ScCell();                     break;
@@ -11798,8 +11796,14 @@ StackVar ScInterpreter::Interpret()
                     case ocIsNA             : pushLegacyIsNA();             break;
                     case ocIsErr            : pushLegacyIsErrLike(u"ISERR", false); break;
                     case ocIsError          : pushLegacyIsErrLike(u"ISERROR", true); break;
-                    case ocIsEven           : pushLegacyIsEvenOdd(false);   break;
-                    case ocIsOdd            : pushLegacyIsEvenOdd(true);    break;
+                    case ocIsEven           :
+                        warnInformationPredicateDispatch(u"ISEVEN");
+                        PushInt(int(IsEven()));
+                        break;
+                    case ocIsOdd            :
+                        warnInformationPredicateDispatch(u"ISODD");
+                        PushInt(int(!IsEven()));
+                        break;
                     case ocN                : ScN();                    break;
                     case ocGetDateValue     :
                         pushLegacyDateOrTimeValue(
