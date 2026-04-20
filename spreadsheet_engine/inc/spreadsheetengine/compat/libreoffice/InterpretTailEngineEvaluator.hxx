@@ -8025,6 +8025,23 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     bool bImportedCanonicalSource)
 {
     const api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
+    // Scope-fence: SUBTOTAL / AGGREGATE as a nested argument can produce a
+    // reference-list array (svRefList) in ForceArray contexts — e.g.
+    // =SUMPRODUCT(SUBTOTAL(109;OFFSET(A1;ROW(A1:A7)-ROW(A1);;1))) where
+    // OFFSET yields an array of references, SUBTOTAL applies per reference
+    // (ScSubTotal iterates the svRefList), and SUMPRODUCT consumes the
+    // resulting 7x1 numeric matrix. The engine's materializeMatrixFunction-
+    // Call has no reflist-iteration path for SUBTOTAL / AGGREGATE, and the
+    // downstream imported-cached-formula VariableExpected shortcut would
+    // otherwise publish a #NAME? / 0 for these live-recalc formulas when
+    // IsRecalcModeMustAfterImport() is ambiently set (OFFSET is volatile
+    // and shares the exclusive ALWAYS bit with post-import markers).
+    // Decline to legacy, which correctly iterates the reflist.
+    for (const auto& rxChild : rNode.maChildren)
+    {
+        if (rxChild && formulaContainsAggregateLike(*rxChild))
+            return makeUnsupported(eFunction, FallbackReason::UnsupportedFormulaShape);
+    }
     if ((bImportedCanonicalSource || isImportedCachedFormulaRoot(rDoc, rFormulaPos))
         && containsReferenceLikeDescendant(rNode))
     {

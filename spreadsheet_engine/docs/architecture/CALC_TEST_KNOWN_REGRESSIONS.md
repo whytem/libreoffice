@@ -24,9 +24,9 @@ runs the test and exits non-zero only if the failure set differs from this
 list (i.e., a *new* regression slipped in, or an old one was *unintentionally*
 fixed without the list being updated).
 
-## Failure baseline (2026-04-19, after IF matrix-frame fence fix)
+## Failure baseline (2026-04-19, after recalc-subsystem guard fix)
 
-6 tests fail in `CppunitTest_sc_ucalc_formula2`. Total run: 135 tests.
+4 tests fail in `CppunitTest_sc_ucalc_formula2`. Total run: 135 tests.
 
 Previous baseline was 30 tests. Progress so far:
 
@@ -86,10 +86,35 @@ Previous baseline was 30 tests. Progress so far:
 All two previous failures cleared by the stored-host-truth fix (imports
 now correctly consume the cached value; live calc no longer shadows it).
 
-### Recalc / dependency tracking (2)
+### Recalc / dependency tracking (0)
 
-- `testFormulaDepTrackingDeleteCol`
-- `testIterations`
+(Cleared: `testFormulaDepTrackingDeleteCol` and `testIterations` — the
+engine-authoritative seam in `applyEngineAuthoritativeResult`
+(`sc/source/core/data/formulacell.cxx`) now declines to legacy for two
+narrow shapes the engine's text-reparse model cannot express:
+
+1. **Broken-reference propagation.** Legacy `DeleteCells` /
+   `DeleteRow` / `DeleteTab` mark either the reference token itself
+   (`ScSingleRefData::IsDeleted()`) or the directly-affected cell's
+   compiled `pCode->GetCodeError()` as `NoRef`. The token's error bit
+   is not reflected in `GetFormula(GRAM_ODFF)` text, so the engine
+   sees a plain cell reference like `=[.A1]` and reads `A1`'s host
+   value through `readMaterializedHostCellValue`, which resolves via
+   `tryMaterializeBoundedReferencedFormulaCellValue` to an Empty /
+   0.0 scalar (the referenced #REF! cell's `aResult` meType is
+   `Invalid`). The apply-path now walks the token array and
+   declines when any `svSingleRef` / `svDoubleRef` token is
+   `IsDeleted()` or its target cell has `pCode->GetCodeError() !=
+   NONE` or `GetRawError() != NONE`, so legacy's `ScInterpreter`
+   path surfaces the #REF! as it did before.
+2. **Iteration-cycle convergence.** The engine has no iteration
+   budget or epsilon; on an iteration-enabled document it lets the
+   broadcaster's natural recalc cascade propagate to the fixed-point
+   attractor (for `=COS(A2)` with `A1=A3`, 0.73908513...), whereas
+   legacy's `InterpretTail(SCITP_FROM_ITERATION)` stops at
+   `IterEps=0.001` after ~14 steps (~0.7387). The apply-path now
+   declines whenever `rDocument.GetDocOptions().IsIter()` is true,
+   so iteration-enabled docs keep legacy's convergence contract.)
 
 ### Function evaluation (2)
 
@@ -99,6 +124,14 @@ values or false `Err:522` (Circular Reference) on dependency change.
 
 - `testFuncRefListArraySUBTOTAL`
 - `testFuncTableRef`
+
+(Partial fix for `testFuncRefListArraySUBTOTAL`: added
+`formulaContainsAggregateLike` guard in
+`materializeMatchLookupInputSourceNode` to decline the engine route
+when any child contains SUBTOTAL / AGGREGATE. The test passes in
+some runs but remains flaky in the gate — likely test-ordering
+dependent, similar to the earlier `testFuncIF` observation. Kept on
+the list pending stabilization.)
 
 (Cleared: `testFuncIF` — `tryPlanEngineIfJump` and `tryPlanEngineIfError`
 in `interpr4.cxx` lacked a JumpMatrix-on-stack scope fence. The matrix
@@ -134,21 +167,7 @@ queries) so trailing empties no longer absorb the resolved index.)
 These directly exercise the seam. Their failure suggests the seam's
 authoritative-with-fallback / statistical-distribution paths regressed.
 
-- `testInterpretTailEngineEvaluatorAuthoritativeWithFallback` (partial
-  fix landed: `NORMSDIST` / `NORM.S.DIST` /
-  `COM.MICROSOFT.NORM.S.DIST` / `LEGACY.NORMSDIST` now have a first-party
-  handler in `evaluateStatisticalDistributionFunction` that reuses
-  `evaluateNormalDistribution(x, 0, 1, cumulative)`. Previously the
-  StatisticalDistribution classifier admitted the function but the
-  dispatcher fell through to `UnsupportedFunction`, and with
-  `isFamilyLocalDefaultOnFormula` routing the whole family through the
-  authoritative-while-off path every `=NORM.S.DIST(x; TRUE())` /
-  `=NORM.S.DIST(x; FALSE())` produced an authoritative fallback. The
-  test still fails on downstream classification assertions for
-  error-literal and scalar-expression roots now classifying as
-  `ScalarRoot` rather than `Unknown`; those shifted when
-  `isPromotableScalarRootNode` admitted ErrorLiteral / CellReference /
-  BinaryOperation / UnaryOperation roots.)
+- `testInterpretTailEngineEvaluatorAuthoritativeWithFallback`
 - `testInterpretTailEngineEvaluatorStatisticalDistributionAuthoritative`
 
 (Cleared: `testInterpretTailEngineEvaluatorMathScalarAuthoritative` —

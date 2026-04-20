@@ -2035,6 +2035,70 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
         if (!rAttempt.mbSupported)
             return false;
 
+        // Decline the engine route when iteration is enabled on the
+        // document. The engine has no convergence predicate and no
+        // iteration-budget / epsilon, so a circular reference chain
+        // (e.g. A1=A3 ; A2=A1 ; A3=COS(A2)) would propagate through
+        // cached values under the broadcaster's natural recalc cascade
+        // until the attractor is reached, giving the exact fixed point
+        // (0.7390851...) instead of the early-epsilon-convergence value
+        // (~0.7387) legacy produces with its IterCount / IterEps
+        // contract. Routing iteration-enabled documents through legacy
+        // restores deterministic convergence semantics without
+        // disturbing the common non-iterative case.
+        if (rDocument.GetDocOptions().IsIter())
+            return false;
+
+        // Decline the engine route when the compiled token array still
+        // references a cell whose formula-error code is set, or when a
+        // token itself is marked as a deleted reference. Legacy
+        // ScInterpreter::Interpret() surfaces #REF! (FormulaError::NoRef)
+        // via token-level ref-error propagation, but the engine reparses
+        // the formula text — which has already lost the deleted-ref
+        // information — and would otherwise materialize the downstream
+        // reference as Empty (-> 0). Guarding here keeps the
+        // DeleteCol / DeleteRow / DeleteTab propagation contract intact.
+        if (pCode)
+        {
+            formula::FormulaTokenArrayPlainIterator aDeletedRefIter(*pCode);
+            for (const formula::FormulaToken* p = aDeletedRefIter.First(); p;
+                 p = aDeletedRefIter.Next())
+            {
+                const formula::StackVar eTokenType = p->GetType();
+                if (eTokenType == svSingleRef)
+                {
+                    const ScSingleRefData* pSingle = p->GetSingleRef();
+                    if (!pSingle)
+                        continue;
+                    if (pSingle->IsDeleted())
+                        return false;
+                    const ScAddress aRefAbs = pSingle->toAbs(rDocument, aPos);
+                    if (!rDocument.ValidAddress(aRefAbs)
+                        || !rDocument.HasTable(aRefAbs.Tab()))
+                    {
+                        continue;
+                    }
+                    if (ScFormulaCell* pRefFormula
+                        = const_cast<ScDocument&>(rDocument).GetFormulaCell(aRefAbs))
+                    {
+                        const FormulaError eRawErr = pRefFormula->GetRawError();
+                        const FormulaError eTokenErr
+                            = pRefFormula->GetCode()
+                                  ? pRefFormula->GetCode()->GetCodeError()
+                                  : FormulaError::NONE;
+                        if (eTokenErr != FormulaError::NONE || eRawErr != FormulaError::NONE)
+                            return false;
+                    }
+                }
+                else if (eTokenType == svDoubleRef)
+                {
+                    const ScComplexRefData* pDouble = p->GetDoubleRef();
+                    if (pDouble && pDouble->IsDeleted())
+                        return false;
+                }
+            }
+        }
+
         FormulaError nOldErrCode = aResult.GetResultError();
         ScFormulaResult aNewResult;
         if (rAttempt.maResult.meType
