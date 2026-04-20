@@ -7075,55 +7075,6 @@ StackVar ScInterpreter::Interpret()
                               "family-local default-on information predicate reached "
                               "ScInterpreter");
                       };
-                const auto pushLegacyIsEmpty = [&]() {
-                    warnInformationPredicateDispatch(u"ISBLANK");
-                    short nRes = 0;
-                    nFuncFmtType = SvNumFormatType::LOGICAL;
-                    switch (GetRawStackType())
-                    {
-                        case svEmptyCell:
-                        {
-                            FormulaConstTokenRef p = PopToken();
-                            if (!static_cast<const ScEmptyCellToken*>(p.get())->IsInherited())
-                                nRes = 1;
-                        }
-                        break;
-                        case svDoubleRef:
-                        case svSingleRef:
-                        {
-                            ScAddress aAdr;
-                            if (!PopDoubleRefOrSingleRef(aAdr))
-                                break;
-                            ScRefCellValue aCell(mrDoc, aAdr);
-                            if (aCell.getType() == CELLTYPE_NONE)
-                                nRes = 1;
-                        }
-                        break;
-                        case svExternalSingleRef:
-                        case svExternalDoubleRef:
-                        case svMatrix:
-                        {
-                            ScMatrixRef pMat = GetMatrix();
-                            if (!pMat)
-                                break;
-                            if (!pJumpMatrix)
-                                nRes = pMat->IsEmptyCell(0, 0) ? 1 : 0;
-                            else
-                            {
-                                SCSIZE nCols, nRows, nC, nR;
-                                pMat->GetDimensions(nCols, nRows);
-                                pJumpMatrix->GetPos(nC, nR);
-                                if (nC < nCols && nR < nRows)
-                                    nRes = pMat->IsEmptyCell(nC, nR) ? 1 : 0;
-                            }
-                        }
-                        break;
-                        default:
-                            Pop();
-                    }
-                    nGlobalError = FormulaError::NONE;
-                    PushInt(nRes);
-                };
                 const auto pushLegacyIsLogical = [&]() {
                     warnInformationPredicateDispatch(u"ISLOGICAL");
                     bool bRes = false;
@@ -14484,7 +14435,57 @@ StackVar ScInterpreter::Interpret()
                     case ocFisherInv        :
                         PushDouble(semath::inverseFisherTransform(GetDouble()));
                         break;
-                    case ocIsEmpty          : pushLegacyIsEmpty();          break;
+                    case ocIsEmpty          :
+                    {
+                        warnInformationPredicateDispatch(u"ISBLANK");
+                        short nRes = 0;
+                        nFuncFmtType = SvNumFormatType::LOGICAL;
+                        switch (GetRawStackType())
+                        {
+                            case svEmptyCell:
+                            {
+                                FormulaConstTokenRef p = PopToken();
+                                if (!static_cast<const ScEmptyCellToken*>(p.get())->IsInherited())
+                                    nRes = 1;
+                            }
+                            break;
+                            case svDoubleRef:
+                            case svSingleRef:
+                            {
+                                ScAddress aAdr;
+                                if (!PopDoubleRefOrSingleRef(aAdr))
+                                    break;
+                                ScRefCellValue aCell(mrDoc, aAdr);
+                                if (aCell.getType() == CELLTYPE_NONE)
+                                    nRes = 1;
+                            }
+                            break;
+                            case svExternalSingleRef:
+                            case svExternalDoubleRef:
+                            case svMatrix:
+                            {
+                                ScMatrixRef pMat = GetMatrix();
+                                if (!pMat)
+                                    break;
+                                if (!pJumpMatrix)
+                                    nRes = pMat->IsEmptyCell(0, 0) ? 1 : 0;
+                                else
+                                {
+                                    SCSIZE nCols, nRows, nC, nR;
+                                    pMat->GetDimensions(nCols, nRows);
+                                    pJumpMatrix->GetPos(nC, nR);
+                                    if (nC < nCols && nR < nRows)
+                                        nRes = pMat->IsEmptyCell(nC, nR) ? 1 : 0;
+                                }
+                            }
+                            break;
+                            default:
+                                Pop();
+                        }
+                        nGlobalError = FormulaError::NONE;
+                        PushInt(nRes);
+                    }
+                    break;
                     case ocIsString         :
                         warnInformationPredicateDispatch(u"ISTEXT");
                         PushInt(int(IsString()));
