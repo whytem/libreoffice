@@ -680,7 +680,6 @@ private:
     void ScChooseColsOrRows(bool bCols);
     void ScToColOrRow(bool bCol);
     void ScWrapColsOrRows(bool bCols);
-    void ScHorizontalOrVerticalStack(bool bHorizontal);
 
 public:
     // If upon call rMissingField==true then the database field parameter may be

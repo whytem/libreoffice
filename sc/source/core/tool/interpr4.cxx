@@ -9405,19 +9405,33 @@ StackVar ScInterpreter::Interpret()
                     {
                         const FormulaToken* pTok
                             = pStack[sp - nParamCount + i];
-                        if (!pTok || pTok->GetType() != svMatrix)
+                        // Scope fence: admit svMatrix directly plus
+                        // svSingleRef / svDoubleRef via the Phase D
+                        // host-facade materialization primitive.
+                        if (!pTok
+                            || (pTok->GetType() != svMatrix
+                                && pTok->GetType() != svSingleRef
+                                && pTok->GetType() != svDoubleRef))
                         {
                             pushSpillEngineDecline();
                             return false;
                         }
-                        ScMatrix* pMat
-                            = const_cast<FormulaToken*>(pTok)->GetMatrix();
-                        if (!pMat)
+                        std::optional<serpn::MatrixOperand> oOperand;
+                        if (pTok->GetType() == svMatrix)
                         {
-                            pushSpillEngineDecline();
-                            return false;
+                            ScMatrix* pMat
+                                = const_cast<FormulaToken*>(pTok)->GetMatrix();
+                            if (!pMat)
+                            {
+                                pushSpillEngineDecline();
+                                return false;
+                            }
+                            oOperand = convertMatrixRefToMatrixOperand(*pMat);
                         }
-                        auto oOperand = convertMatrixRefToMatrixOperand(*pMat);
+                        else
+                        {
+                            oOperand = materializeRangeTokenToMatrixOperand(pTok);
+                        }
                         if (!oOperand)
                         {
                             pushSpillEngineDecline();
@@ -13205,11 +13219,17 @@ StackVar ScInterpreter::Interpret()
                         break;
                     case ocHStack           :
                         if (!tryPlanEngineSpillHStackOrVStack(/*bHorizontal*/ true))
-                            ScHorizontalOrVerticalStack(true);
+                        {
+                            OSL_FAIL("engine-backed HSTACK declined ocHStack");
+                            PushIllegalParameter();
+                        }
                         break;
                     case ocVStack           :
                         if (!tryPlanEngineSpillHStackOrVStack(/*bHorizontal*/ false))
-                            ScHorizontalOrVerticalStack(false);
+                        {
+                            OSL_FAIL("engine-backed VSTACK declined ocVStack");
+                            PushIllegalParameter();
+                        }
                         break;
                     case ocTake             :
                         if (!tryPlanEngineSpillTakeOrDrop(/*bTake*/ true))
