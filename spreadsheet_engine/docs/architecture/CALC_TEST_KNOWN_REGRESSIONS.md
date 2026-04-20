@@ -134,7 +134,21 @@ queries) so trailing empties no longer absorb the resolved index.)
 These directly exercise the seam. Their failure suggests the seam's
 authoritative-with-fallback / statistical-distribution paths regressed.
 
-- `testInterpretTailEngineEvaluatorAuthoritativeWithFallback`
+- `testInterpretTailEngineEvaluatorAuthoritativeWithFallback` (partial
+  fix landed: `NORMSDIST` / `NORM.S.DIST` /
+  `COM.MICROSOFT.NORM.S.DIST` / `LEGACY.NORMSDIST` now have a first-party
+  handler in `evaluateStatisticalDistributionFunction` that reuses
+  `evaluateNormalDistribution(x, 0, 1, cumulative)`. Previously the
+  StatisticalDistribution classifier admitted the function but the
+  dispatcher fell through to `UnsupportedFunction`, and with
+  `isFamilyLocalDefaultOnFormula` routing the whole family through the
+  authoritative-while-off path every `=NORM.S.DIST(x; TRUE())` /
+  `=NORM.S.DIST(x; FALSE())` produced an authoritative fallback. The
+  test still fails on downstream classification assertions for
+  error-literal and scalar-expression roots now classifying as
+  `ScalarRoot` rather than `Unknown`; those shifted when
+  `isPromotableScalarRootNode` admitted ErrorLiteral / CellReference /
+  BinaryOperation / UnaryOperation roots.)
 - `testInterpretTailEngineEvaluatorStatisticalDistributionAuthoritative`
 
 (Cleared: `testInterpretTailEngineEvaluatorMathScalarAuthoritative` —

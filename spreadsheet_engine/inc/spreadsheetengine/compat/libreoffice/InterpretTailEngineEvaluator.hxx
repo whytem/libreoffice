@@ -10623,6 +10623,46 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         return makeNumericAttempt(aDistribution.maValue);
     }
 
+    if (aFunctionName == u"NORMSDIST" || aFunctionName == u"LEGACY.NORMSDIST"
+        || aFunctionName == u"NORM.S.DIST" || aFunctionName == u"COM.MICROSOFT.NORM.S.DIST")
+    {
+        const bool bMicrosoftSyntax = aFunctionName == u"NORM.S.DIST"
+                                      || aFunctionName == u"COM.MICROSOFT.NORM.S.DIST";
+        if (bMicrosoftSyntax)
+        {
+            if (rNode.maChildren.size() != 2)
+                return makeErrorAttempt(api::Error::IllegalArgument);
+        }
+        else
+        {
+            if (rNode.maChildren.size() != 1)
+                return makeErrorAttempt(api::Error::IllegalArgument);
+        }
+
+        const auto aX = materializeNumber(*rNode.maChildren[0]);
+        if (!aX.mbSupported)
+            return makeUnsupportedAttempt(aX.meFallbackReason);
+        if (!aX.moValue)
+            return makeErrorAttempt(aX.meError);
+
+        bool bCumulative = true;
+        if (bMicrosoftSyntax)
+        {
+            const auto aCumulative = materializeBool(*rNode.maChildren[1]);
+            if (!aCumulative.mbSupported)
+                return makeUnsupportedAttempt(aCumulative.meFallbackReason);
+            if (!aCumulative.moValue)
+                return makeErrorAttempt(aCumulative.meError);
+            bCumulative = *aCumulative.moValue;
+        }
+
+        const auto aDistribution = spreadsheetengine::core::math::evaluateNormalDistribution(
+            *aX.moValue, 0.0, 1.0, bCumulative);
+        if (!aDistribution)
+            return makeErrorAttempt(aDistribution.meError);
+        return makeNumericAttempt(aDistribution.maValue);
+    }
+
     if (aFunctionName == u"LOGNORMDIST" || aFunctionName == u"LOGNORM.DIST"
         || aFunctionName == u"COM.MICROSOFT.LOGNORM.DIST")
     {
