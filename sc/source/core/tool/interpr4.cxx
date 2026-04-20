@@ -7609,6 +7609,26 @@ StackVar ScInterpreter::Interpret()
                         return false;
                     }
 
+                    // Matrix-frame fence: when an outer JumpMatrix sits
+                    // immediately below the condition on the stack, the
+                    // legacy `ScIfJump` -> `MatrixJumpConditionToMatrix`
+                    // path converts the scalar condition to a 1x1 matrix
+                    // and creates a nested JumpMatrix so the outer
+                    // iteration can collect per-cell results. The engine's
+                    // scalar-only fast path skips that conversion and
+                    // emits a plain `aCode.Jump`, which leaves the outer
+                    // JumpMatrix without a matrix-shaped result for the
+                    // current cell (e.g. the inner `IF(1;23)` of
+                    // `=IF({1;0};IF(1;23);42)` lost row 0). Decline to
+                    // legacy whenever the JumpMatrix protocol is in play.
+                    if (GetStackType(2) == svJumpMatrix)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnControlFlowEngineDeclinedCount);
+                        return false;
+                    }
+
                     const FormulaToken* pConditionToken = pStack[sp - 1];
                     if (!pConditionToken)
                     {
@@ -12098,6 +12118,21 @@ StackVar ScInterpreter::Interpret()
                     const short* pJump = pCur->GetJump();
                     const short nJumpCount = pJump[0];
                     if (!sp || nJumpCount != 2)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnControlFlowEngineDeclinedCount);
+                        return false;
+                    }
+
+                    // Matrix-frame fence: see tryPlanEngineIfJump for the
+                    // rationale. When an outer JumpMatrix sits below the
+                    // primary on the stack, the legacy IFERROR/IFNA path
+                    // routes through `MatrixJumpConditionToMatrix` to
+                    // emit a matrix-shaped result for the outer
+                    // iteration; the engine's scalar fast path would
+                    // skip that and corrupt the outer JumpMatrix.
+                    if (GetStackType(2) == svJumpMatrix)
                     {
                         addDispatchRuntimeStat(
                             interpreterDispatchRuntimeStatsStore()
