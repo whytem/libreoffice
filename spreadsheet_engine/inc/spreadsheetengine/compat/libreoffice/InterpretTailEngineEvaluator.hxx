@@ -33,6 +33,7 @@
 #include <formula/token.hxx>
 #include <global.hxx>
 #include <interpretercontext.hxx>
+#include <kahan.hxx>
 #include <rangeutl.hxx>
 #include <svl/numformat.hxx>
 #include <tokenarray.hxx>
@@ -8285,7 +8286,13 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         const auto& rValues = *aValues.moValue;
         if (aFunctionName == u"SUM")
         {
-            spreadsheetengine::core::fp::KahanSum aSum;
+            // Use legacy ::KahanSum (sc/inc/kahan.hxx) which queues the last
+            // non-zero value and snaps to exact 0.0 via rtl::math::approxEqual
+            // at get() time. The engine's plain Kahan-Babuška accumulator
+            // (spreadsheetengine::core::fp::KahanSum) lacks that snap and
+            // returns ~-2.84e-14 for tdf#156985 input
+            // SUM(A1:A5) = SUM(-170.87, -223.73, -12.58, 234.98, 172.2) == 0.
+            ::KahanSum aSum;
             for (double fValue : rValues)
                 aSum += fValue;
             return makeNumericAttempt(aSum.get());
@@ -8301,7 +8308,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
 
         if (aFunctionName == u"SUMSQ")
         {
-            spreadsheetengine::core::fp::KahanSum aSum;
+            ::KahanSum aSum;
             for (double fValue : rValues)
                 aSum += fValue * fValue;
             return makeNumericAttempt(aSum.get());
@@ -8311,7 +8318,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         {
             if (rValues.empty())
                 return makeErrorAttempt(api::Error::DivisionByZero);
-            spreadsheetengine::core::fp::KahanSum aSum;
+            ::KahanSum aSum;
             for (double fValue : rValues)
                 aSum += fValue;
             return makeNumericAttempt(aSum.get() / static_cast<double>(rValues.size()));
@@ -8321,11 +8328,11 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         {
             if (rValues.empty())
                 return makeNumericAttempt(0.0);
-            spreadsheetengine::core::fp::KahanSum aMeanSum;
+            ::KahanSum aMeanSum;
             for (double fValue : rValues)
                 aMeanSum += fValue;
             const double fMean = aMeanSum.get() / static_cast<double>(rValues.size());
-            spreadsheetengine::core::fp::KahanSum aDeviation;
+            ::KahanSum aDeviation;
             for (double fValue : rValues)
             {
                 const double fDelta = fValue - fMean;
