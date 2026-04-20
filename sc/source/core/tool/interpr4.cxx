@@ -5161,107 +5161,6 @@ StackVar ScInterpreter::Interpret()
                         },
                         "family-local default-on financial rate family reached ScInterpreter");
                 };
-                const auto pushLegacyIrr = [&]() {
-                    warnIfLegacyRateFamilyReached(u"IRR");
-                    nFuncFmtType = SvNumFormatType::PERCENT;
-                    sal_uInt8 nParamCount = GetByte();
-                    if (!MustHaveParamCount(nParamCount, 1, 2))
-                        return;
-
-                    constexpr double fEpsilon = 1.0E-7;
-                    const double fEstimated = nParamCount == 2 ? GetDouble() : 0.1;
-                    double fEps = 1.0;
-                    double x = fEstimated == -1.0 ? 0.1 : fEstimated;
-                    double fValue = 0.0;
-
-                    ScRange aRange;
-                    ScMatrixRef pMat;
-                    SCSIZE nC = 0;
-                    SCSIZE nR = 0;
-                    bool bIsMatrix = false;
-                    switch (GetStackType())
-                    {
-                        case svDoubleRef:
-                            PopDoubleRef(aRange);
-                            break;
-                        case svMatrix:
-                        case svExternalSingleRef:
-                        case svExternalDoubleRef:
-                            pMat = GetMatrix();
-                            if (pMat)
-                            {
-                                pMat->GetDimensions(nC, nR);
-                                if (nC == 0 || nR == 0)
-                                {
-                                    PushIllegalParameter();
-                                    return;
-                                }
-                                bIsMatrix = true;
-                            }
-                            else
-                            {
-                                PushIllegalParameter();
-                                return;
-                            }
-                            break;
-                        default:
-                            PushIllegalParameter();
-                            return;
-                    }
-
-                    constexpr sal_uInt16 nIterationsMax = 20;
-                    sal_uInt16 nItCount = 0;
-                    FormulaError nIterError = FormulaError::NONE;
-                    while (fEps > fEpsilon && nItCount < nIterationsMax
-                           && nGlobalError == FormulaError::NONE)
-                    {
-                        KahanSum fNom = 0.0;
-                        KahanSum fDenom = 0.0;
-                        double fCount = 0.0;
-                        if (bIsMatrix)
-                        {
-                            for (SCSIZE j = 0; j < nC && nGlobalError == FormulaError::NONE; j++)
-                            {
-                                for (SCSIZE k = 0; k < nR; k++)
-                                {
-                                    if (!pMat->IsValue(j, k))
-                                        continue;
-                                    fValue = pMat->GetDouble(j, k);
-                                    if (nGlobalError != FormulaError::NONE)
-                                        break;
-
-                                    fNom += fValue / pow(1.0 + x, fCount);
-                                    fDenom += -fCount * fValue / pow(1.0 + x, fCount + 1.0);
-                                    fCount++;
-                                }
-                            }
-                        }
-                        else
-                        {
-                            ScValueIterator aValIter(mrContext, aRange, mnSubTotalFlags);
-                            bool bLoop = aValIter.GetFirst(fValue, nIterError);
-                            while (bLoop && nIterError == FormulaError::NONE)
-                            {
-                                fNom += fValue / pow(1.0 + x, fCount);
-                                fDenom += -fCount * fValue / pow(1.0 + x, fCount + 1.0);
-                                fCount++;
-                                bLoop = aValIter.GetNext(fValue, nIterError);
-                            }
-                            SetError(nIterError);
-                        }
-                        const double xNew
-                            = x - o3tl::div_allow_zero(fNom.get(), fDenom.get());
-                        nItCount++;
-                        fEps = std::abs(xNew - x);
-                        x = xNew;
-                    }
-                    if (fEstimated == 0.0 && std::abs(x) < fEpsilon)
-                        x = 0.0;
-                    if (fEps < fEpsilon)
-                        PushDouble(x);
-                    else
-                        PushError(FormulaError::NoConvergence);
-                };
                 const auto pushLegacyMirr = [&]() {
                     warnIfLegacyRateFamilyReached(u"MIRR");
                     nFuncFmtType = SvNumFormatType::PERCENT;
@@ -15003,7 +14902,109 @@ StackVar ScInterpreter::Interpret()
                             PushDouble(fVal.get());
                         }();
                         break;
-                    case ocIRR              : pushLegacyIrr();          break;
+                    case ocIRR              :
+                        [&]() {
+                            warnIfLegacyRateFamilyReached(u"IRR");
+                            nFuncFmtType = SvNumFormatType::PERCENT;
+                            sal_uInt8 nParamCount = GetByte();
+                            if (!MustHaveParamCount(nParamCount, 1, 2))
+                                return;
+
+                            constexpr double fEpsilon = 1.0E-7;
+                            const double fEstimated = nParamCount == 2 ? GetDouble() : 0.1;
+                            double fEps = 1.0;
+                            double x = fEstimated == -1.0 ? 0.1 : fEstimated;
+                            double fValue = 0.0;
+
+                            ScRange aRange;
+                            ScMatrixRef pMat;
+                            SCSIZE nC = 0;
+                            SCSIZE nR = 0;
+                            bool bIsMatrix = false;
+                            switch (GetStackType())
+                            {
+                                case svDoubleRef:
+                                    PopDoubleRef(aRange);
+                                    break;
+                                case svMatrix:
+                                case svExternalSingleRef:
+                                case svExternalDoubleRef:
+                                    pMat = GetMatrix();
+                                    if (pMat)
+                                    {
+                                        pMat->GetDimensions(nC, nR);
+                                        if (nC == 0 || nR == 0)
+                                        {
+                                            PushIllegalParameter();
+                                            return;
+                                        }
+                                        bIsMatrix = true;
+                                    }
+                                    else
+                                    {
+                                        PushIllegalParameter();
+                                        return;
+                                    }
+                                    break;
+                                default:
+                                    PushIllegalParameter();
+                                    return;
+                            }
+
+                            constexpr sal_uInt16 nIterationsMax = 20;
+                            sal_uInt16 nItCount = 0;
+                            FormulaError nIterError = FormulaError::NONE;
+                            while (fEps > fEpsilon && nItCount < nIterationsMax
+                                   && nGlobalError == FormulaError::NONE)
+                            {
+                                KahanSum fNom = 0.0;
+                                KahanSum fDenom = 0.0;
+                                double fCount = 0.0;
+                                if (bIsMatrix)
+                                {
+                                    for (SCSIZE j = 0; j < nC && nGlobalError == FormulaError::NONE; j++)
+                                    {
+                                        for (SCSIZE k = 0; k < nR; k++)
+                                        {
+                                            if (!pMat->IsValue(j, k))
+                                                continue;
+                                            fValue = pMat->GetDouble(j, k);
+                                            if (nGlobalError != FormulaError::NONE)
+                                                break;
+
+                                            fNom += fValue / pow(1.0 + x, fCount);
+                                            fDenom += -fCount * fValue / pow(1.0 + x, fCount + 1.0);
+                                            fCount++;
+                                        }
+                                    }
+                                }
+                                else
+                                {
+                                    ScValueIterator aValIter(mrContext, aRange, mnSubTotalFlags);
+                                    bool bLoop = aValIter.GetFirst(fValue, nIterError);
+                                    while (bLoop && nIterError == FormulaError::NONE)
+                                    {
+                                        fNom += fValue / pow(1.0 + x, fCount);
+                                        fDenom += -fCount * fValue / pow(1.0 + x, fCount + 1.0);
+                                        fCount++;
+                                        bLoop = aValIter.GetNext(fValue, nIterError);
+                                    }
+                                    SetError(nIterError);
+                                }
+                                const double xNew
+                                    = x - o3tl::div_allow_zero(fNom.get(), fDenom.get());
+                                nItCount++;
+                                fEps = std::abs(xNew - x);
+                                x = xNew;
+                            }
+                            if (fEstimated == 0.0 && std::abs(x) < fEpsilon)
+                                x = 0.0;
+                            if (fEps < fEpsilon)
+                                PushDouble(x);
+                            else
+                                PushError(FormulaError::NoConvergence);
+                        }();
+                        break;
                     case ocMIRR             : pushLegacyMirr();         break;
                     case ocISPMT            :
                     {
