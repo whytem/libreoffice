@@ -1847,6 +1847,84 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterBadLiteralDispatch)
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterSpillEngineDispatch)
+{
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    ScopedEnvironmentOverride aMode(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+    ScopedEnvironmentOverride aForceCalculation("SC_FORCE_CALCULATION", "core");
+    ScopedEnvironmentOverride aDisableAuthorityWhileOff(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF", "0");
+
+    m_pDoc->InsertTab(0, u"Spill"_ustr);
+    resetScInterpreterDispatchRuntimeStats();
+
+    ScMarkData aMark(m_pDoc->GetSheetLimits());
+    aMark.SelectOneTable(0);
+
+    // Populate a 3-row source range and exercise each of the six
+    // Phase 5A admissions (SORT / SORTBY / UNIQUE / FILTER / TAKE /
+    // DROP). Ranges arrive at the admission site as svMatrix tokens
+    // after the parameter classifier runs for these opcodes, so the
+    // engine admission is exercised end-to-end.
+    m_pDoc->SetValue(ScAddress(4, 0, 0), 3.0);
+    m_pDoc->SetValue(ScAddress(4, 1, 0), 1.0);
+    m_pDoc->SetValue(ScAddress(4, 2, 0), 2.0);
+    m_pDoc->InsertMatrixFormula(0, 0, 0, 2, aMark, u"=SORT(E1:E3)"_ustr);
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(0, 0, 0)));
+    ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(0, 1, 0)));
+    ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(ScAddress(0, 2, 0)));
+
+    m_pDoc->InsertMatrixFormula(0, 4, 0, 6, aMark, u"=UNIQUE(E1:E3)"_ustr);
+    ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(ScAddress(0, 4, 0)));
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(0, 5, 0)));
+    ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(0, 6, 0)));
+
+    m_pDoc->SetValue(ScAddress(5, 0, 0), 1.0);
+    m_pDoc->SetValue(ScAddress(5, 1, 0), 0.0);
+    m_pDoc->SetValue(ScAddress(5, 2, 0), 1.0);
+    m_pDoc->InsertMatrixFormula(0, 8, 0, 10, aMark,
+        u"=FILTER(E1:E3;F1:F3)"_ustr);
+    ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(ScAddress(0, 8, 0)));
+    ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(0, 9, 0)));
+
+    m_pDoc->InsertMatrixFormula(0, 12, 0, 13, aMark, u"=TAKE(E1:E3;2)"_ustr);
+    ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(ScAddress(0, 12, 0)));
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(0, 13, 0)));
+
+    m_pDoc->InsertMatrixFormula(0, 16, 0, 17, aMark, u"=DROP(E1:E3;1)"_ustr);
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(0, 16, 0)));
+    ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(0, 17, 0)));
+
+    m_pDoc->SetValue(ScAddress(6, 0, 0), 3.0);
+    m_pDoc->SetValue(ScAddress(6, 1, 0), 1.0);
+    m_pDoc->SetValue(ScAddress(6, 2, 0), 2.0);
+    m_pDoc->InsertMatrixFormula(0, 20, 0, 22, aMark,
+        u"=SORTBY(E1:E3;G1:G3)"_ustr);
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(0, 20, 0)));
+    ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(0, 21, 0)));
+    ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(ScAddress(0, 22, 0)));
+
+    const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
+    const std::string aLabel
+        = "spill_attempted="
+          + std::to_string(aDispatchStats.mnSpillEngineAttemptedCount)
+          + " succeeded="
+          + std::to_string(aDispatchStats.mnSpillEngineSucceededCount)
+          + " declined="
+          + std::to_string(aDispatchStats.mnSpillEngineDeclinedCount);
+    CPPUNIT_ASSERT_MESSAGE(
+        "spill admissions should attempt engine dispatch: " + aLabel,
+        aDispatchStats.mnSpillEngineAttemptedCount > 0);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "spill dispatch accounting should stay balanced: " + aLabel,
+        aDispatchStats.mnSpillEngineAttemptedCount,
+        aDispatchStats.mnSpillEngineSucceededCount
+            + aDispatchStats.mnSpillEngineDeclinedCount);
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterRangeDispatch)
 {
     sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
