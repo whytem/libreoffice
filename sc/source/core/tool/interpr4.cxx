@@ -134,6 +134,7 @@ namespace sefinance = spreadsheetengine::core::finance;
 namespace semath = spreadsheetengine::core::math;
 namespace serpn = spreadsheetengine::core::rpn;
 namespace sespill = spreadsheetengine::core::rpn::spill;
+namespace searray = spreadsheetengine::api::array;
 namespace serefexec = spreadsheetengine::compat::libreoffice::referenceexecution;
 namespace sequery = spreadsheetengine::core::query;
 namespace secoercion = spreadsheetengine::core::coercion;
@@ -9660,6 +9661,592 @@ StackVar ScInterpreter::Interpret()
                     return true;
                 };
 
+                // Phase 5B shape-reshaping admissions.  Each helper
+                // enforces the svMatrix-only scope fence on the matrix
+                // arguments, converts them through
+                // convertMatrixRefToMatrixOperand, dispatches to the
+                // matching sespill::plan* planner, and PushMatrix's the
+                // result back through convertMatrixOperandToMatrixRef.
+                // Range inputs decline and defer to the legacy body
+                // pending the Phase D reference-to-matrix
+                // materialization contract.
+
+                const auto tryPlanEngineSpillHStackOrVStack
+                    = [&](bool bHorizontal) -> bool {
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnSpillEngineAttemptedCount);
+
+                    const sal_uInt8 nParamCount = pCur->GetByte();
+                    if (nParamCount < 1 || sp < nParamCount)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    std::vector<serpn::MatrixOperand> aOperands;
+                    aOperands.reserve(nParamCount);
+                    for (sal_uInt8 i = 0; i < nParamCount; ++i)
+                    {
+                        const FormulaToken* pTok
+                            = pStack[sp - nParamCount + i];
+                        if (!pTok || pTok->GetType() != svMatrix)
+                        {
+                            pushSpillEngineDecline();
+                            return false;
+                        }
+                        ScMatrix* pMat
+                            = const_cast<FormulaToken*>(pTok)->GetMatrix();
+                        if (!pMat)
+                        {
+                            pushSpillEngineDecline();
+                            return false;
+                        }
+                        auto oOperand = convertMatrixRefToMatrixOperand(*pMat);
+                        if (!oOperand)
+                        {
+                            pushSpillEngineDecline();
+                            return false;
+                        }
+                        aOperands.push_back(std::move(*oOperand));
+                    }
+                    const auto aPlan = sespill::planHStackOrVStack(
+                        aOperands,
+                        bHorizontal ? searray::StackDirection::Horizontal
+                                    : searray::StackDirection::Vertical);
+                    if (!aPlan
+                        || aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    ScMatrixRef pStackResult
+                        = convertMatrixOperandToMatrixRef(aPlan.maValue);
+                    if (!pStackResult)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    sp -= nParamCount;
+                    nGlobalError = FormulaError::NONE;
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnSpillEngineSucceededCount);
+                    PushMatrix(pStackResult);
+                    return true;
+                };
+
+                const auto tryPlanEngineSpillChooseColsOrRows
+                    = [&](bool bCols) -> bool {
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnSpillEngineAttemptedCount);
+
+                    const sal_uInt8 nParamCount = pCur->GetByte();
+                    if (nParamCount < 2 || sp < nParamCount)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    const FormulaToken* pSourceTok
+                        = pStack[sp - nParamCount];
+                    if (!pSourceTok || pSourceTok->GetType() != svMatrix)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    ScMatrix* pSourceMat
+                        = const_cast<FormulaToken*>(pSourceTok)->GetMatrix();
+                    if (!pSourceMat)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    auto oSource = convertMatrixRefToMatrixOperand(*pSourceMat);
+                    if (!oSource)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    std::vector<sal_Int32> aSelections;
+                    for (sal_uInt8 i = 1; i < nParamCount; ++i)
+                    {
+                        const FormulaToken* pTok
+                            = pStack[sp - nParamCount + i];
+                        if (!pTok)
+                        {
+                            pushSpillEngineDecline();
+                            return false;
+                        }
+                        if (pTok->GetType() == svDouble)
+                        {
+                            aSelections.push_back(
+                                static_cast<sal_Int32>(pTok->GetDouble()));
+                        }
+                        else if (pTok->GetType() == svMatrix)
+                        {
+                            ScMatrix* pIdxMat
+                                = const_cast<FormulaToken*>(pTok)->GetMatrix();
+                            if (!pIdxMat)
+                            {
+                                pushSpillEngineDecline();
+                                return false;
+                            }
+                            SCSIZE nIdxCols = 0, nIdxRows = 0;
+                            pIdxMat->GetDimensions(nIdxCols, nIdxRows);
+                            for (SCSIZE c = 0; c < nIdxCols; ++c)
+                            {
+                                for (SCSIZE r = 0; r < nIdxRows; ++r)
+                                {
+                                    if (pIdxMat->IsStringOrEmpty(c, r))
+                                    {
+                                        pushSpillEngineDecline();
+                                        return false;
+                                    }
+                                    aSelections.push_back(
+                                        static_cast<sal_Int32>(
+                                            pIdxMat->GetDouble(c, r)));
+                                }
+                            }
+                        }
+                        else
+                        {
+                            pushSpillEngineDecline();
+                            return false;
+                        }
+                    }
+                    const auto aPlan = sespill::planChooseColsOrRows(
+                        *oSource, aSelections,
+                        bCols ? searray::Axis::Columns : searray::Axis::Rows);
+                    if (!aPlan
+                        || aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    ScMatrixRef pChooseResult
+                        = convertMatrixOperandToMatrixRef(aPlan.maValue);
+                    if (!pChooseResult)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    sp -= nParamCount;
+                    nGlobalError = FormulaError::NONE;
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnSpillEngineSucceededCount);
+                    PushMatrix(pChooseResult);
+                    return true;
+                };
+
+                const auto tryPlanEngineSpillExpand = [&]() -> bool {
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnSpillEngineAttemptedCount);
+
+                    const sal_uInt8 nParamCount = pCur->GetByte();
+                    if (nParamCount < 2 || nParamCount > 4 || sp < nParamCount)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    const FormulaToken* pPadTok
+                        = nParamCount >= 4 ? pStack[sp - 1] : nullptr;
+                    const FormulaToken* pColsTok
+                        = nParamCount >= 3
+                              ? pStack[sp - (nParamCount - 2)]
+                              : nullptr;
+                    const FormulaToken* pRowsTok
+                        = pStack[sp - (nParamCount - 1)];
+                    const FormulaToken* pSourceTok
+                        = pStack[sp - nParamCount];
+                    if (!pSourceTok || pSourceTok->GetType() != svMatrix)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    if (pRowsTok && pRowsTok->GetType() != svDouble
+                        && pRowsTok->GetType() != svMissing)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    if (pColsTok && pColsTok->GetType() != svDouble
+                        && pColsTok->GetType() != svMissing)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    if (pPadTok && pPadTok->GetType() != svDouble
+                        && pPadTok->GetType() != svString
+                        && pPadTok->GetType() != svMissing)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    ScMatrix* pSourceMat
+                        = const_cast<FormulaToken*>(pSourceTok)->GetMatrix();
+                    if (!pSourceMat)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    auto oSource = convertMatrixRefToMatrixOperand(*pSourceMat);
+                    if (!oSource)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    std::optional<sal_Int32> oRows;
+                    std::optional<sal_Int32> oCols;
+                    if (pRowsTok && pRowsTok->GetType() == svDouble)
+                        oRows = static_cast<sal_Int32>(pRowsTok->GetDouble());
+                    if (pColsTok && pColsTok->GetType() == svDouble)
+                        oCols = static_cast<sal_Int32>(pColsTok->GetDouble());
+                    std::optional<spreadsheetengine::api::CellValue> oPadValue;
+                    if (pPadTok && pPadTok->GetType() == svDouble)
+                    {
+                        oPadValue = spreadsheetengine::api::CellValue::number(
+                            pPadTok->GetDouble());
+                    }
+                    else if (pPadTok && pPadTok->GetType() == svString)
+                    {
+                        oPadValue = spreadsheetengine::api::CellValue::text(
+                            selibreoffice::toApiString(
+                                pPadTok->GetString().getString()));
+                    }
+                    const auto aPlan
+                        = sespill::planExpand(*oSource, oRows, oCols, oPadValue);
+                    if (!aPlan
+                        || aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    ScMatrixRef pExpandResult
+                        = convertMatrixOperandToMatrixRef(aPlan.maValue);
+                    if (!pExpandResult)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    sp -= nParamCount;
+                    nGlobalError = FormulaError::NONE;
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnSpillEngineSucceededCount);
+                    PushMatrix(pExpandResult);
+                    return true;
+                };
+
+                const auto tryPlanEngineSpillToColOrRow
+                    = [&](bool bToColumn) -> bool {
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnSpillEngineAttemptedCount);
+
+                    const sal_uInt8 nParamCount = pCur->GetByte();
+                    if (nParamCount < 1 || nParamCount > 3 || sp < nParamCount)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    const FormulaToken* pScanTok
+                        = nParamCount >= 3 ? pStack[sp - 1] : nullptr;
+                    const FormulaToken* pIgnoreTok
+                        = nParamCount >= 2
+                              ? pStack[sp - (nParamCount - 1)]
+                              : nullptr;
+                    const FormulaToken* pSourceTok
+                        = pStack[sp - nParamCount];
+                    if (!pSourceTok || pSourceTok->GetType() != svMatrix)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    if (pIgnoreTok && pIgnoreTok->GetType() != svDouble
+                        && pIgnoreTok->GetType() != svMissing)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    if (pScanTok && pScanTok->GetType() != svDouble
+                        && pScanTok->GetType() != svMissing)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    ScMatrix* pSourceMat
+                        = const_cast<FormulaToken*>(pSourceTok)->GetMatrix();
+                    if (!pSourceMat)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    auto oSource = convertMatrixRefToMatrixOperand(*pSourceMat);
+                    if (!oSource)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    searray::FlattenIgnore eIgnore
+                        = searray::FlattenIgnore::Default;
+                    if (pIgnoreTok && pIgnoreTok->GetType() == svDouble)
+                    {
+                        const sal_Int32 nIgnore
+                            = static_cast<sal_Int32>(pIgnoreTok->GetDouble());
+                        if (nIgnore < 0 || nIgnore > 3)
+                        {
+                            pushSpillEngineDecline();
+                            return false;
+                        }
+                        eIgnore
+                            = static_cast<searray::FlattenIgnore>(nIgnore);
+                    }
+                    const bool bByColumn
+                        = pScanTok && pScanTok->GetType() == svDouble
+                          && pScanTok->GetDouble() != 0.0;
+                    const auto aPlan = sespill::planToColOrRow(
+                        *oSource, bToColumn, bByColumn, eIgnore);
+                    if (!aPlan
+                        || aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    ScMatrixRef pFlattenResult
+                        = convertMatrixOperandToMatrixRef(aPlan.maValue);
+                    if (!pFlattenResult)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    sp -= nParamCount;
+                    nGlobalError = FormulaError::NONE;
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnSpillEngineSucceededCount);
+                    PushMatrix(pFlattenResult);
+                    return true;
+                };
+
+                const auto tryPlanEngineSpillWrapColsOrRows
+                    = [&](bool bCols) -> bool {
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnSpillEngineAttemptedCount);
+
+                    const sal_uInt8 nParamCount = pCur->GetByte();
+                    if (nParamCount < 2 || nParamCount > 3 || sp < nParamCount)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    const FormulaToken* pPadTok
+                        = nParamCount >= 3 ? pStack[sp - 1] : nullptr;
+                    const FormulaToken* pWrapTok
+                        = pStack[sp - (nParamCount - 1)];
+                    const FormulaToken* pSourceTok
+                        = pStack[sp - nParamCount];
+                    if (!pSourceTok || pSourceTok->GetType() != svMatrix)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    if (!pWrapTok || pWrapTok->GetType() != svDouble)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    if (pPadTok && pPadTok->GetType() != svDouble
+                        && pPadTok->GetType() != svString
+                        && pPadTok->GetType() != svMissing)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    const sal_Int32 nWrap
+                        = static_cast<sal_Int32>(pWrapTok->GetDouble());
+                    if (nWrap <= 0)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    ScMatrix* pSourceMat
+                        = const_cast<FormulaToken*>(pSourceTok)->GetMatrix();
+                    if (!pSourceMat)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    auto oSource = convertMatrixRefToMatrixOperand(*pSourceMat);
+                    if (!oSource)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    std::optional<spreadsheetengine::api::CellValue> oPadValue;
+                    if (pPadTok && pPadTok->GetType() == svDouble)
+                    {
+                        oPadValue = spreadsheetengine::api::CellValue::number(
+                            pPadTok->GetDouble());
+                    }
+                    else if (pPadTok && pPadTok->GetType() == svString)
+                    {
+                        oPadValue = spreadsheetengine::api::CellValue::text(
+                            selibreoffice::toApiString(
+                                pPadTok->GetString().getString()));
+                    }
+                    const auto aPlan = sespill::planWrapColsOrRows(
+                        *oSource,
+                        static_cast<spreadsheetengine::api::MatrixSize>(nWrap),
+                        bCols, oPadValue);
+                    if (!aPlan
+                        || aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    ScMatrixRef pWrapResult
+                        = convertMatrixOperandToMatrixRef(aPlan.maValue);
+                    if (!pWrapResult)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    sp -= nParamCount;
+                    nGlobalError = FormulaError::NONE;
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnSpillEngineSucceededCount);
+                    PushMatrix(pWrapResult);
+                    return true;
+                };
+
+                const auto tryPlanEngineSpillTextSplit = [&]() -> bool {
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnSpillEngineAttemptedCount);
+
+                    const sal_uInt8 nParamCount = pCur->GetByte();
+                    if (nParamCount < 1 || nParamCount > 6 || sp < nParamCount)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    const FormulaToken* pPadTok
+                        = nParamCount >= 6 ? pStack[sp - 1] : nullptr;
+                    const FormulaToken* pMatchTok
+                        = nParamCount >= 5
+                              ? pStack[sp - (nParamCount - 4)]
+                              : nullptr;
+                    const FormulaToken* pIgnoreTok
+                        = nParamCount >= 4
+                              ? pStack[sp - (nParamCount - 3)]
+                              : nullptr;
+                    const FormulaToken* pRowDelimTok
+                        = nParamCount >= 3
+                              ? pStack[sp - (nParamCount - 2)]
+                              : nullptr;
+                    const FormulaToken* pColDelimTok
+                        = nParamCount >= 2
+                              ? pStack[sp - (nParamCount - 1)]
+                              : nullptr;
+                    const FormulaToken* pTextTok
+                        = pStack[sp - nParamCount];
+                    if (!pTextTok || pTextTok->GetType() != svString)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    const auto isStringOrMissing
+                        = [](const FormulaToken* pTok) {
+                              return !pTok || pTok->GetType() == svString
+                                     || pTok->GetType() == svMissing;
+                          };
+                    if (!isStringOrMissing(pColDelimTok)
+                        || !isStringOrMissing(pRowDelimTok))
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    if (pIgnoreTok && pIgnoreTok->GetType() != svDouble
+                        && pIgnoreTok->GetType() != svMissing)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    if (pMatchTok && pMatchTok->GetType() != svDouble
+                        && pMatchTok->GetType() != svMissing)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    if (pPadTok && pPadTok->GetType() != svDouble
+                        && pPadTok->GetType() != svString
+                        && pPadTok->GetType() != svMissing)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    const spreadsheetengine::api::String aText
+                        = selibreoffice::toApiString(
+                            pTextTok->GetString().getString());
+                    std::vector<spreadsheetengine::api::String> aColDelims;
+                    if (pColDelimTok && pColDelimTok->GetType() == svString)
+                    {
+                        aColDelims.push_back(selibreoffice::toApiString(
+                            pColDelimTok->GetString().getString()));
+                    }
+                    std::vector<spreadsheetengine::api::String> aRowDelims;
+                    if (pRowDelimTok && pRowDelimTok->GetType() == svString)
+                    {
+                        aRowDelims.push_back(selibreoffice::toApiString(
+                            pRowDelimTok->GetString().getString()));
+                    }
+                    const bool bIgnoreEmpty
+                        = pIgnoreTok && pIgnoreTok->GetType() == svDouble
+                          && pIgnoreTok->GetDouble() != 0.0;
+                    const bool bMatchMode
+                        = pMatchTok && pMatchTok->GetType() == svDouble
+                          && pMatchTok->GetDouble() != 0.0;
+                    std::optional<spreadsheetengine::api::CellValue> oPadValue;
+                    if (pPadTok && pPadTok->GetType() == svDouble)
+                    {
+                        oPadValue = spreadsheetengine::api::CellValue::number(
+                            pPadTok->GetDouble());
+                    }
+                    else if (pPadTok && pPadTok->GetType() == svString)
+                    {
+                        oPadValue = spreadsheetengine::api::CellValue::text(
+                            selibreoffice::toApiString(
+                                pPadTok->GetString().getString()));
+                    }
+                    const auto aPlan = sespill::planTextSplit(
+                        aText, aColDelims, aRowDelims, bIgnoreEmpty,
+                        bMatchMode, oPadValue);
+                    if (!aPlan
+                        || aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    ScMatrixRef pTextSplitResult
+                        = convertMatrixOperandToMatrixRef(aPlan.maValue);
+                    if (!pTextSplitResult)
+                    {
+                        pushSpillEngineDecline();
+                        return false;
+                    }
+                    sp -= nParamCount;
+                    nGlobalError = FormulaError::NONE;
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore()
+                            .mnSpillEngineSucceededCount);
+                    PushMatrix(pTextSplitResult);
+                    return true;
+                };
+
                 // Batch 3 DB family admission (DSUM / DCOUNT / DAVERAGE
                 // / DMAX / DMIN). The 3-arg shape is
                 // (database_range, field, criteria_range). Scope fence:
@@ -12172,8 +12759,14 @@ StackVar ScInterpreter::Interpret()
                         if (!tryPlanEngineChooseJump())
                             ScChooseJump();
                         break;
-                    case ocChooseCols       : ScChooseColsOrRows(true); break;
-                    case ocChooseRows       : ScChooseColsOrRows(false); break;
+                    case ocChooseCols       :
+                        if (!tryPlanEngineSpillChooseColsOrRows(/*bCols*/ true))
+                            ScChooseColsOrRows(true);
+                        break;
+                    case ocChooseRows       :
+                        if (!tryPlanEngineSpillChooseColsOrRows(/*bCols*/ false))
+                            ScChooseColsOrRows(false);
+                        break;
                     case ocAdd              :
                         if (!tryPushEngineScalarBinaryOp(serpn::BinaryScalarOperator::Add))
                         {
@@ -12349,25 +12942,49 @@ StackVar ScInterpreter::Interpret()
                         if (!tryPlanEngineSpillTakeOrDrop(/*bTake*/ false))
                             ScTakeOrDrop(false);
                         break;
-                    case ocExpand           : ScExpand();               break;
-                    case ocHStack           : ScHorizontalOrVerticalStack(true); break;
-                    case ocVStack           : ScHorizontalOrVerticalStack(false); break;
+                    case ocExpand           :
+                        if (!tryPlanEngineSpillExpand())
+                            ScExpand();
+                        break;
+                    case ocHStack           :
+                        if (!tryPlanEngineSpillHStackOrVStack(/*bHorizontal*/ true))
+                            ScHorizontalOrVerticalStack(true);
+                        break;
+                    case ocVStack           :
+                        if (!tryPlanEngineSpillHStackOrVStack(/*bHorizontal*/ false))
+                            ScHorizontalOrVerticalStack(false);
+                        break;
                     case ocTake             :
                         if (!tryPlanEngineSpillTakeOrDrop(/*bTake*/ true))
                             ScTakeOrDrop(true);
                         break;
                     case ocTextAfter        : pushLegacyTextBeforeAfter(false); break;
                     case ocTextBefore       : pushLegacyTextBeforeAfter(true);  break;
-                    case ocTextSplit        : ScTextSplit();            break;
-                    case ocToCol            : ScToColOrRow(true);       break;
-                    case ocToRow            : ScToColOrRow(false);      break;
+                    case ocTextSplit        :
+                        if (!tryPlanEngineSpillTextSplit())
+                            ScTextSplit();
+                        break;
+                    case ocToCol            :
+                        if (!tryPlanEngineSpillToColOrRow(/*bToColumn*/ true))
+                            ScToColOrRow(true);
+                        break;
+                    case ocToRow            :
+                        if (!tryPlanEngineSpillToColOrRow(/*bToColumn*/ false))
+                            ScToColOrRow(false);
+                        break;
                     case ocUnique           :
                         if (!tryPlanEngineSpillUnique())
                             ScUnique();
                         break;
                     case ocLet              : ScLet();                  break;
-                    case ocWrapCols         : ScWrapColsOrRows(true);   break;
-                    case ocWrapRows         : ScWrapColsOrRows(false);  break;
+                    case ocWrapCols         :
+                        if (!tryPlanEngineSpillWrapColsOrRows(/*bCols*/ true))
+                            ScWrapColsOrRows(true);
+                        break;
+                    case ocWrapRows         :
+                        if (!tryPlanEngineSpillWrapColsOrRows(/*bCols*/ false))
+                            ScWrapColsOrRows(false);
+                        break;
                     case ocTrue             :
                         warnIfLegacyDispatchReached(
                             "family-local default-on", u"TRUE()",

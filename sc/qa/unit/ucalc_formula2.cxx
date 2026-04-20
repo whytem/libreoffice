@@ -1905,6 +1905,83 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterSpillEngineDispatch)
     ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(0, 21, 0)));
     ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(ScAddress(0, 22, 0)));
 
+    // Phase 5B shape-reshaping admissions. Each formula is written
+    // as an inline-matrix-literal so the admission site observes an
+    // svMatrix source token and admits through the engine planner.
+    // In the test's native grammar an inline `{1;2}` is a 2-column,
+    // 1-row row vector (see `testNestedIfInArrayMatrix` above which
+    // relies on the same convention).
+    m_pDoc->InsertMatrixFormula(2, 0, 5, 0, aMark,
+        u"=HSTACK({1;2};{3;4})"_ustr);
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(2, 0, 0)));
+    ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(3, 0, 0)));
+    ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(ScAddress(4, 0, 0)));
+    ASSERT_DOUBLES_EQUAL(4.0, m_pDoc->GetValue(ScAddress(5, 0, 0)));
+
+    m_pDoc->InsertMatrixFormula(2, 2, 3, 3, aMark,
+        u"=VSTACK({1;2};{3;4})"_ustr);
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(2, 2, 0)));
+    ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(3, 2, 0)));
+    ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(ScAddress(2, 3, 0)));
+    ASSERT_DOUBLES_EQUAL(4.0, m_pDoc->GetValue(ScAddress(3, 3, 0)));
+
+    m_pDoc->InsertMatrixFormula(2, 5, 3, 5, aMark,
+        u"=CHOOSECOLS({10;20;30};1;3)"_ustr);
+    ASSERT_DOUBLES_EQUAL(10.0, m_pDoc->GetValue(ScAddress(2, 5, 0)));
+    ASSERT_DOUBLES_EQUAL(30.0, m_pDoc->GetValue(ScAddress(3, 5, 0)));
+
+    m_pDoc->InsertMatrixFormula(2, 7, 2, 7, aMark,
+        u"=CHOOSEROWS({1;2;3};1)"_ustr);
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(2, 7, 0)));
+
+    m_pDoc->InsertMatrixFormula(2, 9, 3, 10, aMark,
+        u"=EXPAND({1};2;2;9)"_ustr);
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(2, 9, 0)));
+    ASSERT_DOUBLES_EQUAL(9.0, m_pDoc->GetValue(ScAddress(3, 9, 0)));
+    ASSERT_DOUBLES_EQUAL(9.0, m_pDoc->GetValue(ScAddress(2, 10, 0)));
+    ASSERT_DOUBLES_EQUAL(9.0, m_pDoc->GetValue(ScAddress(3, 10, 0)));
+
+    // TOCOL: flatten {1;2;3;4} (row vector) into a column of 4.
+    m_pDoc->InsertMatrixFormula(2, 12, 2, 15, aMark,
+        u"=TOCOL({1;2;3;4})"_ustr);
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(2, 12, 0)));
+    ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(2, 13, 0)));
+    ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(ScAddress(2, 14, 0)));
+    ASSERT_DOUBLES_EQUAL(4.0, m_pDoc->GetValue(ScAddress(2, 15, 0)));
+
+    // TOROW: flatten {1;2;3;4} (already a row) back into a 4-col row.
+    m_pDoc->InsertMatrixFormula(2, 17, 5, 17, aMark,
+        u"=TOROW({1;2;3;4})"_ustr);
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(2, 17, 0)));
+    ASSERT_DOUBLES_EQUAL(4.0, m_pDoc->GetValue(ScAddress(5, 17, 0)));
+
+    // WRAPCOLS: wrap 4 elements into nWrapCount=2 column-height,
+    // column-major: result[0,0]=1, result[0,1]=2, result[1,0]=3.
+    m_pDoc->InsertMatrixFormula(2, 19, 3, 20, aMark,
+        u"=WRAPCOLS({1;2;3;4};2)"_ustr);
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(2, 19, 0)));
+    ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(ScAddress(3, 19, 0)));
+    ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(2, 20, 0)));
+    ASSERT_DOUBLES_EQUAL(4.0, m_pDoc->GetValue(ScAddress(3, 20, 0)));
+
+    // WRAPROWS: wrap 4 elements into nWrapCount=2 row-width,
+    // row-major: result[0,0]=1, result[1,0]=2, result[0,1]=3.
+    m_pDoc->InsertMatrixFormula(2, 22, 3, 23, aMark,
+        u"=WRAPROWS({1;2;3;4};2)"_ustr);
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(2, 22, 0)));
+    ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(3, 22, 0)));
+    ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(ScAddress(2, 23, 0)));
+    ASSERT_DOUBLES_EQUAL(4.0, m_pDoc->GetValue(ScAddress(3, 23, 0)));
+
+    // TEXTSPLIT: semicolon is the row separator inside the inline
+    // text, comma is the column separator.
+    m_pDoc->InsertMatrixFormula(2, 25, 3, 26, aMark,
+        u"=TEXTSPLIT(\"a,b/c,d\";\",\";\"/\")"_ustr);
+    CPPUNIT_ASSERT_EQUAL(u"a"_ustr, m_pDoc->GetString(ScAddress(2, 25, 0)));
+    CPPUNIT_ASSERT_EQUAL(u"b"_ustr, m_pDoc->GetString(ScAddress(3, 25, 0)));
+    CPPUNIT_ASSERT_EQUAL(u"c"_ustr, m_pDoc->GetString(ScAddress(2, 26, 0)));
+    CPPUNIT_ASSERT_EQUAL(u"d"_ustr, m_pDoc->GetString(ScAddress(3, 26, 0)));
+
     const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
     const std::string aLabel
         = "spill_attempted="

@@ -499,6 +499,425 @@ inline RpnCoercionResult<MatrixOperand> planDrop(
     return detail::sliceMatrixOperand(rSource, /*bTake*/ false, oRows, oColumns);
 }
 
+// Phase 5B shape-reshaping planners.  Each composes an `api::array`
+// geometry helper with a MatrixOperand-level copy.  The input semantics
+// match the Calc legacy bodies (`ScHorizontalOrVerticalStack` /
+// `ScChooseColsOrRows` / `ScExpand` / `ScToColOrRow` /
+// `ScWrapColsOrRows`) so the admission sites can call these planners
+// instead of the legacy bodies when the scope fence is satisfied.
+
+// HSTACK / VSTACK: concatenate a sequence of matrices along one axis.
+// Shorter sides pad with `#N/A` errors, matching the legacy behavior.
+// `eDirection == Horizontal` stacks columns (HSTACK); `Vertical`
+// stacks rows (VSTACK).
+[[nodiscard]] inline RpnCoercionResult<MatrixOperand> planHStackOrVStack(
+    const std::vector<MatrixOperand>& rSources,
+    api::array::StackDirection eDirection)
+{
+    if (rSources.empty())
+        return RpnCoercionResult<MatrixOperand>::failure(api::Error::NotAvailable);
+    for (const auto& rSource : rSources)
+    {
+        if (rSource.isEmpty())
+            return RpnCoercionResult<MatrixOperand>::failure(api::Error::IllegalArgument);
+    }
+
+    api::MatrixDimensions aResultDims { 0, 0 };
+    for (const auto& rSource : rSources)
+        aResultDims = api::array::appendStackDimensions(
+            aResultDims, rSource.maDimensions, eDirection);
+
+    MatrixOperand aResult;
+    aResult.meProvenance = MatrixProvenance::ComputedResult;
+    aResult.maDimensions = aResultDims;
+    aResult.maValues.resize(
+        static_cast<std::size_t>(aResultDims.mnColumns)
+        * aResultDims.mnRows,
+        api::CellValue::error(api::Error::NotAvailable));
+
+    api::MatrixSize nOffset = 0;
+    for (const auto& rSource : rSources)
+    {
+        const api::MatrixSize nSrcCols = rSource.maDimensions.mnColumns;
+        const api::MatrixSize nSrcRows = rSource.maDimensions.mnRows;
+        if (eDirection == api::array::StackDirection::Horizontal)
+        {
+            for (api::MatrixSize c = 0; c < nSrcCols; ++c)
+            {
+                for (api::MatrixSize r = 0; r < nSrcRows; ++r)
+                {
+                    const auto aDest = api::array::stackDestination(
+                        eDirection, { c, r }, nOffset);
+                    aResult.maValues[
+                        static_cast<std::size_t>(aDest.mnRow)
+                            * aResultDims.mnColumns
+                        + aDest.mnColumn]
+                        = rSource.maValues[
+                            static_cast<std::size_t>(r) * nSrcCols + c];
+                }
+            }
+            nOffset += nSrcCols;
+        }
+        else
+        {
+            for (api::MatrixSize r = 0; r < nSrcRows; ++r)
+            {
+                for (api::MatrixSize c = 0; c < nSrcCols; ++c)
+                {
+                    const auto aDest = api::array::stackDestination(
+                        eDirection, { c, r }, nOffset);
+                    aResult.maValues[
+                        static_cast<std::size_t>(aDest.mnRow)
+                            * aResultDims.mnColumns
+                        + aDest.mnColumn]
+                        = rSource.maValues[
+                            static_cast<std::size_t>(r) * nSrcCols + c];
+                }
+            }
+            nOffset += nSrcRows;
+        }
+    }
+    return RpnCoercionResult<MatrixOperand>::success(aResult);
+}
+
+// CHOOSECOLS / CHOOSEROWS: select a subset of columns / rows by
+// 1-based index (negative indices wrap from the end, matching the
+// Calc legacy `normalizeSelectionIndex` contract).  `eAxis` chooses
+// columns when `Columns`, rows when `Rows`.
+[[nodiscard]] inline RpnCoercionResult<MatrixOperand> planChooseColsOrRows(
+    const MatrixOperand& rSource, const std::vector<sal_Int32>& rSelections,
+    api::array::Axis eAxis)
+{
+    if (rSource.isEmpty())
+        return RpnCoercionResult<MatrixOperand>::failure(api::Error::IllegalArgument);
+    if (rSelections.empty())
+        return RpnCoercionResult<MatrixOperand>::failure(api::Error::IllegalArgument);
+
+    const api::MatrixSize nAxisLimit
+        = eAxis == api::array::Axis::Columns
+              ? rSource.maDimensions.mnColumns
+              : rSource.maDimensions.mnRows;
+
+    std::vector<api::MatrixSize> aResolved;
+    aResolved.reserve(rSelections.size());
+    for (sal_Int32 nSel : rSelections)
+    {
+        const auto aResolution
+            = api::array::normalizeSelectionIndex(nSel, nAxisLimit);
+        if (!aResolution)
+            return RpnCoercionResult<MatrixOperand>::failure(aResolution.meError);
+        aResolved.push_back(aResolution.maValue);
+    }
+
+    const auto aDimensions = api::array::planChooseResultDimensions(
+        rSource.maDimensions, static_cast<api::MatrixSize>(aResolved.size()),
+        eAxis);
+    if (!aDimensions)
+        return RpnCoercionResult<MatrixOperand>::failure(aDimensions.meError);
+
+    MatrixOperand aResult;
+    aResult.meProvenance = MatrixProvenance::ComputedResult;
+    aResult.maDimensions = aDimensions.maValue;
+    aResult.maValues.resize(
+        static_cast<std::size_t>(aResult.maDimensions.mnColumns)
+        * aResult.maDimensions.mnRows);
+
+    if (eAxis == api::array::Axis::Columns)
+    {
+        for (api::MatrixSize r = 0; r < aResult.maDimensions.mnRows; ++r)
+        {
+            for (api::MatrixSize c = 0; c < aResult.maDimensions.mnColumns; ++c)
+            {
+                const api::MatrixSize nSrcCol = aResolved[c];
+                aResult.maValues[
+                    static_cast<std::size_t>(r) * aResult.maDimensions.mnColumns + c]
+                    = rSource.maValues[
+                        static_cast<std::size_t>(r) * rSource.maDimensions.mnColumns
+                        + nSrcCol];
+            }
+        }
+    }
+    else
+    {
+        for (api::MatrixSize r = 0; r < aResult.maDimensions.mnRows; ++r)
+        {
+            const api::MatrixSize nSrcRow = aResolved[r];
+            for (api::MatrixSize c = 0; c < aResult.maDimensions.mnColumns; ++c)
+            {
+                aResult.maValues[
+                    static_cast<std::size_t>(r) * aResult.maDimensions.mnColumns + c]
+                    = rSource.maValues[
+                        static_cast<std::size_t>(nSrcRow) * rSource.maDimensions.mnColumns
+                        + c];
+            }
+        }
+    }
+    return RpnCoercionResult<MatrixOperand>::success(aResult);
+}
+
+// EXPAND: pad the source to the requested number of rows / columns.
+// Cells outside the source are filled with `rPadValue` when it is
+// non-empty; otherwise with `#N/A`.
+[[nodiscard]] inline RpnCoercionResult<MatrixOperand> planExpand(
+    const MatrixOperand& rSource, const std::optional<sal_Int32>& oRows,
+    const std::optional<sal_Int32>& oColumns,
+    const std::optional<api::CellValue>& oPadValue)
+{
+    if (rSource.isEmpty())
+        return RpnCoercionResult<MatrixOperand>::failure(api::Error::IllegalArgument);
+
+    const auto aDimensions = api::array::planExpandDimensions(
+        rSource.maDimensions, oRows, oColumns);
+    if (!aDimensions)
+        return RpnCoercionResult<MatrixOperand>::failure(aDimensions.meError);
+
+    MatrixOperand aResult;
+    aResult.meProvenance = MatrixProvenance::ComputedResult;
+    aResult.maDimensions = aDimensions.maValue;
+
+    const api::CellValue aPad = oPadValue.value_or(
+        api::CellValue::error(api::Error::NotAvailable));
+    aResult.maValues.assign(
+        static_cast<std::size_t>(aResult.maDimensions.mnColumns)
+            * aResult.maDimensions.mnRows,
+        aPad);
+
+    for (api::MatrixSize r = 0; r < rSource.maDimensions.mnRows; ++r)
+    {
+        for (api::MatrixSize c = 0; c < rSource.maDimensions.mnColumns; ++c)
+        {
+            aResult.maValues[
+                static_cast<std::size_t>(r) * aResult.maDimensions.mnColumns + c]
+                = rSource.maValues[
+                    static_cast<std::size_t>(r) * rSource.maDimensions.mnColumns + c];
+        }
+    }
+    return RpnCoercionResult<MatrixOperand>::success(aResult);
+}
+
+// TOCOL / TOROW: flatten the source into a single column (TOCOL) or
+// single row (TOROW).  `eIgnore` selects whether blanks, errors, or
+// both are skipped during the walk.  The walk is row-major when
+// `bByColumn` is false (scan rows first, TOCOL/TOROW default) or
+// column-major when true.
+[[nodiscard]] inline RpnCoercionResult<MatrixOperand> planToColOrRow(
+    const MatrixOperand& rSource, bool bToColumn, bool bByColumn,
+    api::array::FlattenIgnore eIgnore)
+{
+    if (rSource.isEmpty())
+        return RpnCoercionResult<MatrixOperand>::failure(api::Error::IllegalArgument);
+
+    std::vector<api::CellValue> aRetained;
+    aRetained.reserve(rSource.maValues.size());
+
+    const api::MatrixSize nCols = rSource.maDimensions.mnColumns;
+    const api::MatrixSize nRows = rSource.maDimensions.mnRows;
+    const api::MatrixSize nOuter = bByColumn ? nCols : nRows;
+    const api::MatrixSize nInner = bByColumn ? nRows : nCols;
+    for (api::MatrixSize i = 0; i < nOuter; ++i)
+    {
+        for (api::MatrixSize j = 0; j < nInner; ++j)
+        {
+            const api::MatrixSize nCol = bByColumn ? i : j;
+            const api::MatrixSize nRow = bByColumn ? j : i;
+            const auto& rCell
+                = rSource.maValues[static_cast<std::size_t>(nRow) * nCols + nCol];
+            const bool bEmpty = rCell.meKind == api::CellValueKind::Empty;
+            const bool bError = rCell.meKind == api::CellValueKind::Error;
+            if (api::array::shouldIncludeFlattenedValue(eIgnore, bEmpty, bError))
+                aRetained.push_back(rCell);
+        }
+    }
+
+    const auto aDimensions = api::array::planFlattenOutputDimensions(
+        static_cast<api::MatrixSize>(aRetained.size()), bToColumn);
+    if (!aDimensions)
+        return RpnCoercionResult<MatrixOperand>::failure(aDimensions.meError);
+
+    MatrixOperand aResult;
+    aResult.meProvenance = MatrixProvenance::ComputedResult;
+    aResult.maDimensions = aDimensions.maValue;
+    aResult.maValues.resize(aRetained.size());
+    for (std::size_t i = 0; i < aRetained.size(); ++i)
+    {
+        const auto aDest = api::array::flattenDestination(
+            static_cast<api::MatrixSize>(i), bToColumn);
+        aResult.maValues[
+            static_cast<std::size_t>(aDest.mnRow) * aResult.maDimensions.mnColumns
+            + aDest.mnColumn]
+            = aRetained[i];
+    }
+    return RpnCoercionResult<MatrixOperand>::success(aResult);
+}
+
+// WRAPCOLS / WRAPROWS: reshape a row / column vector into a 2D matrix
+// whose columns (WRAPCOLS) or rows (WRAPROWS) each contain at most
+// `nWrapCount` elements.  Cells past the last source element are
+// filled with `rPadValue` when present; otherwise with `#N/A`.
+[[nodiscard]] inline RpnCoercionResult<MatrixOperand> planWrapColsOrRows(
+    const MatrixOperand& rSource, api::MatrixSize nWrapCount, bool bWrapColumns,
+    const std::optional<api::CellValue>& oPadValue)
+{
+    if (rSource.isEmpty())
+        return RpnCoercionResult<MatrixOperand>::failure(api::Error::IllegalArgument);
+
+    const auto aDimensions = api::array::planWrapOutputDimensions(
+        rSource.maDimensions, nWrapCount, bWrapColumns);
+    if (!aDimensions)
+        return RpnCoercionResult<MatrixOperand>::failure(aDimensions.meError);
+
+    MatrixOperand aResult;
+    aResult.meProvenance = MatrixProvenance::ComputedResult;
+    aResult.maDimensions = aDimensions.maValue;
+
+    const api::CellValue aPad = oPadValue.value_or(
+        api::CellValue::error(api::Error::NotAvailable));
+    aResult.maValues.assign(
+        static_cast<std::size_t>(aResult.maDimensions.mnColumns)
+            * aResult.maDimensions.mnRows,
+        aPad);
+
+    const api::MatrixSize nElementCount = static_cast<api::MatrixSize>(
+        rSource.maDimensions.mnColumns * rSource.maDimensions.mnRows);
+    const bool bColumnSource = rSource.maDimensions.mnColumns == 1;
+    for (api::MatrixSize i = 0; i < nElementCount; ++i)
+    {
+        const api::MatrixSize nSrcCol = bColumnSource ? 0 : i;
+        const api::MatrixSize nSrcRow = bColumnSource ? i : 0;
+        const auto aDest = api::array::wrapDestination(i, nWrapCount, bWrapColumns);
+        aResult.maValues[
+            static_cast<std::size_t>(aDest.mnRow) * aResult.maDimensions.mnColumns
+            + aDest.mnColumn]
+            = rSource.maValues[
+                static_cast<std::size_t>(nSrcRow) * rSource.maDimensions.mnColumns
+                + nSrcCol];
+    }
+    return RpnCoercionResult<MatrixOperand>::success(aResult);
+}
+
+namespace detail
+{
+
+// Split a single UTF-16 text payload on a list of UTF-16 delimiters,
+// returning the runs between delimiters.  When `bIgnoreEmpty` is true
+// empty runs are skipped.  When `bMatchMode` is true the comparison is
+// case-insensitive over ASCII letters (legacy uses ScGlobal's CharClass
+// for full Unicode; the planner only needs ASCII lowering because the
+// engine-admitted scope fence already rejects non-ASCII delimiters by
+// letting them match byte-for-byte which still matches the legacy
+// branch for case-sensitive comparisons).
+[[nodiscard]] inline std::vector<api::String> splitTextOnDelimiters(
+    const api::String& rText, const std::vector<api::String>& rDelimiters,
+    bool bIgnoreEmpty, bool bMatchMode)
+{
+    std::vector<api::String> aResult;
+    if (rDelimiters.empty() || rText.empty())
+    {
+        if (!bIgnoreEmpty || !rText.empty())
+            aResult.push_back(rText);
+        return aResult;
+    }
+
+    const auto toAsciiLower = [](const api::String& rInput) {
+        api::String aOut(rInput.size(), u'\0');
+        for (std::size_t i = 0; i < rInput.size(); ++i)
+        {
+            const char16_t ch = rInput[i];
+            aOut[i] = (ch >= u'A' && ch <= u'Z')
+                          ? static_cast<char16_t>(ch - u'A' + u'a')
+                          : ch;
+        }
+        return aOut;
+    };
+
+    const api::String aHaystack = bMatchMode ? toAsciiLower(rText) : rText;
+    const auto nLength = rText.size();
+    std::size_t nStart = 0;
+    while (nStart <= nLength)
+    {
+        std::size_t nIndex = nLength;
+        std::size_t nDelLength = 0;
+        for (const auto& rDelim : rDelimiters)
+        {
+            if (rDelim.empty())
+                continue;
+            const api::String aNeedle
+                = bMatchMode ? toAsciiLower(rDelim) : rDelim;
+            const auto nFound = aHaystack.find(aNeedle, nStart);
+            if (nFound != api::String::npos && nFound < nIndex)
+            {
+                nIndex = nFound;
+                nDelLength = aNeedle.size();
+            }
+        }
+
+        api::String aRun = rText.substr(nStart, nIndex - nStart);
+        if (!bIgnoreEmpty || !aRun.empty())
+            aResult.push_back(std::move(aRun));
+        if (nIndex == nLength)
+            break;
+        nStart = nIndex + nDelLength;
+    }
+    return aResult;
+}
+
+} // namespace detail
+
+// TEXTSPLIT: split `rText` by `rRowDelimiters` into rows, then each
+// row-run by `rColDelimiters` into columns.  Output dimensions are
+// the maximum column count across all row splits × the row count.
+// Cells past the per-row column count are filled with `oPadValue` (or
+// `#N/A` when absent).  `bIgnoreEmpty` drops empty runs during the
+// split; `bMatchMode` switches to ASCII case-folded comparison.
+[[nodiscard]] inline RpnCoercionResult<MatrixOperand> planTextSplit(
+    const api::String& rText, const std::vector<api::String>& rColDelimiters,
+    const std::vector<api::String>& rRowDelimiters, bool bIgnoreEmpty,
+    bool bMatchMode, const std::optional<api::CellValue>& oPadValue)
+{
+    if (rText.empty())
+        return RpnCoercionResult<MatrixOperand>::failure(api::Error::IllegalArgument);
+
+    const auto aRowRuns = detail::splitTextOnDelimiters(
+        rText, rRowDelimiters, bIgnoreEmpty, bMatchMode);
+    std::vector<std::vector<api::String>> aRows;
+    aRows.reserve(aRowRuns.size());
+    api::MatrixSize nCols = 1;
+    for (const auto& rRun : aRowRuns)
+    {
+        auto aColSplit = detail::splitTextOnDelimiters(
+            rRun, rColDelimiters, bIgnoreEmpty, bMatchMode);
+        nCols = std::max<api::MatrixSize>(
+            nCols, static_cast<api::MatrixSize>(aColSplit.size()));
+        aRows.push_back(std::move(aColSplit));
+    }
+    const api::MatrixSize nRows = static_cast<api::MatrixSize>(aRows.size());
+    if (nRows == 0 || nCols == 0)
+        return RpnCoercionResult<MatrixOperand>::failure(api::Error::NotAvailable);
+
+    MatrixOperand aResult;
+    aResult.meProvenance = MatrixProvenance::ComputedResult;
+    aResult.maDimensions = { nCols, nRows };
+    aResult.maValues.resize(static_cast<std::size_t>(nCols) * nRows);
+    const api::CellValue aPad = oPadValue.value_or(
+        api::CellValue::error(api::Error::NotAvailable));
+    for (api::MatrixSize r = 0; r < nRows; ++r)
+    {
+        for (api::MatrixSize c = 0; c < nCols; ++c)
+        {
+            if (static_cast<std::size_t>(c) < aRows[r].size())
+            {
+                aResult.maValues[static_cast<std::size_t>(r) * nCols + c]
+                    = api::CellValue::text(api::StringView(aRows[r][c]));
+            }
+            else
+            {
+                aResult.maValues[static_cast<std::size_t>(r) * nCols + c] = aPad;
+            }
+        }
+    }
+    return RpnCoercionResult<MatrixOperand>::success(aResult);
+}
+
 } // namespace spreadsheetengine::core::rpn::spill
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

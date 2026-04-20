@@ -20,13 +20,23 @@ using spreadsheetengine::api::CellValue;
 using spreadsheetengine::api::Error;
 using spreadsheetengine::api::MatrixDimensions;
 using spreadsheetengine::api::MatrixSize;
+using spreadsheetengine::api::String;
+using spreadsheetengine::api::array::Axis;
+using spreadsheetengine::api::array::FlattenIgnore;
+using spreadsheetengine::api::array::StackDirection;
 using spreadsheetengine::core::rpn::MatrixOperand;
 using spreadsheetengine::core::rpn::MatrixProvenance;
+using spreadsheetengine::core::rpn::spill::planChooseColsOrRows;
 using spreadsheetengine::core::rpn::spill::planDrop;
+using spreadsheetengine::core::rpn::spill::planExpand;
 using spreadsheetengine::core::rpn::spill::planFilter;
+using spreadsheetengine::core::rpn::spill::planHStackOrVStack;
 using spreadsheetengine::core::rpn::spill::planSort;
 using spreadsheetengine::core::rpn::spill::planTake;
+using spreadsheetengine::core::rpn::spill::planTextSplit;
+using spreadsheetengine::core::rpn::spill::planToColOrRow;
 using spreadsheetengine::core::rpn::spill::planUnique;
+using spreadsheetengine::core::rpn::spill::planWrapColsOrRows;
 using spreadsheetengine::core::rpn::spill::SpillError;
 using spreadsheetengine::standalone::test::almostEqual;
 using spreadsheetengine::standalone::test::fail;
@@ -155,6 +165,153 @@ int main()
     const auto aTakeZero = planTake(aSource, std::optional<sal_Int32>(0), std::nullopt);
     if (aTakeZero || aTakeZero.meError != Error::NotAvailable)
         return fail("spreadsheetengine_spill_tests", "TAKE zero should report NotAvailable");
+
+    // HSTACK: append columns of two matrices side by side.
+    const auto aLeft = makeNumericMatrix(1, 2, { 1.0, 2.0 });
+    const auto aRight = makeNumericMatrix(1, 2, { 3.0, 4.0 });
+    const auto aHStack = planHStackOrVStack({ aLeft, aRight }, StackDirection::Horizontal);
+    if (!aHStack || aHStack.maValue.maDimensions.mnColumns != 2
+        || aHStack.maValue.maDimensions.mnRows != 2
+        || !expectNumeric(aHStack.maValue, 0, 0, 1.0)
+        || !expectNumeric(aHStack.maValue, 1, 0, 3.0)
+        || !expectNumeric(aHStack.maValue, 0, 1, 2.0)
+        || !expectNumeric(aHStack.maValue, 1, 1, 4.0))
+    {
+        return fail("spreadsheetengine_spill_tests", "HSTACK column append mismatch");
+    }
+
+    // VSTACK: append rows of two matrices top to bottom.
+    const auto aTop = makeNumericMatrix(2, 1, { 1.0, 2.0 });
+    const auto aBottom = makeNumericMatrix(2, 1, { 3.0, 4.0 });
+    const auto aVStack = planHStackOrVStack({ aTop, aBottom }, StackDirection::Vertical);
+    if (!aVStack || aVStack.maValue.maDimensions.mnColumns != 2
+        || aVStack.maValue.maDimensions.mnRows != 2
+        || !expectNumeric(aVStack.maValue, 0, 0, 1.0)
+        || !expectNumeric(aVStack.maValue, 1, 0, 2.0)
+        || !expectNumeric(aVStack.maValue, 0, 1, 3.0)
+        || !expectNumeric(aVStack.maValue, 1, 1, 4.0))
+    {
+        return fail("spreadsheetengine_spill_tests", "VSTACK row append mismatch");
+    }
+
+    // CHOOSECOLS: pick columns 1 and 3 (1-based) from a 3x2 matrix.
+    const auto aChooseSrc = makeNumericMatrix(3, 2, { 10.0, 20.0, 30.0, 40.0, 50.0, 60.0 });
+    const auto aChooseCols
+        = planChooseColsOrRows(aChooseSrc, { 1, 3 }, Axis::Columns);
+    if (!aChooseCols || aChooseCols.maValue.maDimensions.mnColumns != 2
+        || aChooseCols.maValue.maDimensions.mnRows != 2
+        || !expectNumeric(aChooseCols.maValue, 0, 0, 10.0)
+        || !expectNumeric(aChooseCols.maValue, 1, 0, 30.0)
+        || !expectNumeric(aChooseCols.maValue, 0, 1, 40.0)
+        || !expectNumeric(aChooseCols.maValue, 1, 1, 60.0))
+    {
+        return fail("spreadsheetengine_spill_tests", "CHOOSECOLS 1-based mismatch");
+    }
+
+    // CHOOSEROWS: negative index wraps from the end.
+    const auto aChooseRows
+        = planChooseColsOrRows(aChooseSrc, { -1 }, Axis::Rows);
+    if (!aChooseRows || aChooseRows.maValue.maDimensions.mnRows != 1
+        || !expectNumeric(aChooseRows.maValue, 0, 0, 40.0)
+        || !expectNumeric(aChooseRows.maValue, 1, 0, 50.0)
+        || !expectNumeric(aChooseRows.maValue, 2, 0, 60.0))
+    {
+        return fail("spreadsheetengine_spill_tests", "CHOOSEROWS negative index mismatch");
+    }
+
+    // EXPAND: enlarge a 2x2 to 3x3 and pad with 0.
+    const auto aExpandSrc = makeNumericMatrix(2, 2, { 1.0, 2.0, 3.0, 4.0 });
+    const auto aExpand = planExpand(
+        aExpandSrc, std::optional<sal_Int32>(3), std::optional<sal_Int32>(3),
+        std::optional<CellValue>(CellValue::number(0.0)));
+    if (!aExpand || aExpand.maValue.maDimensions.mnColumns != 3
+        || aExpand.maValue.maDimensions.mnRows != 3
+        || !expectNumeric(aExpand.maValue, 0, 0, 1.0)
+        || !expectNumeric(aExpand.maValue, 2, 2, 0.0)
+        || !expectNumeric(aExpand.maValue, 2, 0, 0.0))
+    {
+        return fail("spreadsheetengine_spill_tests", "EXPAND 2x2 -> 3x3 pad mismatch");
+    }
+
+    // TOCOL: flatten a 2x2 row-major into a single column.
+    const auto aToCol = planToColOrRow(
+        aExpandSrc, /*bToColumn*/ true, /*bByColumn*/ false, FlattenIgnore::Default);
+    if (!aToCol || aToCol.maValue.maDimensions.mnColumns != 1
+        || aToCol.maValue.maDimensions.mnRows != 4
+        || !expectNumeric(aToCol.maValue, 0, 0, 1.0)
+        || !expectNumeric(aToCol.maValue, 0, 1, 2.0)
+        || !expectNumeric(aToCol.maValue, 0, 2, 3.0)
+        || !expectNumeric(aToCol.maValue, 0, 3, 4.0))
+    {
+        return fail("spreadsheetengine_spill_tests", "TOCOL flatten row-major mismatch");
+    }
+
+    // TOROW: flatten a 2x2 row-major into a single row.
+    const auto aToRow = planToColOrRow(
+        aExpandSrc, /*bToColumn*/ false, /*bByColumn*/ false, FlattenIgnore::Default);
+    if (!aToRow || aToRow.maValue.maDimensions.mnRows != 1
+        || aToRow.maValue.maDimensions.mnColumns != 4
+        || !expectNumeric(aToRow.maValue, 0, 0, 1.0)
+        || !expectNumeric(aToRow.maValue, 3, 0, 4.0))
+    {
+        return fail("spreadsheetengine_spill_tests", "TOROW flatten row-major mismatch");
+    }
+
+    // WRAPCOLS: wrap a 4-element row vector into 2x2.  `nWrapCount`
+    // names the column height, so the elements fill column-major.
+    const auto aWrapSrc = makeNumericMatrix(4, 1, { 1.0, 2.0, 3.0, 4.0 });
+    const auto aWrapCols = planWrapColsOrRows(
+        aWrapSrc, /*nWrapCount*/ 2, /*bWrapColumns*/ true, std::nullopt);
+    if (!aWrapCols || aWrapCols.maValue.maDimensions.mnColumns != 2
+        || aWrapCols.maValue.maDimensions.mnRows != 2
+        || !expectNumeric(aWrapCols.maValue, 0, 0, 1.0)
+        || !expectNumeric(aWrapCols.maValue, 0, 1, 2.0)
+        || !expectNumeric(aWrapCols.maValue, 1, 0, 3.0)
+        || !expectNumeric(aWrapCols.maValue, 1, 1, 4.0))
+    {
+        return fail("spreadsheetengine_spill_tests", "WRAPCOLS 4->2x2 mismatch");
+    }
+
+    // WRAPROWS: wrap a 4-element column vector into 2x2.  `nWrapCount`
+    // names the row width, so the elements fill row-major.
+    const auto aWrapColSrc = makeNumericMatrix(1, 4, { 1.0, 2.0, 3.0, 4.0 });
+    const auto aWrapRows = planWrapColsOrRows(
+        aWrapColSrc, /*nWrapCount*/ 2, /*bWrapColumns*/ false, std::nullopt);
+    if (!aWrapRows || aWrapRows.maValue.maDimensions.mnColumns != 2
+        || aWrapRows.maValue.maDimensions.mnRows != 2
+        || !expectNumeric(aWrapRows.maValue, 0, 0, 1.0)
+        || !expectNumeric(aWrapRows.maValue, 1, 0, 2.0)
+        || !expectNumeric(aWrapRows.maValue, 0, 1, 3.0)
+        || !expectNumeric(aWrapRows.maValue, 1, 1, 4.0))
+    {
+        return fail("spreadsheetengine_spill_tests", "WRAPROWS 4->2x2 mismatch");
+    }
+
+    // TEXTSPLIT: split "a,b;c,d" by column delim ',' and row delim ';'.
+    const std::vector<String> aColDelim { String(u",") };
+    const std::vector<String> aRowDelim { String(u";") };
+    const auto aTextSplit = planTextSplit(
+        String(u"a,b;c,d"), aColDelim, aRowDelim,
+        /*bIgnoreEmpty*/ false, /*bMatchMode*/ false, std::nullopt);
+    if (!aTextSplit || aTextSplit.maValue.maDimensions.mnColumns != 2
+        || aTextSplit.maValue.maDimensions.mnRows != 2)
+    {
+        return fail("spreadsheetengine_spill_tests", "TEXTSPLIT basic grid mismatch");
+    }
+    {
+        const auto& rGrid = aTextSplit.maValue;
+        const auto cellAt = [&](MatrixSize nCol, MatrixSize nRow) {
+            return rGrid.maValues[
+                static_cast<std::size_t>(nRow) * rGrid.maDimensions.mnColumns + nCol];
+        };
+        if (cellAt(0, 0).maString != String(u"a")
+            || cellAt(1, 0).maString != String(u"b")
+            || cellAt(0, 1).maString != String(u"c")
+            || cellAt(1, 1).maString != String(u"d"))
+        {
+            return fail("spreadsheetengine_spill_tests", "TEXTSPLIT grid cell text mismatch");
+        }
+    }
 
     std::cout << "spreadsheetengine spill api tests passed\n";
     return EXIT_SUCCESS;
