@@ -677,7 +677,6 @@ private:
         spreadsheetengine::compat::libreoffice::interpreterdispatch::UnaryMatrixScalarMode eMode);
     void ScSyntheticBinaryOp(OpCode eOpCode, void (ScInterpreter::*pOperation)());
     void ScMatchOp(bool bExtended);
-    void ScWrapColsOrRows(bool bCols);
 
 public:
     // If upon call rMissingField==true then the database field parameter may be
