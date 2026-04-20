@@ -662,7 +662,6 @@ private:
     void GetStVarParams( bool bTextAsZero, double(*VarResult)( double fVal, size_t nValCount ) );
     void ScColumn();
     void ScRow();
-    void ScSheet();
     void IterateParametersIf( ScIterFuncIf );
     void ScCountIf();
     void IterateParametersIfs( double(*ResultFunc)( const sc::ParamIfsResult& rRes ) );

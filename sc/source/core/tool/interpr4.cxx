@@ -12175,11 +12175,14 @@ StackVar ScInterpreter::Interpret()
                     return true;
                 };
 
-                // Batch 2 first admission: scalar axis-ordinal
-                // COLUMN / ROW / SHEET. Covers no-argument (use aPos) and
-                // single-reference argument via planAxisOrdinal.
-                // Matrix-context no-arg, external-ref, double-ref, and any
-                // other shape defer to the legacy ScColumn / ScRow / ScSheet.
+                // Batch 2 first admission: axis-ordinal COLUMN / ROW / SHEET.
+                // Phase G1 extends the SHEET variant to cover every shape
+                // legacy ScSheet accepted (no-arg, svString sheet-name
+                // lookup, svSingleRef, svDoubleRef) so ocSheet can retire
+                // behind the ocBad template. COLUMN / ROW retain their
+                // narrower scope (no-arg non-matrix + svSingleRef) because
+                // the matrix-formula no-arg path and svDoubleRef matrix
+                // result for those two still live in legacy.
                 const auto tryPlanEngineAxisOrdinal
                     = [&](serpn::AxisOrdinalKind eKind) -> bool {
                     addDispatchRuntimeStat(
@@ -12195,36 +12198,140 @@ StackVar ScInterpreter::Interpret()
                         return false;
                     }
 
-                    ScAddress aRefPos;
+                    const bool bIsSheet = (eKind == serpn::AxisOrdinalKind::Sheet);
+
                     if (nParamCount == 0)
                     {
-                        if (bMatrixFormula)
+                        if (bMatrixFormula && !bIsSheet)
+                        {
+                            // COLUMN / ROW in matrix-formula context emit a
+                            // matrix plan via PushReferenceAxisPlan — owned
+                            // by the legacy body for now.
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnReferenceEngineDeclinedCount);
+                            return false;
+                        }
+                        spreadsheetengine::api::ResolvedReference aResolved;
+                        aResolved.maRange.maStart = {
+                            static_cast<spreadsheetengine::api::SheetId>(aPos.Tab()),
+                            static_cast<spreadsheetengine::api::ColumnIndex>(aPos.Col()),
+                            static_cast<spreadsheetengine::api::RowIndex>(aPos.Row())
+                        };
+                        aResolved.maRange.maEnd = aResolved.maRange.maStart;
+                        const auto aPlan = serpn::planAxisOrdinal(
+                            serpn::RpnValue::reference(aResolved), eKind);
+                        if (!aPlan
+                            || aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
                         {
                             addDispatchRuntimeStat(
                                 interpreterDispatchRuntimeStatsStore()
                                     .mnReferenceEngineDeclinedCount);
                             return false;
                         }
-                        aRefPos = aPos;
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnReferenceEngineSucceededCount);
+                        PushDouble(aPlan.maValue);
+                        return true;
                     }
-                    else
+
+                    if (!sp || !pStack[sp - 1])
                     {
-                        if (!sp || !pStack[sp - 1]
-                            || pStack[sp - 1]->GetType() != svSingleRef)
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnReferenceEngineDeclinedCount);
+                        return false;
+                    }
+
+                    const StackVar eType = pStack[sp - 1]->GetType();
+
+                    // SHEET-specific widening: svString (sheet-name lookup)
+                    // and svDoubleRef (use the start cell's sheet ordinal).
+                    if (bIsSheet)
+                    {
+                        if (eType == svString)
                         {
+                            const svl::SharedString aStr = PopString();
+                            const auto aOrdinal
+                                = serefexec::sheetOrdinal(mrDoc, aStr.getString());
                             addDispatchRuntimeStat(
                                 interpreterDispatchRuntimeStatsStore()
-                                    .mnReferenceEngineDeclinedCount);
-                            return false;
+                                    .mnReferenceEngineSucceededCount);
+                            double fValue = 0.0;
+                            if (!aOrdinal)
+                                SetError(selibreoffice::toFormulaError(aOrdinal.meError));
+                            else
+                                fValue = aOrdinal.maValue;
+                            if (nGlobalError != FormulaError::NONE)
+                                fValue = 0.0;
+                            PushDouble(fValue);
+                            return true;
                         }
-                        PopSingleRef(aRefPos);
-                        if (nGlobalError != FormulaError::NONE)
+                        if (eType == svDoubleRef)
                         {
+                            ScRange aRange;
+                            PopDoubleRef(aRange);
+                            spreadsheetengine::api::ResolvedReference aResolved;
+                            aResolved.maRange.maStart = {
+                                static_cast<spreadsheetengine::api::SheetId>(aRange.aStart.Tab()),
+                                static_cast<spreadsheetengine::api::ColumnIndex>(aRange.aStart.Col()),
+                                static_cast<spreadsheetengine::api::RowIndex>(aRange.aStart.Row())
+                            };
+                            aResolved.maRange.maEnd = {
+                                static_cast<spreadsheetengine::api::SheetId>(aRange.aEnd.Tab()),
+                                static_cast<spreadsheetengine::api::ColumnIndex>(aRange.aEnd.Col()),
+                                static_cast<spreadsheetengine::api::RowIndex>(aRange.aEnd.Row())
+                            };
+                            const auto aPlan = serpn::planAxisOrdinal(
+                                serpn::RpnValue::reference(aResolved), eKind);
                             addDispatchRuntimeStat(
                                 interpreterDispatchRuntimeStatsStore()
-                                    .mnReferenceEngineDeclinedCount);
-                            return false;
+                                    .mnReferenceEngineSucceededCount);
+                            double fValue = 0.0;
+                            if (!aPlan)
+                                SetError(selibreoffice::toFormulaError(aPlan.meError));
+                            else if (aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
+                                SetError(FormulaError::IllegalParameter);
+                            else
+                                fValue = aPlan.maValue;
+                            if (nGlobalError != FormulaError::NONE)
+                                fValue = 0.0;
+                            PushDouble(fValue);
+                            return true;
                         }
+                    }
+
+                    if (eType != svSingleRef)
+                    {
+                        if (bIsSheet)
+                        {
+                            // Legacy ScSheet: default branch is
+                            // IllegalParameter. Engine owns this path too
+                            // so it can OSL_FAIL cleanly when the body is
+                            // retired.
+                            Pop();
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore()
+                                    .mnReferenceEngineSucceededCount);
+                            SetError(FormulaError::IllegalParameter);
+                            PushDouble(0.0);
+                            return true;
+                        }
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnReferenceEngineDeclinedCount);
+                        return false;
+                    }
+
+                    ScAddress aRefPos;
+                    PopSingleRef(aRefPos);
+                    if (nGlobalError != FormulaError::NONE)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore()
+                                .mnReferenceEngineDeclinedCount);
+                        return false;
                     }
 
                     spreadsheetengine::api::ResolvedReference aResolved;
@@ -14410,7 +14517,10 @@ StackVar ScInterpreter::Interpret()
                         break;
                     case ocSheet            :
                         if (!tryPlanEngineAxisOrdinal(serpn::AxisOrdinalKind::Sheet))
-                            ScSheet();
+                        {
+                            OSL_FAIL("engine-backed SHEET declined ocSheet");
+                            PushIllegalParameter();
+                        }
                         break;
                     case ocRRI              :
                     {

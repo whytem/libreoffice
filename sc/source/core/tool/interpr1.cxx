@@ -2755,66 +2755,6 @@ void ScInterpreter::ScRow()
     PushDouble( nVal );
 }
 
-void ScInterpreter::ScSheet()
-{
-    sal_uInt8 nParamCount = GetByte();
-    if ( !MustHaveParamCount( nParamCount, 0, 1 ) )
-        return;
-
-    double fValue = 0.0;
-    if ( nParamCount == 0 )
-    {
-        const auto aOrdinal = spreadsheetengine::api::reference::sheetOrdinalFromSheetId(aPos.Tab());
-        fValue = aOrdinal.maValue;
-    }
-    else
-    {
-        switch ( GetStackType() )
-        {
-            case svString :
-            {
-                svl::SharedString aStr = PopString();
-                const auto aOrdinal = serefexec::sheetOrdinal(mrDoc, aStr.getString());
-                if (!aOrdinal)
-                    SetError(selibreoffice::toFormulaError(aOrdinal.meError));
-                else
-                    fValue = aOrdinal.maValue;
-            }
-            break;
-            case svSingleRef :
-            {
-                SCCOL nCol1(0);
-                SCROW nRow1(0);
-                SCTAB nTab1(0);
-                PopSingleRef(nCol1, nRow1, nTab1);
-                const auto aOrdinal = serefexec::sheetOrdinal(
-                    ScRange(nCol1, nRow1, nTab1, nCol1, nRow1, nTab1));
-                if (!aOrdinal)
-                    SetError(selibreoffice::toFormulaError(aOrdinal.meError));
-                else
-                    fValue = aOrdinal.maValue;
-            }
-            break;
-            case svDoubleRef :
-            {
-                ScRange aRange;
-                PopDoubleRef(aRange);
-                const auto aOrdinal = serefexec::sheetOrdinal(aRange);
-                if (!aOrdinal)
-                    SetError(selibreoffice::toFormulaError(aOrdinal.meError));
-                else
-                    fValue = aOrdinal.maValue;
-            }
-            break;
-            default:
-                SetError( FormulaError::IllegalParameter );
-        }
-        if ( nGlobalError != FormulaError::NONE )
-            fValue = 0.0;
-    }
-    PushDouble(fValue);
-}
-
 namespace {
 
 bool isCellContentEmpty( const ScRefCellValue& rCell )
