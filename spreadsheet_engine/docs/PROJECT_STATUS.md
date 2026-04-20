@@ -45,7 +45,7 @@ This is the deletion-gating number for the standing replay corpus:
 - `interp4_dispatch_legacy_lambda_count=45`
 - `interp4_dispatch_legacy_dispatch_target_count=62`
 - `interp4_dispatch_legacy_call_count=80`
-- `interp4_dispatch_engine_attempt_count=65`
+- `interp4_dispatch_engine_attempt_count=71`
 - `interp4_dispatch_engine_attempted_total=0`
 - `interp4_dispatch_engine_succeeded_total=0`
 - `interp4_dispatch_engine_declined_total=0`
@@ -328,6 +328,35 @@ results on the same semantic surface as MDETERM / TRANSPOSE / MMULT
 `ocLet` remains the last unstarted Batch 1 member; the nested-
 interpreter spawn contract for binding resolution is the gating
 substrate work.
+
+Batch 5A substrate (`runtime/RpnSpill.hxx`) has landed with six
+admissions covering the simple-shape dynamic-array family:
+`ocFilter`, `ocSort`, `ocSortBy`, `ocUnique`, `ocTake`, `ocDrop`
+now try `sespill::planFilter` / `planSort` / `planUnique` /
+`planTake` / `planDrop` before falling back to legacy
+`ScFilter` / `ScSort` / `ScSortBy` / `ScUnique` / `ScTakeOrDrop`.
+The planners are pure functions over the engine's
+`MatrixOperand` substrate; geometry delegates to
+`spreadsheetengine::api::array::planTakeDropSlice` for the
+TAKE/DROP windows. Scope fence: every source must arrive as an
+svMatrix token, every option argument must be a scalar svDouble
+or svMissing. Range inputs defer to legacy pending the Phase D
+reference-to-matrix materialization contract. The spill
+admission accounting publishes three new `spill_engine_*`
+runtime totals on the dispatch stats snapshot. The Host facade
+adds a dedicated `SpillRangeAllocator` contract plus a
+header-only libreoffice compat adapter
+(`compat/libreoffice/SpillAllocation.hxx`) that wraps
+ScDocument for collision probing and rectangle allocation.
+Phase 5A admissions do NOT reach the allocator yet — they
+PushMatrix directly through `convertMatrixOperandToMatrixRef`,
+matching the legacy behavior; the allocator lifecycle lands
+with Phase 5B when the shape-reshaping family needs it, and it
+is documented up-front that `#SPILL!` on collision is NEW
+behavior not a migration of existing behavior. Phase 5B
+(HSTACK / VSTACK / CHOOSECOLS / CHOOSEROWS / EXPAND / TOCOL /
+TOROW / WRAPCOLS / WRAPROWS / TEXTSPLIT) remains a follow-up.
+
 The current value reflects the restored original `Sc*` names after backing out
 earlier rename-only metric compression, and the quarantine audit currently
 shows `62 / 62` dispatch-reachable legacy lambdas warning when reached. This
