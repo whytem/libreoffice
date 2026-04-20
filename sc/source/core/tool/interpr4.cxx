@@ -7075,43 +7075,6 @@ StackVar ScInterpreter::Interpret()
                               "family-local default-on information predicate reached "
                               "ScInterpreter");
                       };
-                const auto pushLegacyIsLogical = [&]() {
-                    warnInformationPredicateDispatch(u"ISLOGICAL");
-                    bool bRes = false;
-                    switch (GetStackType())
-                    {
-                        case svDoubleRef:
-                        case svSingleRef:
-                        {
-                            ScAddress aAdr;
-                            if (!PopDoubleRefOrSingleRef(aAdr))
-                                break;
-
-                            ScRefCellValue aCell(mrDoc, aAdr);
-                            if (GetCellErrCode(aCell) == FormulaError::NONE && aCell.hasNumeric())
-                            {
-                                const sal_uInt32 nFormat = GetCellNumberFormat(aAdr, aCell);
-                                bRes = (mrContext.NFGetType(nFormat) == SvNumFormatType::LOGICAL);
-                            }
-                        }
-                        break;
-                        case svMatrix:
-                        {
-                            double fVal;
-                            svl::SharedString aStr;
-                            const ScMatValType nMatValType = GetDoubleOrStringFromMatrix(fVal, aStr);
-                            bRes = (nMatValType == ScMatValType::Boolean);
-                        }
-                        break;
-                        default:
-                            PopError();
-                            if (nGlobalError == FormulaError::NONE)
-                                bRes = (nCurFmtType == SvNumFormatType::LOGICAL);
-                    }
-                    nCurFmtType = nFuncFmtType = SvNumFormatType::LOGICAL;
-                    nGlobalError = FormulaError::NONE;
-                    PushInt(int(bRes));
-                };
                 const auto pushLegacyIsValue = [&]() {
                     warnInformationPredicateDispatch(u"ISNUMBER");
                     nFuncFmtType = SvNumFormatType::LOGICAL;
@@ -14494,7 +14457,45 @@ StackVar ScInterpreter::Interpret()
                         warnInformationPredicateDispatch(u"ISNONTEXT");
                         PushInt(int(!IsString()));
                         break;
-                    case ocIsLogical        : pushLegacyIsLogical();        break;
+                    case ocIsLogical        :
+                    {
+                        warnInformationPredicateDispatch(u"ISLOGICAL");
+                        bool bRes = false;
+                        switch (GetStackType())
+                        {
+                            case svDoubleRef:
+                            case svSingleRef:
+                            {
+                                ScAddress aAdr;
+                                if (!PopDoubleRefOrSingleRef(aAdr))
+                                    break;
+
+                                ScRefCellValue aCell(mrDoc, aAdr);
+                                if (GetCellErrCode(aCell) == FormulaError::NONE && aCell.hasNumeric())
+                                {
+                                    const sal_uInt32 nFormat = GetCellNumberFormat(aAdr, aCell);
+                                    bRes = (mrContext.NFGetType(nFormat) == SvNumFormatType::LOGICAL);
+                                }
+                            }
+                            break;
+                            case svMatrix:
+                            {
+                                double fVal;
+                                svl::SharedString aStr;
+                                const ScMatValType nMatValType = GetDoubleOrStringFromMatrix(fVal, aStr);
+                                bRes = (nMatValType == ScMatValType::Boolean);
+                            }
+                            break;
+                            default:
+                                PopError();
+                                if (nGlobalError == FormulaError::NONE)
+                                    bRes = (nCurFmtType == SvNumFormatType::LOGICAL);
+                        }
+                        nCurFmtType = nFuncFmtType = SvNumFormatType::LOGICAL;
+                        nGlobalError = FormulaError::NONE;
+                        PushInt(int(bRes));
+                    }
+                    break;
                     case ocType             : ScType();                 break;
                     case ocCell             : ScCell();                     break;
                     case ocIsRef            :
