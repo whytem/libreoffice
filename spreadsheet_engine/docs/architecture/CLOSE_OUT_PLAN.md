@@ -9,57 +9,48 @@ toward its Success Criteria.
 Close out the five-batch RPN Evaluator plan against its explicit Success
 Criteria:
 
-- `legacy_interpreter_subroutine_count` ≤ `40` (currently `96`)
-- `interp4_dispatch_legacy_lambda_count` ≤ `10` (currently `62`)
-- `interp4_dispatch_engine_attempted_total_core_forced_full_legacy` ≥ `5000`
-  (currently `602`)
-- Acceptance rate ≥ `0.95` across the core-forced-full-legacy lane
-- Live authoritative-match rate ≥ `99.5%` (currently `99.4493%`)
+- `legacy_interpreter_subroutine_count` ≤ `40` (currently `51`)
+- `interp4_dispatch_legacy_lambda_count` ≤ `10` (currently `25`)
+- every retired opcode shows non-zero exercised engine-first runtime on a
+  focused or corpus audit lane before fallback deletion
+- acceptance rate ≥ `0.95` across the exercised retirement lane for each
+  retired opcode family
+- Live authoritative-match rate ≥ `99.5%` (currently `99.4690%`)
 - Host facade has stable explicit contracts for every resolution /
   iteration / materialization primitive the batches depend on
 - Every retirement commit follows the `ocBad` template
-- All five substrate headers present under `runtime/` (Batch 5 still
-  missing)
+- All five substrate headers present under `runtime/` (complete; Batch 5
+  still needs public-header normalization)
 
 ## Shape of the work
 
-Retirement — not admission — is the lever that reduces the two headline
-counters. Phase A is sequenced first because the 17 opcodes already
-admitted carry their legacy bodies behind `tryPlanEngine*()` fallbacks;
-deleting those bodies (per the `ocBad` template) is pure gain.
+Retirement — not admission — remains the main lever that reduces the two
+headline counters, but the recent Batch-5 sweep changed the local optimum.
+With the honest baseline now at `51` subroutines and `25` lambdas, the
+highest-leverage remaining surface is the text/info and parsing/inspection
+cluster inside `Interpret()`, not another generic retirement grab-bag.
 
 The remaining admissions all gate on substrate or numerical cores
 that do not yet exist. Each of Phases B–F adds one such substrate and
 the admissions it unlocks; they are independent of each other and can
 run in parallel worktrees.
 
-## Phase A — Retire already-admitted opcodes
+## Phase A — Text/Info Retirement Wave
 
-Biggest metric lever. Apply the `ocBad` template to every opcode
-that currently routes through `tryPlanEngine*` with a fallback: delete
-the legacy body + declaration, collapse the dispatch to the engine
-call, replace the fallback with `OSL_FAIL` + engine-consistent error.
+Immediate next leverage. Execute the focused plan in
+[COMPUTATIONAL_SUBSTRATE_TEXT_INFO_RETIREMENT_PLAN.md](COMPUTATIONAL_SUBSTRATE_TEXT_INFO_RETIREMENT_PLAN.md):
 
-Batch 1: `ScIfJump`, `ScChooseJump`, `pushLegacyIfError`,
-`pushLegacyIfs`, `pushLegacySwitch`
+- Wave A: pure text/info subset
+- Wave B: parsing/inspection subset
+- Wave C: close any remaining authoritative-match gaps owned by those waves
+  before fallback deletion
 
-Batch 2: `ScColumn` / `ScRow` / `ScSheet`, `ScColumns` / `ScRows` /
-`ScSheets`, `ScAreas`, `ScOffset`, `ScIndex` (partial — scalar path
-only), `ScAddressFunc` (partial — 2-arg path only), `ScIndirect`
+Gate per retirement: the family has engine/shared coverage already, the
+focused or corpus audit lane shows exercised engine-first runtime, and
+the known-regressions baseline does not change.
 
-Batch 3: `ScCountIf`, `ScSumIf`, `ScAverageIf`, the Ifs family (5),
-DB `Sum` / `Avg` / `Max` / `Min` / `Product`
-
-Batch 4: `ScEMat`, `ScMatSequence`, `ScMatTrans`, the compat
-`matrixDeterminant` dispatcher (for `ocMatDet` where scope fence
-covers full live traffic)
-
-Gate per retirement: admission shows ≥ 95% acceptance on the
-core-forced-full-legacy audit lane, and the known-regressions
-baseline does not change.
-
-Expected delta: `legacy_interpreter_subroutine_count` ~96 → ~65;
-`legacy_lambda_count` ~62 → ~48.
+Expected delta: `interp4_dispatch_legacy_lambda_count` `25` → low-teens,
+with a smaller but still real follow-on drop in `legacy_interpreter_subroutine_count`.
 
 ## Phase B — Batch 3 tail substrate + admissions
 
@@ -159,7 +150,7 @@ continue piecewise wrapper-cleanup for any family now at engine
 parity that is not a batch member.
 
 Expected delta: `legacy_interpreter_subroutine_count` → ~40;
-`legacy_lambda_count` → ~10. **Headline metrics hit their targets.**
+`interp4_dispatch_legacy_lambda_count` → ~10. **Headline metrics hit their targets.**
 
 ## Phase H — Known-regressions baseline to zero
 

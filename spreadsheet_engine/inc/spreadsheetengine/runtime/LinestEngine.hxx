@@ -50,10 +50,11 @@
 //   stats are handled by the same QR pipeline but depend on the caller
 //   having wired MatrixOperand dimensions correctly.
 //
-// Per the RPN Evaluator Initiative policy, no Calc opcode routes through
-// this layer yet unless explicitly admitted via a `tryPlanEngineLinest*`
-// lambda in interpr4.cxx. The decline path in those lambdas is the only
-// way Calc sees this header's results.
+// This layer now backs the admitted regression / trend / growth matrix
+// planners used by Calc's engine-first dispatch. Wider host-sensitive
+// shapes and the remaining forecast/ETS tails still defer through the
+// surrounding planner/decline plumbing, but this core is no longer
+// substrate-only.
 
 namespace spreadsheetengine::core::rpn
 {

@@ -25,11 +25,10 @@
 // caller should take. They never mutate PC state, never touch FormulaToken,
 // and never read Calc state.
 //
-// Per the RPN Evaluator Initiative policy, no opcode currently routes through
-// this layer. It exists so subsequent engine-first admissions for
-// ocIf / ocChoose / ocIfs_MS / ocSwitch_MS / ocLet / ocIfError / ocIfNA can
-// consume a single, tested decision substrate rather than re-deriving the
-// decision logic per opcode.
+// This layer now backs the admitted scalar control-flow paths for
+// ocIf / ocChoose / ocIfs_MS / ocSwitch_MS / ocIfError / ocIfNA. Matrix
+// conditions and nested-interpreter LET semantics still defer to Calc-host
+// logic, but the decision substrate itself is no longer substrate-only.
 
 namespace spreadsheetengine::core::rpn
 {

@@ -30,12 +30,11 @@
 // reference and matrix operand resolution explicitly to the caller via
 // NeedsReferenceResolution / NeedsMatrixMaterialization.
 //
-// Per the RPN Evaluator Initiative policy, no Calc opcode currently routes
-// through this layer. It exists so the subsequent engine-first admissions
-// for ocCountIf / ocSumIf / ocAverageIf / ocCountIfs / ocSumIfs /
-// ocAverageIfs / ocMinIfs_MS / ocMaxIfs_MS / ocCountEmptyCells can consume
-// a single tested decision substrate rather than re-deriving predicate
-// parsing per opcode.
+// This layer now backs the admitted criteria-family paths for
+// ocCountIf / ocSumIf / ocAverageIf / ocCountIfs / ocSumIfs /
+// ocAverageIfs / ocMinIfs_MS / ocMaxIfs_MS / ocCountEmptyCells. Wider
+// host-sensitive shapes still defer, but predicate parsing is no longer
+// re-derived per opcode inside Calc.
 
 namespace spreadsheetengine::core::rpn
 {

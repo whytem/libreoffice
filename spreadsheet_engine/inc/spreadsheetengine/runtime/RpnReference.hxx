@@ -31,12 +31,11 @@
 // NeedsReferenceResolution; matrix inputs that require materialization
 // defer through NeedsMatrixMaterialization.
 //
-// Per the RPN Evaluator Initiative policy, no Calc opcode currently routes
-// through this layer. It exists so the subsequent engine-first admissions
-// for ocColumn / ocRow / ocSheet / ocColumns / ocRows / ocSheets /
-// ocMultiArea / ocAreas / ocAddress / ocIndirect / ocOffset / ocIndex can
-// consume a single tested decision substrate rather than re-deriving the
-// resolution logic per opcode.
+// This layer now backs the admitted scalar/reference paths for
+// ocColumn / ocRow / ocSheet / ocColumns / ocRows / ocSheets / ocAreas /
+// ocAddress (2-arg form) / ocIndirect / ocOffset / ocIndex (scalar projection).
+// Matrix-returning and broader host-sensitive forms still defer to Calc-host
+// logic, but this is no longer a substrate-only header.
 
 namespace spreadsheetengine::core::rpn
 {

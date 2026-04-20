@@ -36,11 +36,10 @@
 // - numerical primitives like LU / QR decomposition (those live in
 //   core::math already and are called from the planners below)
 //
-// Per the RPN Evaluator Initiative policy, no Calc opcode routes
-// through this layer yet. It exists so subsequent engine-first
-// admissions for ocMatValue / ocMatTrans / ocMatDet / ocMatInv /
-// ocMatMult / ocMatSequence / ocEMat / ocSumProduct / ocSumX2*
-// can consume a single tested decision substrate.
+// This layer now backs the admitted svMatrix-only paths for MUNIT /
+// MSEQUENCE / TRANSPOSE / MDETERM / MMULT / MINVERSE plus the first
+// regression/forecast matrix admissions. Reference-to-matrix widening and
+// full matrix-frame ownership still defer to later host/materialization work.
 
 namespace spreadsheetengine::core::rpn
 {

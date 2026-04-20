@@ -9,17 +9,17 @@ hundred functions."
 
 After the current honest baseline of:
 
-- `legacy_interpreter_subroutine_count=99`
-- `interp4_dispatch_legacy_lambda_count=62`
+- `legacy_interpreter_subroutine_count=51`
+- `interp4_dispatch_legacy_lambda_count=25`
 - `interp4_dispatch_engine_attempt_count=14`
 - `interp4_dispatch_engine_attempted_total=0`
 - `interp4_dispatch_engine_succeeded_total=0`
 - `interp4_dispatch_engine_declined_total=0`
-- `interp4_dispatch_engine_attempted_total_core_forced_full_legacy=602`
+- `interp4_dispatch_engine_attempted_total_core_forced_full_legacy=606`
 - `interp4_dispatch_engine_succeeded_total_core_forced_full_legacy=602`
-- `interp4_dispatch_engine_declined_total_core_forced_full_legacy=0`
+- `interp4_dispatch_engine_declined_total_core_forced_full_legacy=4`
 - `sc_formula_executor_classic_interpret_total_live=0`
-- `sc_formula_executor_classic_interpret_total_core_forced_full_legacy=602`
+- `sc_formula_executor_classic_interpret_total_core_forced_full_legacy=606`
 - `interpret_tail_live_unique_unseen_formula_cells=21`
 - `interpret_tail_live_unique_fallback_formula_cells=0`
 - `interpret_tail_live_unique_unsupported_function_formula_cells=0`
@@ -95,6 +95,10 @@ For this initiative, the project should use the following working rules:
 - the next success metric is meaningful reduction in
   `interp4_dispatch_legacy_lambda_count`, not just another drop in
   `legacy_interpreter_subroutine_count`
+- the next retirement wave should preferentially target the densest remaining
+  interpreter clusters that already lean on engine/shared helpers, beginning
+  with the text/info and parsing/inspection subset tracked in
+  [COMPUTATIONAL_SUBSTRATE_TEXT_INFO_RETIREMENT_PLAN.md](COMPUTATIONAL_SUBSTRATE_TEXT_INFO_RETIREMENT_PLAN.md)
 
 ### Retirement Template
 
@@ -166,8 +170,10 @@ Checkpoint:
   - typed coercion returns `NeedsReferenceResolution` or
     `NeedsMatrixMaterialization` instead of silently pretending those cases are
     scalar-ready
-- no opcode routes through this layer yet; it is a prerequisite slice for the
-  later operator migration, not a stealth dispatch change
+- this substrate is now actively consumed by the operator, control-flow,
+  reference, criteria, database, and matrix planners; the remaining work is to
+  widen admitted shapes and retire Calc-host fallbacks rather than to
+  introduce the value model itself
 
 ### 3. Engine Operator Dispatch
 
@@ -189,11 +195,12 @@ Checkpoint:
   `ScInterpreter::Interpret()`, but the broad replay corpus still reports
   `interp4_dispatch_engine_attempted_total=0`
 - the new core-forced full-legacy replay lane now proves that classic
-  `ScInterpreter::Interpret()` is reachable again (`602` executions on the
+  `ScInterpreter::Interpret()` is reachable again (`606` executions on the
   standing corpus), and it now reports
-  `interp4_dispatch_engine_attempted_total_core_forced_full_legacy=602` with
-  `602` successes and `0` declines, so engine-first dispatch is carrying real
-  load inside the residual classic tail
+  `interp4_dispatch_engine_attempted_total_core_forced_full_legacy=606` with
+  `602` successes and `4` declines, so engine-first dispatch is carrying real
+  load inside the residual classic tail but still has a narrow decline pocket
+  to close before broad retirement claims are justified
 - that movement now comes from both the `ocBad` root-error-literal slice and
   the follow-up `ocRange` audit/fix; the classic opcode census still shows
   `Bad=506` and `Range=96` because it records opcode entry before the switch
@@ -244,11 +251,11 @@ Checkpoint:
   never touch `FormulaToken`
 - matrix and reference conditions defer explicitly through
   `NeedsMatrixMaterialization` / `NeedsReferenceResolution`
-- no Calc opcode routes through this layer yet; this checkpoint exists to
-  lock the decision substrate before dispatch migration begins
-- first admission target: `ocIf` scalar-condition path; matrix-condition
-  path stays on legacy `ScIfJumpNotMatrix` until Batch 4 lands the matrix
-  operand model
+- limited Calc opcode routing now exists through this layer:
+  scalar `ocIf`, `ocChoose`, `ocIfError` / `ocIfNA`, `ocIfs_MS`, and
+  `ocSwitch_MS` each use the corresponding planner when their operands stay
+  within the admitted scalar contract
+- matrix-condition and nested-interpreter `ocLet` paths still defer to legacy
 
 ### 4b. Criteria and Database (Batch 3)
 
@@ -285,8 +292,10 @@ Checkpoint:
     own variant-specific iteration
 - reference and matrix operands defer explicitly through
   `NeedsReferenceResolution` / `NeedsMatrixMaterialization`
-- no Calc opcode routes through this layer yet; this checkpoint exists
-  to lock the contract before dispatch migration begins
+- Calc now routes COUNTIF / SUMIF / AVERAGEIF, the IFS aggregate family,
+  COUNTEMPTY, and the first DB aggregate/variance/get members through this
+  layer when their arguments stay within the admitted single-sheet scalarized
+  contract
 
 ### 5. Engine Reference & Matrix Frame
 

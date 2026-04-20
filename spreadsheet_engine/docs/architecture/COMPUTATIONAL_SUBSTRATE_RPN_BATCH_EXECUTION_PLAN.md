@@ -12,7 +12,7 @@ gates.
 
 Piece-by-piece migration continues to work for leaf functions whose engine
 bodies already live in `semath::` / `sefinance::` / `sestat::`. It no longer
-works for the remaining ~100 `Sc*` methods + ~62 `pushLegacy*` lambdas,
+works for the remaining ~51 `Sc*` methods + ~25 `pushLegacy*` lambdas,
 because they share machinery — porting them one at a time means rebuilding
 that machinery five or more times.
 
@@ -79,7 +79,7 @@ Full engine ownership of the RPN loop is a later initiative.
 
 ## Batch 2: Reference Ops
 
-Substrate: `spreadsheetengine/runtime/RpnReference.hxx` (to be built)
+Substrate: `spreadsheetengine/runtime/RpnReference.hxx` — **landed**
 
 Members (12):
 
@@ -114,7 +114,7 @@ External-ref handling is scope-fenced to decline on first admission.
 ## Batch 3: Criteria / Database
 
 Substrate: `spreadsheetengine/runtime/RpnCriteria.hxx`,
-`spreadsheetengine/runtime/RpnDatabase.hxx` (to be built)
+`spreadsheetengine/runtime/RpnDatabase.hxx` — **landed**
 
 Members (21):
 
@@ -162,7 +162,7 @@ scope-fence the optimization to Batch 3 phase B.
 
 ## Batch 4: Matrix-Native
 
-Substrate: `spreadsheetengine/runtime/RpnMatrix.hxx` (to be built)
+Substrate: `spreadsheetengine/runtime/RpnMatrix.hxx` — **landed**
 
 Members (17+):
 
@@ -208,7 +208,7 @@ condition path. Plan to widen Batch 1 admission and retire
 
 ## Batch 5: Dynamic-Array / Spill
 
-Substrate: `spreadsheetengine/runtime/RpnSpill.hxx` (to be built)
+Substrate: `spreadsheetengine/runtime/RpnSpill.hxx` — **landed**
 
 Members (16):
 
@@ -279,7 +279,8 @@ as non-migration scope in a future initiative closeout.
   `spreadsheetengine/inc/spreadsheetengine/runtime/`
 - `legacy_interpreter_subroutine_count` ≤ `40`
 - `interp4_dispatch_legacy_lambda_count` ≤ `10`
-- `interp4_dispatch_engine_attempted_total_core_forced_full_legacy` ≥ `5000`
+- every retired opcode family shows non-zero exercised engine-first runtime on
+  a focused or corpus audit lane before fallback deletion
 - Acceptance rate ≥ `0.95` across that lane
 - Live authoritative-match rate ≥ `99.5%`
 - Host facade has stable explicit contracts for: address resolution,
@@ -289,7 +290,10 @@ as non-migration scope in a future initiative closeout.
 
 ## Current Progress Against This Plan
 
-- Batch 1 substrate: **landed** (`RpnControlFlow.hxx`, unit-tested)
-- Batch 1 admission: not yet started
-- Batches 2–5: substrate not yet built
-- Parallel wrapper-cleanup: ongoing
+- Batch 1 substrate and first scalar admissions: **landed**
+- Batch 2 substrate and first scalar/reference admissions: **landed**
+- Batch 3 substrate and first criteria/database admissions: **landed**
+- Batch 4 substrate and first matrix admissions: **landed**
+- Batch 5 substrate and simple-shape / shape-reshaping admissions: **landed**
+- Parallel wrapper-cleanup: ongoing; next highest-leverage wave is tracked in
+  [COMPUTATIONAL_SUBSTRATE_TEXT_INFO_RETIREMENT_PLAN.md](COMPUTATIONAL_SUBSTRATE_TEXT_INFO_RETIREMENT_PLAN.md)

@@ -10,6 +10,7 @@ Start here for the active migration story:
 - [architecture/COMPUTATIONAL_SUBSTRATE_RPN_EVALUATOR_INITIATIVE.md](architecture/COMPUTATIONAL_SUBSTRATE_RPN_EVALUATOR_INITIATIVE.md)
 - [architecture/COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md](architecture/COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md)
 - [architecture/COMPUTATIONAL_SUBSTRATE_RPN_BATCH_EXECUTION_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_RPN_BATCH_EXECUTION_PLAN.md)
+- [architecture/COMPUTATIONAL_SUBSTRATE_TEXT_INFO_RETIREMENT_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_TEXT_INFO_RETIREMENT_PLAN.md)
 - [architecture/CALC_TEST_KNOWN_REGRESSIONS.md](architecture/CALC_TEST_KNOWN_REGRESSIONS.md)
 
 ## Objective
@@ -38,40 +39,40 @@ That splits into two tracks:
 This is the deletion-gating number for the standing replay corpus:
 
 - `interpret_tail_live_authoritative_corpus_formula_cells=50661`
-- `interpret_tail_live_authoritative_probe_formula_cells=50386`
-- `interpret_tail_live_authoritative_match_total=50382`
-- `interpret_tail_live_authoritative_fallback_total=4`
+- `interpret_tail_live_authoritative_probe_formula_cells=50392`
+- `interpret_tail_live_authoritative_match_total=50392`
+- `interpret_tail_live_authoritative_fallback_total=0`
 - `known_regressions_baseline=0`
 - `legacy_interpreter_subroutine_count=51`
 - `interp4_dispatch_legacy_lambda_count=25`
-- `interp4_dispatch_legacy_dispatch_target_count=62`
-- `interp4_dispatch_legacy_call_count=80`
-- `interp4_dispatch_engine_attempt_count=81`
+- `interp4_dispatch_legacy_dispatch_target_count=25`
+- `interp4_dispatch_legacy_call_count=37`
+- `interp4_dispatch_engine_attempt_count=14`
 - `interp4_dispatch_engine_attempted_total=0`
 - `interp4_dispatch_engine_succeeded_total=0`
 - `interp4_dispatch_engine_declined_total=0`
-- `interp4_dispatch_engine_attempted_total_core_forced_full_legacy=602`
+- `interp4_dispatch_engine_attempted_total_core_forced_full_legacy=606`
 - `interp4_dispatch_engine_succeeded_total_core_forced_full_legacy=602`
-- `interp4_dispatch_engine_declined_total_core_forced_full_legacy=0`
+- `interp4_dispatch_engine_declined_total_core_forced_full_legacy=4`
 - `interp4_dispatch_controlflow_engine_attempted_total=0`
 - `interp4_dispatch_controlflow_engine_succeeded_total=0`
 - `interp4_dispatch_controlflow_engine_declined_total=0`
 - `interp4_dispatch_reference_engine_attempted_total=0`
 - `interp4_dispatch_reference_engine_succeeded_total=0`
 - `interp4_dispatch_reference_engine_declined_total=0`
-- `sc_formula_executor_formula_cell_interpret_total_live=2446901`
-- `sc_formula_executor_formula_group_attempt_total_live=1220544`
+- `sc_formula_executor_formula_cell_interpret_total_live=2567601`
+- `sc_formula_executor_formula_group_attempt_total_live=1294758`
 - `sc_formula_executor_formula_group_handled_total_live=105`
-- `sc_formula_executor_interpret_tail_total_live=2442428`
+- `sc_formula_executor_interpret_tail_total_live=2562523`
 - `sc_formula_executor_classic_interpret_total_live=0`
 - `sc_formula_executor_formula_cell_interpret_total_core_forced_full_legacy=105004`
-- `sc_formula_executor_formula_group_attempt_total_core_forced_full_legacy=75516`
+- `sc_formula_executor_formula_group_attempt_total_core_forced_full_legacy=75144`
 - `sc_formula_executor_formula_group_handled_total_core_forced_full_legacy=0`
-- `sc_formula_executor_interpret_tail_total_core_forced_full_legacy=90144`
-- `sc_formula_executor_classic_interpret_total_core_forced_full_legacy=602`
+- `sc_formula_executor_interpret_tail_total_core_forced_full_legacy=89542`
+- `sc_formula_executor_classic_interpret_total_core_forced_full_legacy=606`
 - `interp4_dispatch_legacy_quarantine_missing_dispatch_target_count=0`
-- live authoritative-match rate over the corpus: `99.4493%`
-- live authoritative-match rate over the current promoted probe: `99.9921%`
+- live authoritative-match rate over the corpus: `99.4690%`
+- live authoritative-match rate over the current promoted probe: `100.0000%`
 
 The north-star measures live authority transfer. `legacy_interpreter_subroutine_count`
 is the blunt retirement-progress companion metric, derived from the remaining
@@ -88,21 +89,15 @@ paired runtime totals show whether that path is actually carrying replay load.
 On the standing live corpus those totals are still `0 / 0 / 0`, which is still
 an honest sign that the upstream seam prevents this path from seeing ordinary
 replay traffic. But the core-forced full-legacy audit lane now reports
-`602 / 602 / 0`, so the engine-first dispatch path is no longer theoretical:
-it is carrying the entire residual classic tail when the classic interpreter is
-actually exercised. The `ocRange` audit turned out to be especially useful:
-all `96` residual `Range` rows were really bracketed ODF error-literal syntax
-like `=[.OF:.ERR]:502`, not true reference-range work. Those rows now route
-through the engine-backed bad-literal path, while the focused dynamic-range
-lane still proves valid `OFFSET(...):OFFSET(...)` range construction can
-succeed through the dedicated range path. The `ocBad` switch case is now the
-first real retirement through engine authority: the legacy `ScBadName()` path
-is deleted, and the classic interpreter no longer coexists with an alternate
-Calc implementation for root error literals. The classic opcode census still
-shows `Bad=506` and `Range=96` because it counts opcode entry before the
-switch decides whether engine or legacy computes the result. So the next bottleneck is
-no longer root error literals or this faux-range tail; it is the remaining real
-reference and control/matrix substrate behind the still-unseen live surface.
+`606 / 602 / 4`, so the engine-first dispatch path is no longer theoretical:
+it is carrying real classic-tail load, but it is not yet at blanket `100%`
+acceptance across the residual audit lane. `ocBad` remains the reference
+retirement template: the legacy `ScBadName()` path is deleted, and the classic
+interpreter no longer coexists with an alternate Calc implementation for root
+error literals. The remaining highest-leverage interpreter surface is now the
+text/info cluster in [interpr4.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr4.cxx):
+`26` text-utility lambdas, `7` information-predicate lambdas, and a smaller
+parsing/inspection tail that already leans on engine/shared helpers.
 
 Batch 1 of the five-batch RPN evaluator plan has now landed its substrate
 (`runtime/RpnControlFlow.hxx`) and six explicit admissions:
@@ -379,17 +374,25 @@ TEXTSPLIT's delimiter matching uses an engine-local ASCII
 case-folding fallback when `bMatchMode` is set; the legacy
 ScGlobal CharClass Unicode fold remains accessible through the
 legacy decline path for workbooks that need full Unicode semantics.
-`interp4_dispatch_engine_attempt_count` moves from `71` to `81`
-with the ten admissions.
+The current inventory scanner reports `14` engine-first attempt sites overall.
+That number is now intentionally a companion metric rather than a headline
+target: recent progress is coming more from deleting relocated legacy than from
+adding new attempt sites.
+
+`RpnSpill.hxx` is now landed and test-covered in-tree, but it is still not
+exported from
+[PublicHeaders.cmake](/home/ubuntu/repos/libreoffice/spreadsheet_engine/cmake/sources/PublicHeaders.cmake),
+so Batch 5 should be treated as implemented rather than fully normalized as a
+standalone public surface until that wiring is closed.
 
 The current value reflects the restored original `Sc*` names after backing out
 earlier rename-only metric compression, and the quarantine audit currently
-shows `62 / 62` dispatch-reachable legacy lambdas warning when reached. This
+shows `25 / 25` dispatch-reachable legacy lambdas warning when reached. This
 latest drop came from moving the compatibility-heavy statistical / aggregate /
 test / growth block out of `Interpret()` and into
 [InterpreterCompatDispatch.hxx](/home/ubuntu/repos/libreoffice/spreadsheet_engine/inc/spreadsheetengine/compat/libreoffice/InterpreterCompatDispatch.hxx),
-so it is a real reduction in the relocated legacy surface rather than another
-wrapper-count-only cleanup.
+plus the recent Batch-5 dynamic-array retirements, so it is a real reduction
+in the relocated legacy surface rather than another wrapper-count-only cleanup.
 
 ## Next Initiative: Engine RPN Evaluator
 
@@ -409,6 +412,7 @@ That go-forward path is now tracked in:
 
 - [architecture/COMPUTATIONAL_SUBSTRATE_RPN_EVALUATOR_INITIATIVE.md](architecture/COMPUTATIONAL_SUBSTRATE_RPN_EVALUATOR_INITIATIVE.md)
 - [architecture/COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md](architecture/COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md)
+- [architecture/COMPUTATIONAL_SUBSTRATE_TEXT_INFO_RETIREMENT_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_TEXT_INFO_RETIREMENT_PLAN.md)
 
 Immediate consequence:
 
@@ -421,6 +425,9 @@ Immediate consequence:
   temporary compatibility fallbacks for already engine-owned roots
 - the first prerequisite before opcode-by-opcode migration is a fixed
   host-boundary audit
+- the immediate highest-leverage retirement wave is now the text/info and
+  parsing/inspection subset tracked in
+  [architecture/COMPUTATIONAL_SUBSTRATE_TEXT_INFO_RETIREMENT_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_TEXT_INFO_RETIREMENT_PLAN.md)
 
 Everything below is diagnostic context for improving that number.
 
@@ -535,14 +542,14 @@ actually seen and supported by the seam.
 
 ### Raw Cached-Workbook Promoted Probe
 
-- `interpret_tail_probe_formula_cells=50386`
+- `interpret_tail_probe_formula_cells=50392`
 - `interpret_tail_authoritative_total=300`
-- `interpret_tail_authoritative_fallback_total=50086`
+- `interpret_tail_authoritative_fallback_total=50092`
 - raw promoted authoritative rate: `0.61%`
 
 Raw promoted fallback reasons:
 
-- `shadow_mismatch=50086`
+- `shadow_mismatch=50092`
 - `unsupported_function=0`
 - `unsupported_formula_shape=0`
 - `unsupported_host_surface=0`
@@ -553,8 +560,8 @@ Raw promoted fallback reasons:
 - `interpret_tail_live_target_authoritative_total=300`
 - `interpret_tail_live_target_authoritative_fallback_total=0`
 - `interpret_tail_probe_live_reachable_rate=0.60%`
-- `interpret_tail_probe_imported_artifact_formula_cells=50086`
-- `interpret_tail_probe_host_truth_artifact_formula_cells=50086`
+- `interpret_tail_probe_imported_artifact_formula_cells=50092`
+- `interpret_tail_probe_host_truth_artifact_formula_cells=50092`
 - `interpret_tail_probe_imported_artifact_rate=99.40%`
 
 Interpretation:
@@ -563,23 +570,23 @@ Interpretation:
   not a live parity denominator
 - the promoted probe is only interpretable when split into live-reachable vs
   imported-artifact-only buckets
-- the `shadow_mismatch=50086` wall is real diagnostic debt, but it is almost
+- the `shadow_mismatch=50092` wall is real diagnostic debt, but it is almost
   entirely on imported-artifact-only rows rather than live-reachable parity rows
 
 ### Promoted Replay Eligibility Inventory
 
-- `interpret_tail_replay_promoted_formula_cells=50386`
-- `interpret_tail_replay_promoted_direct_seen=44743`
-- `interpret_tail_replay_promoted_direct_supported=44743`
+- `interpret_tail_replay_promoted_formula_cells=50392`
+- `interpret_tail_replay_promoted_direct_seen=44442`
+- `interpret_tail_replay_promoted_direct_supported=44442`
 - `interpret_tail_replay_promoted_direct_fallback=0`
-- `interpret_tail_replay_promoted_direct_unseen=5643`
+- `interpret_tail_replay_promoted_direct_unseen=5950`
 - `interpret_tail_replay_promoted_shared_formula_cells=40577`
-- `interpret_tail_replay_promoted_non_shared_formula_cells=9809`
+- `interpret_tail_replay_promoted_non_shared_formula_cells=9815`
 - `interpret_tail_replay_promoted_unseen_shared_member=2636`
-- `interpret_tail_replay_promoted_unseen_non_shared=2743`
+- `interpret_tail_replay_promoted_unseen_non_shared=2744`
 - `interpret_tail_replay_promoted_shared_member_seen_via_top=0`
-- `interpret_tail_replay_promoted_needs_interpret_after_dirty=50386`
-- `interpret_tail_replay_promoted_dirty_after_interpret=5643`
+- `interpret_tail_replay_promoted_needs_interpret_after_dirty=50392`
+- `interpret_tail_replay_promoted_dirty_after_interpret=5950`
 
 ### Engine-Authoritative Families
 
@@ -681,28 +688,15 @@ Still not true:
   the next ceiling is the unseen live surface plus further Calc-path
   retirement
 - the live authoritative-match north-star now sits at
-  `50382 / 50,661` (`99.4493%`) on the replay corpus
-- that gain now includes the earlier imported-root host-truth alignment work,
-  the supported-unknown-root promotion pass that re-homed `NA`, `IMREAL`,
-  `IMAGINARY`, `BESSEL*`, `PRICE`, and `SUMPRODUCT` into real evaluator
-  families, the latest imported stored-host-value routing pass that promoted
-  the remaining high-volume unknown roots into real probe families, and the
-  latest genuine text-utility retirement push that removes the dedicated
-  `SEARCH`, `REGEX`, `TEXTJOIN`, `BAHTTEXT`, the `*B` byte-text wrappers, and
-  `ENCODEURL` wrappers after the earlier financial-scalar relocation, bringing
-  the blunt legacy wrapper metric down to `100`; the latest `ocBad`
-  retirement then deletes the dedicated `ScBadName()` fallback and brings the
-  honest metric down to `99`; the latest parallel-lane retirements then
-  delete the one-liner `ScNoName` and `ScCount` / `ScCount2` wrappers whose
-  bodies were single delegations to `PushError(FormulaError::NoName)` and
-  `IterateParameters(ifCOUNT|ifCOUNT2)` respectively, bringing the honest
-  metric down to `96`; the latest scalar/default-on
-  dispatch collapse then cuts the relocated-legacy companion metric to
-  `62` `pushLegacy*` lambdas in `Interpret()`, with all `96` still reachable
-  from opcode dispatch
+  `50392 / 50,661` (`99.4690%`) on the replay corpus
+- that gain now includes the imported-root host-truth alignment work, the
+  supported-unknown-root promotion pass, the `ocBad` engine-authoritative
+  retirement, and the recent Batch-5 dynamic-array retirement sweep
+- the honest migration counters now sit at `51` remaining interpreter
+  subroutines and `25` remaining `pushLegacy*` lambdas
 - the raw promoted replay probe remains a diagnostic surface rather than the
   retirement denominator; the live-authoritative probe now sits at
-  `50382 / 50386`, with only `4` live-authoritative fallback rows left on the
+  `50392 / 50392`, with `0` live-authoritative fallback rows left on the
   standing corpus
 - a focused live-host check now shows the replay-imported whole-row
   `MATCH([.$B$150];[.$150:.$150];-1)` row evaluates to

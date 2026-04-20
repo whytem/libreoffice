@@ -33,9 +33,10 @@
 // caller materializes (host-side) into CriteriaAggregateInput ranges and
 // then dispatches through core::query::evaluateCriteriaAggregate.
 //
-// Per the RPN Evaluator Initiative policy, no Calc opcode currently
-// routes through this layer. It exists to lock the shape for subsequent
-// engine-first admissions.
+// This layer now backs the admitted database-family paths for DSUM /
+// DCOUNT / DCOUNT2 / DAVERAGE / DGET / DMAX / DMIN / DPRODUCT /
+// DSTDEV(P) / DVAR(P) when their arguments stay within the admitted
+// single-sheet scalarized contract.
 
 namespace spreadsheetengine::core::rpn
 {
