@@ -17,6 +17,7 @@
 #include <interpretercontext.hxx>
 
 #include <spreadsheetengine/api/Host.hxx>
+#include <spreadsheetengine/api/Query.hxx>
 #include <spreadsheetengine/compat/libreoffice/Address.hxx>
 #include <spreadsheetengine/compat/libreoffice/Date.hxx>
 #include <spreadsheetengine/compat/libreoffice/Error.hxx>
@@ -268,6 +269,42 @@ public:
 
         return spreadsheetengine::api::ValueResult<spreadsheetengine::api::String>::success(
             toApiString(aName));
+    }
+
+    [[nodiscard]] spreadsheetengine::api::ValueResult<bool> iterateRangeCells(
+        const spreadsheetengine::api::CellRange& rRange,
+        const std::function<bool(const spreadsheetengine::api::CellAddress&,
+            const spreadsheetengine::api::CellValue&)>& rVisitor) const override
+    {
+        if (!rRange.isNormalized() || !mrDoc.HasTable(rRange.maStart.mnSheet))
+        {
+            return spreadsheetengine::api::ValueResult<bool>::failure(
+                spreadsheetengine::api::Error::IllegalArgument);
+        }
+
+        for (SCROW nRow = rRange.maStart.mnRow;; ++nRow)
+        {
+            for (SCCOL nColumn = rRange.maStart.mnColumn;; ++nColumn)
+            {
+                const spreadsheetengine::api::CellAddress aAddress
+                    = { rRange.maStart.mnSheet, nColumn, nRow };
+                const auto aValue = spreadsheetengine::compat::libreoffice::readHostDocumentCellValue(
+                    mrDoc, ScAddress(nColumn, nRow, rRange.maStart.mnSheet));
+                if (!aValue)
+                {
+                    return spreadsheetengine::api::ValueResult<bool>::failure(aValue.meError);
+                }
+                if (!rVisitor(aAddress, aValue.maValue))
+                    return spreadsheetengine::api::ValueResult<bool>::success(false);
+                if (nColumn == rRange.maEnd.mnColumn)
+                    break;
+            }
+
+            if (nRow == rRange.maEnd.mnRow)
+                break;
+        }
+
+        return spreadsheetengine::api::ValueResult<bool>::success(true);
     }
 
     [[nodiscard]] spreadsheetengine::api::DateParts getNullDate() const override

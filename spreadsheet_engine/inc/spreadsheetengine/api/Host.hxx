@@ -10,6 +10,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <variant>
 
 #include <spreadsheetengine/api/Date.hxx>
@@ -280,6 +281,16 @@ public:
     [[nodiscard]] virtual ValueResult<String> getSheetName(SheetId nSheet) const = 0;
 };
 
+class RangeIterator
+{
+public:
+    virtual ~RangeIterator() = default;
+
+    [[nodiscard]] virtual ValueResult<bool> iterateRangeCells(
+        const CellRange& rRange,
+        const std::function<bool(const CellAddress&, const CellValue&)>& rVisitor) const = 0;
+};
+
 class RuntimeEnvironment
 {
 public:
@@ -343,6 +354,7 @@ class EvaluationHost : public CellReader,
                        public TextCoercion,
                        public ValueFormatting,
                        public WorkbookInfo,
+                       public RangeIterator,
                        public RuntimeEnvironment
 {
 public:

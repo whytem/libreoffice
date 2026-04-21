@@ -515,6 +515,42 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testCalcHostAdapter)
     CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(2), aResolved.maValue.matrixDimensions().mnColumns);
     CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(1), aResolved.maValue.matrixDimensions().mnRows);
 
+    std::vector<spreadsheetengine::api::CellAddress> aIteratedAddresses;
+    std::vector<spreadsheetengine::api::CellValueKind> aIteratedKinds;
+    const auto aIterated = aHost.iterateRangeCells(
+        { { 0, 0, 0 }, { 0, 2, 1 } },
+        [&](const spreadsheetengine::api::CellAddress& rAddress,
+            const spreadsheetengine::api::CellValue& rValue) {
+            aIteratedAddresses.push_back(rAddress);
+            aIteratedKinds.push_back(rValue.meKind);
+            return true;
+        });
+    CPPUNIT_ASSERT(aIterated);
+    CPPUNIT_ASSERT(aIterated.maValue);
+    CPPUNIT_ASSERT_EQUAL(std::size_t(6), aIteratedAddresses.size());
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(0), aIteratedAddresses[0].mnSheet);
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(0), aIteratedAddresses[0].mnColumn);
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(0), aIteratedAddresses[0].mnRow);
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(1), aIteratedAddresses[1].mnColumn);
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(2), aIteratedAddresses[2].mnColumn);
+    CPPUNIT_ASSERT_EQUAL(static_cast<sal_Int32>(1), aIteratedAddresses[3].mnRow);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::CellValueKind::Number, aIteratedKinds[0]);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::CellValueKind::Text, aIteratedKinds[1]);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::CellValueKind::Error, aIteratedKinds[2]);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::CellValueKind::Empty, aIteratedKinds[3]);
+
+    std::size_t nAbortedVisits = 0;
+    const auto aAborted = aHost.iterateRangeCells(
+        { { 0, 0, 0 }, { 0, 2, 1 } },
+        [&](const spreadsheetengine::api::CellAddress&,
+            const spreadsheetengine::api::CellValue&) {
+            ++nAbortedVisits;
+            return nAbortedVisits < 2;
+        });
+    CPPUNIT_ASSERT(aAborted);
+    CPPUNIT_ASSERT(!aAborted.maValue);
+    CPPUNIT_ASSERT_EQUAL(std::size_t(2), nAbortedVisits);
+
     const auto aParsedNumber = aHost.parseNumber(u"42.5");
     CPPUNIT_ASSERT(aParsedNumber);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(42.5, aParsedNumber.maValue.mfValue, 1e-12);
@@ -3714,6 +3750,32 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorCriteriaAg
         spreadsheetengine::api::formulavalue::ValueType::Value,
         aRangeCriteriaCountIfs.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aRangeCriteriaCountIfs.maResult.mfValue, 1e-12);
+
+    m_pDoc->SetString(9, 0, 0, u"Key"_ustr);
+    m_pDoc->SetString(10, 0, 0, u"Amount"_ustr);
+    m_pDoc->SetValue(9, 1, 0, 1.0);
+    m_pDoc->SetValue(10, 1, 0, 10.0);
+    m_pDoc->SetValue(9, 2, 0, 2.0);
+    m_pDoc->SetValue(10, 2, 0, 20.0);
+    m_pDoc->SetValue(9, 3, 0, 2.0);
+    m_pDoc->SetValue(10, 3, 0, 30.0);
+    m_pDoc->SetValue(9, 4, 0, 4.0);
+    m_pDoc->SetValue(10, 4, 0, 40.0);
+    m_pDoc->SetString(7, 3, 0, u"Key"_ustr);
+    m_pDoc->SetString(8, 3, 0, u"Amount"_ustr);
+    m_pDoc->SetString(7, 4, 0, u">1"_ustr);
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(new ScRangeData(
+        *m_pDoc, u"CriteriaDatabase"_ustr,
+        u"$InterpretTailCriteriaAggregateHelper.$J$1:$K$5"_ustr)));
+
+    const auto aDbSum = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos,
+        u"=DSUM(CriteriaDatabase;\"Amount\";$H$4:$I$5)", false);
+    CPPUNIT_ASSERT(aDbSum.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::CriteriaAggregate, aDbSum.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aDbSum.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(90.0, aDbSum.maResult.mfValue, 1e-12);
 }
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorSelectorHelper)

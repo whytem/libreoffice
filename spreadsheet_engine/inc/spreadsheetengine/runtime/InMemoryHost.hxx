@@ -15,6 +15,7 @@
 #include <vector>
 
 #include <spreadsheetengine/api/Host.hxx>
+#include <spreadsheetengine/api/Query.hxx>
 
 namespace spreadsheetengine::core::host
 {
@@ -100,6 +101,35 @@ public:
         if (!pSheet)
             return api::ValueResult<api::String>::failure(api::Error::IllegalArgument);
         return api::ValueResult<api::String>::success(pSheet->maName);
+    }
+
+    [[nodiscard]] api::ValueResult<bool> iterateRangeCells(
+        const api::CellRange& rRange,
+        const std::function<bool(const api::CellAddress&, const api::CellValue&)>& rVisitor)
+        const override
+    {
+        if (!rRange.isNormalized() || !hasSheet(rRange.maStart.mnSheet))
+            return api::ValueResult<bool>::failure(api::Error::IllegalArgument);
+
+        for (api::RowIndex nRow = rRange.maStart.mnRow;; ++nRow)
+        {
+            for (api::ColumnIndex nColumn = rRange.maStart.mnColumn;; ++nColumn)
+            {
+                const api::CellAddress aAddress { rRange.maStart.mnSheet, nColumn, nRow };
+                const auto aValue = getCellValue(aAddress);
+                if (!aValue)
+                    return api::ValueResult<bool>::failure(aValue.meError);
+                if (!rVisitor(aAddress, aValue.maValue))
+                    return api::ValueResult<bool>::success(false);
+                if (nColumn == rRange.maEnd.mnColumn)
+                    break;
+            }
+
+            if (nRow == rRange.maEnd.mnRow)
+                break;
+        }
+
+        return api::ValueResult<bool>::success(true);
     }
 
     [[nodiscard]] api::DateParts getNullDate() const override { return maNullDate; }

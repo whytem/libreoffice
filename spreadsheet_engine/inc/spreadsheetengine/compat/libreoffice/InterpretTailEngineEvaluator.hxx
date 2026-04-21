@@ -4908,6 +4908,32 @@ public:
         return api::ValueResult<api::CellValue>::success(readMaterializedHostCellValue(mrDoc,
             mrContext, ScAddress(aAddress.mnColumn, aAddress.mnRow, aAddress.mnSheet)));
     }
+
+    [[nodiscard]] api::ValueResult<bool> iterate(
+        const spreadsheetengine::core::query::CriteriaAggregateInput& rInput,
+        const std::function<bool(api::MatrixCoordinate, const api::CellValue&)>& rVisitor)
+        const override
+    {
+        if (rInput.mbScalar || !rInput.maValues.empty())
+        {
+            return spreadsheetengine::core::query::CriteriaAggregateMaterializer::iterate(
+                rInput, rVisitor);
+        }
+
+        if (!rInput.maReference.isNormalized())
+            return api::ValueResult<bool>::failure(api::Error::IllegalArgument);
+
+        const DocumentEvaluationHost aHost(mrDoc);
+        const auto aRange = rInput.maReference.maRange;
+        return aHost.iterateRangeCells(
+            aRange,
+            [&](const api::CellAddress& rAddress, const api::CellValue& rValue) {
+                return rVisitor(
+                    { rAddress.mnColumn - aRange.maStart.mnColumn,
+                        rAddress.mnRow - aRange.maStart.mnRow },
+                    rValue);
+            });
+    }
 };
 
 [[nodiscard]] inline Materialization<spreadsheetengine::core::query::CriteriaAggregateInput>
@@ -9787,7 +9813,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     // reference-list array (svRefList) in ForceArray contexts — e.g.
     // =SUMPRODUCT(SUBTOTAL(109;OFFSET(A1;ROW(A1:A7)-ROW(A1);;1))) where
     // OFFSET yields an array of references, SUBTOTAL applies per reference
-    // (ScSubTotal iterates the svRefList), and SUMPRODUCT consumes the
+    // (the terminal bridge iterates the svRefList), and SUMPRODUCT consumes the
     // resulting 7x1 numeric matrix. The engine's materializeMatrixFunction-
     // Call has no reflist-iteration path for SUBTOTAL / AGGREGATE, and the
     // downstream imported-cached-formula VariableExpected shortcut would

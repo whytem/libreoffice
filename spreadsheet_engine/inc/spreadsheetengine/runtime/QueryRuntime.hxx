@@ -9,6 +9,8 @@
 
 #pragma once
 
+#include <algorithm>
+#include <functional>
 #include <optional>
 #include <vector>
 
@@ -77,6 +79,58 @@ public:
 
     [[nodiscard]] virtual api::ValueResult<api::CellValue> materialize(
         const CriteriaAggregateInput& rInput, api::MatrixCoordinate aCoordinate) const = 0;
+
+    [[nodiscard]] virtual api::ValueResult<bool> iterate(
+        const CriteriaAggregateInput& rInput,
+        const std::function<bool(api::MatrixCoordinate, const api::CellValue&)>& rVisitor) const
+    {
+        if (rInput.mbScalar)
+        {
+            if (!rVisitor({ 0, 0 }, rInput.maScalar))
+                return api::ValueResult<bool>::success(false);
+            return api::ValueResult<bool>::success(true);
+        }
+
+        if (!rInput.maValues.empty())
+        {
+            const auto nExpectedCount = static_cast<std::size_t>(
+                                            std::max<api::MatrixSize>(0, rInput.mnRows))
+                                        * static_cast<std::size_t>(
+                                            std::max<api::MatrixSize>(0, rInput.mnColumns));
+            if (rInput.maValues.size() < nExpectedCount)
+                return api::ValueResult<bool>::failure(api::Error::IllegalArgument);
+
+            for (api::MatrixSize nRow = 0; nRow < rInput.mnRows; ++nRow)
+            {
+                for (api::MatrixSize nCol = 0; nCol < rInput.mnColumns; ++nCol)
+                {
+                    const std::size_t nLinearIndex
+                        = static_cast<std::size_t>(nRow)
+                              * static_cast<std::size_t>(rInput.mnColumns)
+                          + static_cast<std::size_t>(nCol);
+                    if (!rVisitor({ nCol, nRow }, rInput.maValues[nLinearIndex]))
+                        return api::ValueResult<bool>::success(false);
+                }
+            }
+
+            return api::ValueResult<bool>::success(true);
+        }
+
+        for (api::MatrixSize nRow = 0; nRow < rInput.mnRows; ++nRow)
+        {
+            for (api::MatrixSize nCol = 0; nCol < rInput.mnColumns; ++nCol)
+            {
+                const api::MatrixCoordinate aCoordinate { nCol, nRow };
+                const auto aValue = materialize(rInput, aCoordinate);
+                if (!aValue)
+                    return api::ValueResult<bool>::failure(aValue.meError);
+                if (!rVisitor(aCoordinate, aValue.maValue))
+                    return api::ValueResult<bool>::success(false);
+            }
+        }
+
+        return api::ValueResult<bool>::success(true);
+    }
 };
 
 using CriteriaNumberTextParser = std::optional<api::NumberParseResult> (*)(api::StringView);

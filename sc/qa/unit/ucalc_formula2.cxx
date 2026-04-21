@@ -1421,6 +1421,32 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterDatabaseCountDispatch)
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testNamedDatabaseRangeTerminal)
+{
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT(m_pDoc->InsertTab(0, u"DBName"_ustr));
+
+    ScDBCollection* pDBs = m_pDoc->GetDBCollection();
+    CPPUNIT_ASSERT_MESSAGE("Failed to fetch DB collection object.", pDBs);
+
+    std::unique_ptr<ScDBData> pData(new ScDBData(u"salesdb"_ustr, 0, 0, 0, 0, 3));
+    CPPUNIT_ASSERT_MESSAGE("Failed to insert named database range.",
+                           pDBs->getNamedDBs().insert(std::move(pData)));
+
+    m_pDoc->SetString(0, 0, 0, u"Amount"_ustr);
+    m_pDoc->SetValue(0, 1, 0, 10.0);
+    m_pDoc->SetValue(0, 2, 0, 20.0);
+    m_pDoc->SetValue(0, 3, 0, 30.0);
+
+    m_pDoc->SetString(2, 0, 0, u"=SUM(salesdb)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(60.0, m_pDoc->GetValue(2, 0, 0));
+
+    m_pDoc->SetString(2, 1, 0, u"=COUNTA(salesdb)"_ustr);
+    CPPUNIT_ASSERT_EQUAL(4.0, m_pDoc->GetValue(2, 1, 0));
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterReferenceAddressDispatch)
 {
     sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);

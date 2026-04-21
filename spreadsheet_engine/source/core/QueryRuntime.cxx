@@ -584,12 +584,10 @@ api::ValueResult<api::CellValue> evaluateCriteriaAggregate(
     double fProduct = 1.0;
     double fBest = 0.0;
     bool bHasBest = false;
-
-    for (api::MatrixSize nRow = 0; nRow < rBaseRange.mnRows; ++nRow)
-    {
-        for (api::MatrixSize nCol = 0; nCol < rBaseRange.mnColumns; ++nCol)
-        {
-            const api::MatrixCoordinate aCoordinate { nCol, nRow };
+    std::optional<api::Error> oIterationError;
+    const auto aIterated = rMaterializer.iterate(
+        rBaseRange,
+        [&](api::MatrixCoordinate aCoordinate, const api::CellValue&) {
             bool bMatch = true;
             for (std::size_t nIndex = 0; nIndex < rCriteriaRanges.size(); ++nIndex)
             {
@@ -604,35 +602,40 @@ api::ValueResult<api::CellValue> evaluateCriteriaAggregate(
             }
 
             if (!bMatch)
-                continue;
+                return true;
 
             if (eAggregateKind == CriteriaAggregateKind::Count)
             {
                 ++nCount;
-                continue;
+                return true;
             }
 
             const auto aTarget = pTargetRange ? rMaterializer.materialize(*pTargetRange, aCoordinate)
                                               : rMaterializer.materialize(rBaseRange, aCoordinate);
             if (!aTarget)
-                return aTarget;
+            {
+                oIterationError = aTarget.meError;
+                return false;
+            }
 
             if (eAggregateKind == CriteriaAggregateKind::Count2)
             {
                 // Count every matched row with a non-empty field value.
                 // Empty cells and empty-text cells do not contribute.
                 if (aTarget.maValue.meKind == api::CellValueKind::Empty)
-                    continue;
+                    return true;
                 if (aTarget.maValue.meKind == api::CellValueKind::Text
                     && aTarget.maValue.maString.empty())
-                    continue;
+                {
+                    return true;
+                }
                 ++nCount;
-                continue;
+                return true;
             }
 
             const auto oNumber = coerceCriteriaAggregateNumber(aTarget.maValue);
             if (!oNumber)
-                continue;
+                return true;
 
             switch (eAggregateKind)
             {
@@ -666,8 +669,13 @@ api::ValueResult<api::CellValue> evaluateCriteriaAggregate(
                     ++nCount;
                     break;
             }
-        }
-    }
+
+            return true;
+        });
+    if (!aIterated)
+        return api::ValueResult<api::CellValue>::failure(aIterated.meError);
+    if (oIterationError)
+        return api::ValueResult<api::CellValue>::failure(*oIterationError);
 
     switch (eAggregateKind)
     {

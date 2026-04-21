@@ -664,7 +664,7 @@ private:
     void ExecuteLookupTerminal();
     void ExecuteXLookupTerminal();
     void ExecuteSortByTerminal();
-    void ScSubTotal();
+    void ExecuteSubTotalTerminal();
 
 private:
     void ExecuteComparisonKernel(
@@ -700,8 +700,8 @@ public:
     void ScMacro();
     bool SetSbxVariable( SbxVariable* pVar, const ScAddress& );
     FormulaError GetErrorType();
-    void ScDBArea();
-    void ScColRowNameAuto();
+    void ExecuteDBAreaTerminal();
+    void ExecuteColRowNameAutoTerminal();
     void ScGetPivotData();
     void ScHyperLink();
     void ScTTT();

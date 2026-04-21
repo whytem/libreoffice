@@ -5700,7 +5700,7 @@ bool ScCompiler::HandleColRowName()
         if (!bString && aCell.isEmpty())
             bString = true;     // empty cell is ok
         if ( bString )
-        {   // corresponds with ScInterpreter::ScColRowNameAuto()
+        {   // corresponds with ScInterpreter::ExecuteColRowNameAutoTerminal()
             bValidName = true;
             if ( bColName )
             {   // ColName

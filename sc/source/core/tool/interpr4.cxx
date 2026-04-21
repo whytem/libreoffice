@@ -4163,7 +4163,7 @@ void ScInterpreter::ScTableOp()
     mrDoc.DecInterpreterTableOpLevel();
 }
 
-void ScInterpreter::ScDBArea()
+void ScInterpreter::ExecuteDBAreaTerminal()
 {
     ScDBData* pDBData = mrDoc.GetDBCollection()->getNamedDBs().findByIndex(pCur->GetIndex());
     if (pDBData)
@@ -4180,7 +4180,7 @@ void ScInterpreter::ScDBArea()
         PushError( FormulaError::NoName);
 }
 
-void ScInterpreter::ScColRowNameAuto()
+void ScInterpreter::ExecuteColRowNameAutoTerminal()
 {
     ScComplexRefData aRefData( *pCur->GetDoubleRef() );
     ScRange aAbs = aRefData.toAbs(mrDoc, aPos);
@@ -11834,8 +11834,8 @@ StackVar ScInterpreter::Interpret()
                     case ocClose:           // pushed by the compiler
                     case ocMissing          : ExecuteMissingTerminal();     break;
                     case ocMacro            : ScMacro();                    break;
-                    case ocDBArea           : ScDBArea();                   break;
-                    case ocColRowNameAuto   : ScColRowNameAuto();           break;
+                    case ocDBArea           : ExecuteDBAreaTerminal();      break;
+                    case ocColRowNameAuto   : ExecuteColRowNameAutoTerminal(); break;
                     case ocIf               :
                         if (!dispatchIfTerminal())
                         {
@@ -13970,7 +13970,7 @@ StackVar ScInterpreter::Interpret()
                         pushValueResult(sefinance::evaluateNominal(fEffective, fPeriods));
                     }
                     break;
-                    case ocSubTotal         : ScSubTotal();                 break;
+                    case ocSubTotal         : ExecuteSubTotalTerminal();    break;
                     case ocAggregate:
                         warnIfLegacyDispatchReached(
                             "family-local default-on", u"AGGREGATE",

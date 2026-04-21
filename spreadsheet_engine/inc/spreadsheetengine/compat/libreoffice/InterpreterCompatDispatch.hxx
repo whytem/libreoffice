@@ -1429,6 +1429,7 @@ struct Dispatcher
     static void aggregateStDevP(ScInterpreter& rCalc, bool bTextAsZero);
     static void matrixDeterminant(ScInterpreter& rCalc);
     static void aggregateFunction(ScInterpreter& rCalc);
+    static void subtotalFunction(ScInterpreter& rCalc);
     static void probability(ScInterpreter& rCalc);
     static void zTest(ScInterpreter& rCalc);
     static void tTest(ScInterpreter& rCalc);
@@ -2002,6 +2003,77 @@ inline void Dispatcher::aggregateFunction(ScInterpreter& rCalc)
 
     FormulaConstTokenRef xRef(PopToken());
     Pop();
+    Pop();
+    PushTokenRef(xRef);
+}
+
+inline void Dispatcher::subtotalFunction(ScInterpreter& rCalc)
+{
+    sal_uInt8 nParamCount = GetByte();
+    if (!MustHaveParamCountMinWithStackCheck(nParamCount, 2))
+        return;
+
+    const FormulaToken* pFuncToken = pStack[sp - nParamCount];
+    PushWithoutError(*pFuncToken);
+    sal_Int32 nFunc = GetInt32();
+    mnSubTotalFlags = SubtotalFlags::IgnoreNestedStAg | SubtotalFlags::IgnoreFiltered;
+    if (nFunc > 100)
+    {
+        mnSubTotalFlags |= SubtotalFlags::IgnoreHidden;
+        nFunc -= 100;
+    }
+
+    if (nGlobalError != FormulaError::NONE || nFunc < 1 || nFunc > 11)
+    {
+        mnSubTotalFlags = SubtotalFlags::NONE;
+        PushIllegalArgument();
+        return;
+    }
+
+    cPar = nParamCount - 1;
+    switch (nFunc)
+    {
+        case SUBTOTAL_FUNC_AVE:
+            aggregateAverage(rCalc, false);
+            break;
+        case SUBTOTAL_FUNC_CNT:
+            IterateParameters(ifCOUNT);
+            break;
+        case SUBTOTAL_FUNC_CNT2:
+            IterateParameters(ifCOUNT2);
+            break;
+        case SUBTOTAL_FUNC_MAX:
+            aggregateMax(rCalc, false);
+            break;
+        case SUBTOTAL_FUNC_MIN:
+            aggregateMin(rCalc, false);
+            break;
+        case SUBTOTAL_FUNC_PROD:
+            aggregateProduct(rCalc);
+            break;
+        case SUBTOTAL_FUNC_STD:
+            aggregateStDev(rCalc, false);
+            break;
+        case SUBTOTAL_FUNC_STDP:
+            aggregateStDevP(rCalc, false);
+            break;
+        case SUBTOTAL_FUNC_SUM:
+            aggregateSum(rCalc);
+            break;
+        case SUBTOTAL_FUNC_VAR:
+            aggregateVar(rCalc, false);
+            break;
+        case SUBTOTAL_FUNC_VARP:
+            aggregateVarP(rCalc, false);
+            break;
+        default:
+            mnSubTotalFlags = SubtotalFlags::NONE;
+            PushIllegalArgument();
+            return;
+    }
+    mnSubTotalFlags = SubtotalFlags::NONE;
+
+    FormulaConstTokenRef xRef(PopToken());
     Pop();
     PushTokenRef(xRef);
 }

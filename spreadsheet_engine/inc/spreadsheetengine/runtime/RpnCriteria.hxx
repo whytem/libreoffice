@@ -155,25 +155,16 @@ struct MultiCriterionAggregateRequest
     const core::query::CriteriaAggregateInput& rRange)
 {
     std::size_t nEmptyCount = 0;
-    for (api::MatrixSize nRow = 0; nRow < rRange.mnRows; ++nRow)
-    {
-        for (api::MatrixSize nCol = 0; nCol < rRange.mnColumns; ++nCol)
-        {
-            const api::MatrixCoordinate aCoord { nCol, nRow };
-            const auto aResult = rMaterializer.materialize(rRange, aCoord);
-            if (!aResult)
-                return api::ValueResult<double>::failure(aResult.meError);
-            if (aResult.maValue.meKind == api::CellValueKind::Empty)
-            {
+    const auto aIterated = rMaterializer.iterate(
+        rRange, [&](api::MatrixCoordinate, const api::CellValue& rValue) {
+            if (rValue.meKind == api::CellValueKind::Empty)
                 ++nEmptyCount;
-            }
-            else if (aResult.maValue.meKind == api::CellValueKind::Text
-                     && aResult.maValue.maString.empty())
-            {
+            else if (rValue.meKind == api::CellValueKind::Text && rValue.maString.empty())
                 ++nEmptyCount;
-            }
-        }
-    }
+            return true;
+        });
+    if (!aIterated)
+        return api::ValueResult<double>::failure(aIterated.meError);
     return api::ValueResult<double>::success(static_cast<double>(nEmptyCount));
 }
 

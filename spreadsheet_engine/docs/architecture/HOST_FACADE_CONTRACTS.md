@@ -56,7 +56,7 @@ quietly drift out of date.
 | Basic reference resolution | `RangeResolver::resolveRange`, `ReferenceResolver::resolveReference`, external-ref fetch helpers | `already exposed` | host-only union/intersection/range terminals, external add-in terminals | Compile-time and evaluation-time reference resolution now share one contract; the remaining Calc sites are explicit host terminals rather than duplicate evaluator logic |
 | Named / external / database / structured range resolution | compile-host lookup resolvers, `RangeResolver::resolveRange`, `DocumentRangeResolver` | `already exposed` | query-family range walking, structured-reference materialization follow-ups | One evaluation-time resolver now covers named, DB, external, and INDIRECT-driven range binding; structured references that cannot flatten still round-trip as `TokenBackedSymbol` |
 | Matrix materialization | `materializeHostRangeToMatrixOperand`, `CellValueView::matrixReference`, matrix operand bridges | `already exposed` | `ScMatValue`, `ScMatRef`, `ScFrequency`, `ScForecast_Ets`, matrix-return lookup/stat tails | Stable compat-layer contract; may later move behind public API if non-LO hosts need it |
-| Criteria / range iteration | `CriteriaAggregateMaterializer` stopgap inside query runtime | `missing` | `ScSubTotal`, DB-family tails, COUNTBLANK widening, future streaming criteria work | Needs a standalone `RangeIterator` or equivalent streaming walker |
+| Criteria / range iteration | `RangeIterator`, `CriteriaAggregateMaterializer::iterate` | `already exposed` | `ExecuteSubTotalTerminal`, DB-family tails, COUNTBLANK widening, future streaming criteria work | Phase 7 landed a standalone row-major walker on `EvaluationHost`; production query/countblank scans now route through it instead of baking iteration into Calc-local walkers |
 | Formula text / inspection | `runtime::formulainspection::Provider`, `DirectFormulaInspectionAdapter` | `already exposed` | `ExecuteCellTerminal`, `ExecuteCellExternalTerminal`, `ExecuteInfoTerminal`, formula inspection predicates | Formula-presence and formula-text reads now flow through an explicit inspection provider instead of ad hoc document peeks |
 | Format / type inspection | `runtime::cellinspection::*`, `DirectCellInspectionAdapter`, `DirectHostCellInspectionAdapter` | `already exposed` | `ExecuteTypeTerminal`, `ExecuteCellTerminal`, `ExecuteCellExternalTerminal`, `ExecuteCurrentTerminal`, `ExecuteStyleTerminal`, host-sensitive text terminals | The bounded/value vs. host-property split is now explicit, so remaining Calc ownership is terminal glue rather than hidden evaluator policy |
 | Locale / calendar / date / search policy | `RuntimeEnvironment::getNullDate()`, `RuntimeEnvironment::getLocaleTag()`, `RuntimeEnvironment::getSearchType()`, `TextCoercion` | `already exposed` | `ScRandom*`, host-sensitive text/search terminals, date/time parsing tails | Locale, null-date, and search-mode policy are now explicit host contracts; deterministic random/system policy is the remaining open decision |
@@ -79,18 +79,18 @@ contracts above rather than an ad hoc `pushLegacy*` inventory.
 | Legacy cluster | Representative surviving surface | Required host-service categories | Contract status summary |
 | --- | --- | --- | --- |
 | Reference / lookup / addressing | `ExecuteLookupTerminal`, `ExecuteXLookupTerminal`, `ExecuteIndirectTerminal`, `ExecuteAddressTerminal`, `ExecuteIndexTerminal`, `ExecuteMultiAreaTerminal`, `ExecuteExternalTerminal`, `ExecuteMissingTerminal`, `ExecuteRangeReferenceTerminal`, `ExecuteUnionTerminal`, `ExecuteIntersectTerminal` | reference resolution, named/external/database range resolution, matrix materialization | Phase 4 moved evaluator-worthy lookup/address logic behind `RangeResolver`; the remaining Calc terminals are explicit host-owned stack/reference glue |
-| DB / criteria / transform | `ScSubTotal`, `ScDBArea`, `ExecuteSortByTerminal`, `ScColRowNameAuto` | criteria/range iteration, named/database range resolution, spill allocation | The major missing contract here is streaming range iteration; spill is defined but not yet the limiting blocker |
+| DB / criteria / transform | `ExecuteSubTotalTerminal`, `ExecuteDBAreaTerminal`, `ExecuteSortByTerminal`, `ExecuteColRowNameAutoTerminal` | criteria/range iteration, named/database range resolution, spill allocation | Phase 7 moved the remaining query/subtotal glue onto explicit terminals now that `RangeIterator` owns production iteration |
 | Cell / metadata / inspection | `ExecuteTypeTerminal`, `ExecuteCellTerminal`, `ExecuteCellExternalTerminal`, `ExecuteCurrentTerminal`, `ExecuteStyleTerminal`, `ExecuteInfoTerminal`, `ExecuteNTerminal` | scalar cell read, formula text/inspection, format/type inspection | Phase 6 moved the remaining inspection/text-search surface onto explicit runtime contracts plus host-owned terminals; the residual Calc logic is terminal glue rather than hidden evaluator policy |
 | Operator / control / stack state | `ExecuteComparisonKernel`, `ExecuteLogicalFoldKernel`, `ExecuteUnaryMatrixOrScalarKernel`, `ExecuteBinaryMathKernel`, `ExecuteLetKernel` | control-flow/interpreter state, matrix materialization, format propagation | Phase 3 already moved this surface into engine-native runtime helpers; no Host-facade gap remains here |
 | Matrix / statistical tails | `ScMatValue`, `ScMatRef`, `ScFrequency`, `ScForecast_Ets`, `ScFourier`, `ScSumXMY2` | matrix materialization, scalar cell read, criteria/range iteration | Matrix materialization is real; iteration and matrix-frame state still limit wider retirement |
 | Random / system-policy | `ScRandom`, `ScRandbetween`, `ScRandArray`, `ScRandomImpl` | locale/calendar/date mode, deterministic system-state policy | Host environment contract exists, but deterministic/random policy still needs an explicit project decision |
 | External computation terminals | `ScMacro`, `ScDde`, `ScWebservice`, `ScFilterXML`, `ScGetPivotData`, `ScHyperLink` | external computation | Intentionally host-owned and outside the engine-native evaluator contract |
 
-### Missing or fragmented contracts that Phase 7+ depend on
+### Missing or fragmented contracts that Phase 8+ depend on
 
-| Contract | Current status | Why it is still needed |
+| Contract | Current status | Why it mattered |
 | --- | --- | --- |
-| `RangeIterator` | `missing` | Required to stop baking iteration into query/materializer helpers and to widen DB / criteria / COUNTBLANK work honestly |
+| `RangeIterator` | `already exposed` | Phase 7 closed the final open query/database host-surface gap; production criteria/countblank iteration now routes through the host contract rather than ad hoc Calc loops |
 
 This matrix is the Phase 2 completion artifact the pivot plan refers to. New
 Host-facing work should extend one of the rows above rather than inventing an
@@ -583,7 +583,7 @@ for every engine admission that needs a cell's visible value.
 
 ## Contracts still pending
 
-### Range iteration primitive (not yet formalized)
+### Range iteration primitive (landed in Phase 7)
 
 **Needed for:**
 
@@ -595,19 +595,18 @@ for every engine admission that needs a cell's visible value.
 - Future streaming aggregates that cannot afford
   materialize-then-fold.
 
-**Current stopgap.** Every range iteration today goes through
-`CriteriaAggregateMaterializer::materialize` (see
+**Current state.** Phase 7 formalized `RangeIterator` on
+`EvaluationHost`, and production query/countblank admissions now
+route their reference scans through
+`CriteriaAggregateMaterializer::iterate` (see
 [`InterpretTailEngineEvaluator.hxx`](../../inc/spreadsheetengine/compat/libreoffice/InterpretTailEngineEvaluator.hxx)
 and
 [`QueryRuntime.hxx`](../../inc/spreadsheetengine/runtime/QueryRuntime.hxx)),
-which takes a `CriteriaAggregateInput` carrying either a scalar, a
-pre-materialized `std::vector<CellValue>`, or a `ResolvedReference`
-with dimensions, and walks it cell-by-cell through
-`readMaterializedHostCellValue`. That pattern works today but is
-not a standalone primitive — iteration is fused into the query
-evaluator.
+which delegates `ResolvedReference` inputs through the host walker
+and falls back to row-major scalar/vector iteration for
+materialized inputs.
 
-**Desired shape (NOT YET LANDED):**
+**Contract.**
 
 ```cpp
 class RangeIterator {
@@ -615,25 +614,22 @@ public:
     virtual ~RangeIterator() = default;
 
     // Visit each cell in `rRange` in row-major order. Returning
-    // `false` from the callback aborts the walk early.
-    virtual void iterateRangeCells(
+    // `false` from the callback aborts the walk early. The host
+    // surfaces invalid ranges through the ValueResult error.
+    virtual ValueResult<bool> iterateRangeCells(
         const CellRange& rRange,
         const std::function<bool(const CellAddress&,
                                  const CellValue&)>& rVisitor) const = 0;
 };
 ```
 
-Equivalently, an `ScCellIterator`-compatible forward walker that the
-compat layer adapts from `dociter.hxx`. Critical requirements: no
-whole-range materialization up front; visits preserve
-`api::CellValue` variants; empty cells are surfaced (not skipped) so
-COUNTBLANK can count them.
-
-**Blocker.** The engine query evaluator currently prefers the
-materialize-whole-range model because it composes cleanly with the
-matrix-arithmetic substrate. A streaming primitive only pays off
-when the aggregate does not need a second pass; the first target is
-COUNTBLANK against whole-column references.
+Critical requirements remain the same: no whole-range
+materialization up front; visits preserve `api::CellValue`
+variants; empty cells are surfaced (not skipped) so COUNTBLANK can
+count them. The LibreOffice `DocumentEvaluationHost` and the
+standalone in-memory host both implement the contract, and the
+query runtime now uses it in production instead of embedding its own
+document walker.
 
 ### Regex / wildcard mode (landed in Phase 6)
 
