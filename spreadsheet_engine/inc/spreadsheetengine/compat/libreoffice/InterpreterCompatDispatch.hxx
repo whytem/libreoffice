@@ -10,15 +10,25 @@
 #pragma once
 
 #include <interpre.hxx>
+#include <jumpmatrix.hxx>
+#include <spreadsheetengine/compat/libreoffice/Date.hxx>
+#include <spreadsheetengine/compat/libreoffice/Error.hxx>
 #include <spreadsheetengine/compat/libreoffice/FormulaInspectionExecution.hxx>
+#include <spreadsheetengine/compat/libreoffice/LookupExecution.hxx>
+#include <spreadsheetengine/compat/libreoffice/String.hxx>
 #include <spreadsheetengine/compat/libreoffice/TextServices.hxx>
 #include <spreadsheetengine/compat/libreoffice/TextParsingExecution.hxx>
+#include <spreadsheetengine/runtime/ForecastEngine.hxx>
+#include <spreadsheetengine/runtime/ForecastEtsEngine.hxx>
+#include <spreadsheetengine/runtime/RpnMatrix.hxx>
 
 namespace spreadsheetengine::compat::libreoffice::interpretercompatdispatch
 {
 
 namespace selibreoffice = spreadsheetengine::compat::libreoffice;
+namespace selookupexec = spreadsheetengine::compat::libreoffice::lookupexecution;
 namespace semath = spreadsheetengine::core::math;
+namespace serpn = spreadsheetengine::core::rpn;
 using namespace formula;
 
 #define SEIC rCalc
@@ -36,8 +46,10 @@ using namespace formula;
 #define MustHaveParamCountMin(...) SEIC.MustHaveParamCountMin(__VA_ARGS__)
 #define MustHaveParamCountMinWithStackCheck(...) SEIC.MustHaveParamCountMinWithStackCheck(__VA_ARGS__)
 #define CalcGetDouble(...) SEIC.GetDouble(__VA_ARGS__)
+#define GetDoubleWithDefault(...) SEIC.GetDoubleWithDefault(__VA_ARGS__)
 #define GetBool(...) SEIC.GetBool(__VA_ARGS__)
 #define GetInt32(...) SEIC.GetInt32(__VA_ARGS__)
+#define IsMissing(...) SEIC.IsMissing(__VA_ARGS__)
 #define GetStackType(...) SEIC.GetStackType(__VA_ARGS__)
 #define PopSingleRef(...) SEIC.PopSingleRef(__VA_ARGS__)
 #define PopDoubleRef(...) SEIC.PopDoubleRef(__VA_ARGS__)
@@ -74,6 +86,95 @@ using namespace formula;
 #define GetFDist(...) SEIC.GetFDist(__VA_ARGS__)
 #define GetTDist(...) SEIC.GetTDist(__VA_ARGS__)
 #define CalculateTrendGrowth(...) SEIC.CalculateTrendGrowth(__VA_ARGS__)
+
+[[nodiscard]] inline std::optional<serpn::MatrixOperand> matrixRefToMatrixOperand(
+    const ScMatrixRef& pMatrix)
+{
+    if (!pMatrix)
+        return std::nullopt;
+
+    SCSIZE nColumns = 0;
+    SCSIZE nRows = 0;
+    pMatrix->GetDimensions(nColumns, nRows);
+
+    serpn::MatrixOperand aOperand;
+    aOperand.maDimensions = { static_cast<spreadsheetengine::api::MatrixSize>(nColumns),
+                              static_cast<spreadsheetengine::api::MatrixSize>(nRows) };
+    aOperand.meProvenance = serpn::MatrixProvenance::MaterializedReference;
+    aOperand.maValues.reserve(static_cast<std::size_t>(nColumns) * nRows);
+    for (SCSIZE nRow = 0; nRow < nRows; ++nRow)
+    {
+        for (SCSIZE nColumn = 0; nColumn < nColumns; ++nColumn)
+            aOperand.maValues.push_back(selookupexec::detail::toApiCellValue(
+                pMatrix->Get(nColumn, nRow)));
+    }
+    return aOperand;
+}
+
+inline void putScalarIntoMatrix(
+    const spreadsheetengine::api::CellValue& rValue, const ScMatrixRef& pMatrix,
+    SCSIZE nColumn, SCSIZE nRow)
+{
+    if (rValue.isError())
+        pMatrix->PutError(selibreoffice::toFormulaError(rValue.meError), nColumn, nRow);
+    else if (rValue.isText())
+        pMatrix->PutString(svl::SharedString(selibreoffice::toLibreOfficeString(rValue.maString)),
+            nColumn, nRow);
+    else if (rValue.isBoolean())
+        pMatrix->PutBoolean(rValue.mfNumber != 0.0, nColumn, nRow);
+    else if (rValue.isNumber())
+        pMatrix->PutDouble(rValue.mfNumber, nColumn, nRow);
+    else
+        pMatrix->PutEmpty(nColumn, nRow);
+}
+
+[[nodiscard]] inline ScMatrixRef matrixOperandToMatrixRef(const serpn::MatrixOperand& rOperand)
+{
+    ScMatrixRef xMatrix(new ScMatrix(static_cast<SCSIZE>(rOperand.maDimensions.mnColumns),
+        static_cast<SCSIZE>(rOperand.maDimensions.mnRows)));
+    for (SCSIZE nRow = 0; nRow < static_cast<SCSIZE>(rOperand.maDimensions.mnRows); ++nRow)
+    {
+        for (SCSIZE nColumn = 0; nColumn < static_cast<SCSIZE>(rOperand.maDimensions.mnColumns);
+             ++nColumn)
+        {
+            const std::size_t nIndex
+                = static_cast<std::size_t>(nRow) * rOperand.maDimensions.mnColumns + nColumn;
+            putScalarIntoMatrix(rOperand.maValues[nIndex], xMatrix, nColumn, nRow);
+        }
+    }
+    return xMatrix;
+}
+
+[[nodiscard]] inline serpn::MatrixOperand makeScalarMatrixOperand(double fValue)
+{
+    serpn::MatrixOperand aOperand;
+    aOperand.maDimensions = { 1, 1 };
+    aOperand.meProvenance = serpn::MatrixProvenance::ComputedResult;
+    aOperand.maValues.push_back(spreadsheetengine::api::CellValue::number(fValue));
+    return aOperand;
+}
+
+[[nodiscard]] constexpr serpn::ForecastEtsVariant toForecastEtsVariant(ScETSType eType)
+{
+    switch (eType)
+    {
+        case etsAdd:
+            return serpn::ForecastEtsVariant::Add;
+        case etsMult:
+            return serpn::ForecastEtsVariant::Mult;
+        case etsSeason:
+            return serpn::ForecastEtsVariant::Seasonality;
+        case etsPIAdd:
+            return serpn::ForecastEtsVariant::PIAdd;
+        case etsPIMult:
+            return serpn::ForecastEtsVariant::PIMult;
+        case etsStatAdd:
+            return serpn::ForecastEtsVariant::StatAdd;
+        case etsStatMult:
+            return serpn::ForecastEtsVariant::StatMult;
+    }
+    return serpn::ForecastEtsVariant::Add;
+}
 
 struct Dispatcher
 {
@@ -1428,6 +1529,9 @@ struct Dispatcher
     static void aggregateStDev(ScInterpreter& rCalc, bool bTextAsZero);
     static void aggregateStDevP(ScInterpreter& rCalc, bool bTextAsZero);
     static void matrixDeterminant(ScInterpreter& rCalc);
+    static void matrixSumXMY2(ScInterpreter& rCalc);
+    static void matrixFrequency(ScInterpreter& rCalc);
+    static void fourier(ScInterpreter& rCalc);
     static void aggregateFunction(ScInterpreter& rCalc);
     static void subtotalFunction(ScInterpreter& rCalc);
     static void probability(ScInterpreter& rCalc);
@@ -1436,6 +1540,7 @@ struct Dispatcher
     static void fTest(ScInterpreter& rCalc);
     static void chiTest(ScInterpreter& rCalc);
     static void forecast(ScInterpreter& rCalc);
+    static void forecastEts(ScInterpreter& rCalc, ScETSType eETSType);
     static void growth(ScInterpreter& rCalc) { CalculateTrendGrowth(true); }
 };
 
@@ -1872,6 +1977,143 @@ inline void Dispatcher::matrixDeterminant(ScInterpreter& rCalc)
         PushError(selibreoffice::toFormulaError(aDeterminant.meError));
     else
         PushDouble(aDeterminant.maValue);
+}
+
+inline void Dispatcher::matrixSumXMY2(ScInterpreter& rCalc)
+{
+    if (!MustHaveParamCount(GetByte(), 2))
+        return;
+
+    ScMatrixRef pRight = GetMatrix();
+    ScMatrixRef pLeft = GetMatrix();
+    if (!pRight || !pLeft)
+    {
+        PushIllegalParameter();
+        return;
+    }
+
+    const auto oLeft = matrixRefToMatrixOperand(pLeft);
+    const auto oRight = matrixRefToMatrixOperand(pRight);
+    if (!oLeft || !oRight)
+    {
+        PushIllegalParameter();
+        return;
+    }
+
+    const auto aResult
+        = serpn::planSumReductionPair(serpn::SumReductionKind::SumXMinusY2, *oLeft, *oRight);
+    if (!aResult)
+    {
+        if (aResult.meError == spreadsheetengine::api::Error::IllegalArgument
+            || aResult.meError == spreadsheetengine::api::Error::NoValue)
+        {
+            PushNoValue();
+            return;
+        }
+        PushError(selibreoffice::toFormulaError(aResult.meError));
+        return;
+    }
+    PushDouble(aResult.maValue);
+}
+
+inline void Dispatcher::matrixFrequency(ScInterpreter& rCalc)
+{
+    if (!MustHaveParamCount(GetByte(), 2))
+        return;
+
+    ScMatrixRef pBins = GetMatrix();
+    ScMatrixRef pData = GetMatrix();
+    if (!pBins || !pData)
+    {
+        PushIllegalParameter();
+        return;
+    }
+
+    const auto oBins = matrixRefToMatrixOperand(pBins);
+    const auto oData = matrixRefToMatrixOperand(pData);
+    if (!oBins || !oData)
+    {
+        PushIllegalParameter();
+        return;
+    }
+
+    const auto aResult = serpn::planFrequency(*oData, *oBins);
+    if (!aResult)
+    {
+        if (aResult.meError == spreadsheetengine::api::Error::NoValue)
+        {
+            PushNoValue();
+            return;
+        }
+        PushError(selibreoffice::toFormulaError(aResult.meError));
+        return;
+    }
+    PushMatrix(matrixOperandToMatrixRef(aResult.maValue));
+}
+
+inline void Dispatcher::fourier(ScInterpreter& rCalc)
+{
+    sal_uInt8 nParamCount = GetByte();
+    if (!MustHaveParamCount(nParamCount, 2, 5))
+        return;
+
+    bool bInverse = false;
+    bool bPolar = false;
+    double fMinMag = 0.0;
+
+    if (nParamCount == 5)
+    {
+        if (IsMissing())
+            Pop();
+        else
+            fMinMag = CalcGetDouble();
+    }
+
+    if (nParamCount >= 4)
+    {
+        if (IsMissing())
+            Pop();
+        else
+            bPolar = GetBool();
+    }
+
+    if (nParamCount >= 3)
+    {
+        if (IsMissing())
+            Pop();
+        else
+            bInverse = GetBool();
+    }
+
+    const bool bGroupedByColumn = GetBool();
+
+    ScMatrixRef pInput = GetMatrix();
+    if (!pInput)
+    {
+        PushIllegalParameter();
+        return;
+    }
+
+    const auto oInput = matrixRefToMatrixOperand(pInput);
+    if (!oInput)
+    {
+        PushIllegalParameter();
+        return;
+    }
+
+    const auto aResult = serpn::planFourier(
+        *oInput, bGroupedByColumn, bInverse, bPolar, fMinMag);
+    if (!aResult)
+    {
+        if (aResult.meError == spreadsheetengine::api::Error::NoValue)
+        {
+            PushNoValue();
+            return;
+        }
+        PushError(selibreoffice::toFormulaError(aResult.meError));
+        return;
+    }
+    PushMatrix(matrixOperandToMatrixRef(aResult.maValue.maMatrix));
 }
 
 inline void Dispatcher::aggregateFunction(ScInterpreter& rCalc)
@@ -2550,6 +2792,136 @@ inline void Dispatcher::forecast(ScInterpreter& rCalc)
             fMeanY + fSumDeltaXDeltaY.get() / fSumSqrDeltaX.get() * (fVal - fMeanX));
 }
 
+inline void Dispatcher::forecastEts(ScInterpreter& rCalc, ScETSType eETSType)
+{
+    sal_uInt8 nParamCount = GetByte();
+    switch (eETSType)
+    {
+        case etsAdd:
+        case etsMult:
+        case etsStatAdd:
+        case etsStatMult:
+            if (!MustHaveParamCount(nParamCount, 3, 6))
+                return;
+            break;
+        case etsPIAdd:
+        case etsPIMult:
+            if (!MustHaveParamCount(nParamCount, 3, 7))
+                return;
+            break;
+        case etsSeason:
+            if (!MustHaveParamCount(nParamCount, 2, 4))
+                return;
+            break;
+    }
+
+    serpn::MatrixOperand aAggregation;
+    serpn::MatrixOperand aDataCompletion;
+    serpn::MatrixOperand aSeasonality;
+    serpn::MatrixOperand aConfidence;
+    serpn::MatrixOperand* pAggregation = nullptr;
+    serpn::MatrixOperand* pDataCompletion = nullptr;
+    serpn::MatrixOperand* pSeasonality = nullptr;
+    serpn::MatrixOperand* pConfidence = nullptr;
+
+    if ((nParamCount == 6 && eETSType != etsPIAdd && eETSType != etsPIMult)
+        || (nParamCount == 4 && eETSType == etsSeason) || nParamCount == 7)
+    {
+        aAggregation = makeScalarMatrixOperand(GetDoubleWithDefault(1.0));
+        pAggregation = &aAggregation;
+    }
+
+    if ((nParamCount >= 5 && eETSType != etsPIAdd && eETSType != etsPIMult)
+        || (nParamCount >= 3 && eETSType == etsSeason)
+        || (nParamCount >= 6 && (eETSType == etsPIAdd || eETSType == etsPIMult)))
+    {
+        aDataCompletion = makeScalarMatrixOperand(GetDoubleWithDefault(1.0));
+        pDataCompletion = &aDataCompletion;
+    }
+
+    if (((nParamCount >= 4 && eETSType != etsPIAdd && eETSType != etsPIMult)
+         || (nParamCount >= 5 && (eETSType == etsPIAdd || eETSType == etsPIMult)))
+        && eETSType != etsSeason)
+    {
+        aSeasonality = makeScalarMatrixOperand(GetDoubleWithDefault(1.0));
+        pSeasonality = &aSeasonality;
+    }
+
+    if (eETSType == etsPIAdd || eETSType == etsPIMult)
+    {
+        aConfidence
+            = makeScalarMatrixOperand(nParamCount < 4 ? 0.95 : GetDoubleWithDefault(0.95));
+        pConfidence = &aConfidence;
+    }
+
+    ScMatrixRef pTargetOrType;
+    if (eETSType == etsStatAdd || eETSType == etsStatMult)
+    {
+        pTargetOrType = GetMatrix();
+        if (!pTargetOrType)
+        {
+            PushIllegalParameter();
+            return;
+        }
+    }
+
+    ScMatrixRef pKnownX = GetMatrix();
+    ScMatrixRef pKnownY = GetMatrix();
+    if (!pKnownX || !pKnownY)
+    {
+        PushIllegalParameter();
+        return;
+    }
+
+    if (eETSType != etsStatAdd && eETSType != etsStatMult && eETSType != etsSeason)
+    {
+        pTargetOrType = GetMatrix();
+        if (!pTargetOrType)
+        {
+            PushIllegalArgument();
+            return;
+        }
+    }
+
+    const auto oKnownX = matrixRefToMatrixOperand(pKnownX);
+    const auto oKnownY = matrixRefToMatrixOperand(pKnownY);
+    if (!oKnownX || !oKnownY)
+    {
+        PushIllegalParameter();
+        return;
+    }
+
+    serpn::MatrixOperand aTargetOrType;
+    if (pTargetOrType)
+    {
+        const auto oTargetOrType = matrixRefToMatrixOperand(pTargetOrType);
+        if (!oTargetOrType)
+        {
+            PushIllegalParameter();
+            return;
+        }
+        aTargetOrType = *oTargetOrType;
+    }
+
+    const auto aResult = serpn::planForecastEts(
+        toForecastEtsVariant(eETSType), selibreoffice::toApiDateParts(mrContext.NFGetNullDate()),
+        aTargetOrType,
+        *oKnownY, *oKnownX, pConfidence, pSeasonality, pDataCompletion, pAggregation);
+    if (!aResult)
+    {
+        PushError(selibreoffice::toFormulaError(aResult.meError));
+        return;
+    }
+
+    if (aResult.maValue.mbIsScalar)
+    {
+        PushDouble(aResult.maValue.mfScalar);
+        return;
+    }
+
+    PushMatrix(matrixOperandToMatrixRef(aResult.maValue.maMatrix));
+}
+
 } // namespace spreadsheetengine::compat::libreoffice::interpretercompatdispatch
 
 #undef SEIC
@@ -2567,8 +2939,10 @@ inline void Dispatcher::forecast(ScInterpreter& rCalc)
 #undef MustHaveParamCountMin
 #undef MustHaveParamCountMinWithStackCheck
 #undef CalcGetDouble
+#undef GetDoubleWithDefault
 #undef GetBool
 #undef GetInt32
+#undef IsMissing
 #undef GetStackType
 #undef PopSingleRef
 #undef PopDoubleRef

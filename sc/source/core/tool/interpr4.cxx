@@ -13074,7 +13074,7 @@ StackVar ScInterpreter::Interpret()
                         break;
                     case ocSumX2MY2         : CalculateSumX2MY2SumX2DY2(false); break;
                     case ocSumX2DY2         : CalculateSumX2MY2SumX2DY2(true);  break;
-                    case ocSumXMY2          : ScSumXMY2();                  break;
+                    case ocSumXMY2          : ExecuteSumXMY2Terminal();     break;
                     case ocRawSubtract      :
                     {
                         warnIfLegacyDefaultOnReached(
@@ -14398,7 +14398,7 @@ StackVar ScInterpreter::Interpret()
                             });
                     }
                     break;
-                    case ocMatValue         : ScMatValue();                 break;
+                    case ocMatValue         : ExecuteMatValueTerminal();    break;
                     case ocMatrixUnit       :
                         dispatchIdentityMatrix();
                         break;
@@ -14423,7 +14423,7 @@ StackVar ScInterpreter::Interpret()
                     case ocMatTrans         :
                         dispatchTranspose();
                         break;
-                    case ocMatRef           : ScMatRef();                   break;
+                    case ocMatRef           : ExecuteMatRefTerminal();      break;
                     case ocB:
                     {
                         warnIfLegacyStatisticalDistributionReached(u"BINOMDIST");
@@ -14859,7 +14859,7 @@ StackVar ScInterpreter::Interpret()
                         break;
                     case ocLarge            : CalculateSmallLarge(false); break;
                     case ocSmall            : CalculateSmallLarge(true);  break;
-                    case ocFrequency        : ScFrequency();            break;
+                    case ocFrequency        : ExecuteFrequencyTerminal();   break;
                     case ocQuartile         :
                     case ocQuartile_Inc:
                         warnIfLegacyStatisticalDistributionReached(u"QUARTILE.INC");
@@ -14958,13 +14958,13 @@ StackVar ScInterpreter::Interpret()
                         warnIfLegacyStatisticalDistributionReached(u"FORECAST");
                         seinterpcompatdispatch::Dispatcher::forecast(*this);
                         break;
-                    case ocForecast_ETS_ADD : ScForecast_Ets( etsAdd );       break;
-                    case ocForecast_ETS_SEA : ScForecast_Ets( etsSeason );    break;
-                    case ocForecast_ETS_MUL : ScForecast_Ets( etsMult );      break;
-                    case ocForecast_ETS_PIA : ScForecast_Ets( etsPIAdd );     break;
-                    case ocForecast_ETS_PIM : ScForecast_Ets( etsPIMult );    break;
-                    case ocForecast_ETS_STA : ScForecast_Ets( etsStatAdd );   break;
-                    case ocForecast_ETS_STM : ScForecast_Ets( etsStatMult );  break;
+                    case ocForecast_ETS_ADD : ExecuteForecastEtsTerminal( etsAdd );      break;
+                    case ocForecast_ETS_SEA : ExecuteForecastEtsTerminal( etsSeason );   break;
+                    case ocForecast_ETS_MUL : ExecuteForecastEtsTerminal( etsMult );     break;
+                    case ocForecast_ETS_PIA : ExecuteForecastEtsTerminal( etsPIAdd );    break;
+                    case ocForecast_ETS_PIM : ExecuteForecastEtsTerminal( etsPIMult );   break;
+                    case ocForecast_ETS_STA : ExecuteForecastEtsTerminal( etsStatAdd );  break;
+                    case ocForecast_ETS_STM : ExecuteForecastEtsTerminal( etsStatMult ); break;
                     case ocGammaLn          :
                     case ocGammaLn_MS       :
                         warnIfLegacyStatisticalDistributionReached(u"GAMMALN");
@@ -15152,7 +15152,7 @@ StackVar ScInterpreter::Interpret()
                     break;
                     case ocFourier:
                         warnIfLegacyMatrixMathReached(u"ORG.LIBREOFFICE.FOURIER");
-                        ScFourier();
+                        ExecuteFourierTerminal();
                         break;
                     case ocExternal         : ExecuteExternalTerminal();    break;
                     case ocTableOp          : ScTableOp();                  break;

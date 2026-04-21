@@ -3614,6 +3614,53 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorForecastHe
     CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::StatisticalDistribution, aInvalid.meFunction);
     CPPUNIT_ASSERT_EQUAL(
         spreadsheetengine::api::formulavalue::ValueType::Error, aInvalid.maResult.meType);
+
+    for (SCROW nRow = 0; nRow < 6; ++nRow)
+    {
+        m_pDoc->SetValue(3, nRow, 0, (nRow % 2 == 0) ? 2.0 : 4.0);
+        m_pDoc->SetValue(4, nRow, 0, static_cast<double>(nRow + 1));
+    }
+
+    const OUString aEtsAddFormula = u"=FORECAST.ETS(7;D1:D6;E1:E6;2;1;1)"_ustr;
+    const OUString aEtsMultFormula
+        = u"=ORG.LIBREOFFICE.FORECAST.ETS.MULT(7;D1:D6;E1:E6;2;1;1)"_ustr;
+    const OUString aEtsSeasonalityFormula
+        = u"=FORECAST.ETS.SEASONALITY(D1:D6;E1:E6;1;1)"_ustr;
+
+    m_pDoc->SetString(6, 7, 0, aEtsAddFormula);
+    m_pDoc->SetString(7, 7, 0, aEtsMultFormula);
+    m_pDoc->SetString(8, 7, 0, aEtsSeasonalityFormula);
+
+    const auto aEtsAdd = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=FORECAST.ETS(7;D1:D6;E1:E6;2;1;1)", false);
+    CPPUNIT_ASSERT(aEtsAdd.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::GrowthProjection, aEtsAdd.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aEtsAdd.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(
+        m_pDoc->GetValue(6, 7, 0), aEtsAdd.maResult.mfValue, 1e-9);
+
+    const auto aEtsMult = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos,
+        u"=ORG.LIBREOFFICE.FORECAST.ETS.MULT(7;D1:D6;E1:E6;2;1;1)", false);
+    CPPUNIT_ASSERT(aEtsMult.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::GrowthProjection, aEtsMult.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aEtsMult.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(
+        m_pDoc->GetValue(7, 7, 0), aEtsMult.maResult.mfValue, 1e-9);
+
+    const auto aEtsSeasonality = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=FORECAST.ETS.SEASONALITY(D1:D6;E1:E6;1;1)", false);
+    CPPUNIT_ASSERT(aEtsSeasonality.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::GrowthProjection,
+        aEtsSeasonality.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value,
+        aEtsSeasonality.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aEtsSeasonality.maResult.mfValue, 1e-12);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(
+        m_pDoc->GetValue(8, 7, 0), aEtsSeasonality.maResult.mfValue, 1e-12);
 }
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorCriteriaAggregateHelper)
@@ -3853,6 +3900,7 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorMatrixMath
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
 
     CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=MDETERM(A1:B2)"));
+    CPPUNIT_ASSERT(setaileval::isFamilyLocalDefaultOnFormula(u"=FREQUENCY(A3:A6;B3:B4)"));
     CPPUNIT_ASSERT(!setaileval::isFamilyLocalDefaultOnFormula(u"=MMULT(A1:B2;C1:D2)"));
 
     sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
@@ -3879,6 +3927,48 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorMatrixMath
     CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MatrixMath, aInvalid.meFunction);
     CPPUNIT_ASSERT_EQUAL(
         spreadsheetengine::api::formulavalue::ValueType::Error, aInvalid.maResult.meType);
+
+    m_pDoc->SetValue(0, 2, 0, 1.0);
+    m_pDoc->SetValue(0, 3, 0, 2.0);
+    m_pDoc->SetValue(0, 4, 0, 3.0);
+    m_pDoc->SetValue(0, 5, 0, 4.0);
+    m_pDoc->SetValue(1, 2, 0, 2.0);
+    m_pDoc->SetValue(1, 3, 0, 3.0);
+
+    const auto aSumXMy2 = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=SUMXMY2(A3:A6;{2|3|4|5})", false);
+    CPPUNIT_ASSERT(aSumXMy2.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::NumericAggregate, aSumXMy2.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aSumXMy2.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(4.0, aSumXMy2.maResult.mfValue, 1e-12);
+
+    const auto aFrequencyScalar = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=FREQUENCY(A3:A6;B3:B4)", false);
+    CPPUNIT_ASSERT(aFrequencyScalar.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MatrixMath, aFrequencyScalar.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value,
+        aFrequencyScalar.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aFrequencyScalar.maResult.mfValue, 1e-12);
+
+    ScMarkData aMark(m_pDoc->GetSheetLimits());
+    aMark.SelectOneTable(0);
+    m_pDoc->InsertMatrixFormula(5, 0, 5, 2, aMark, u"=FREQUENCY(A3:A6;B3:B4)"_ustr);
+
+    const auto aFrequencyMatrix = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=FREQUENCY(A3:A6;B3:B4)", false, nullptr, {}, true);
+    CPPUNIT_ASSERT(aFrequencyMatrix.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::MatrixMath, aFrequencyMatrix.meFunction);
+    CPPUNIT_ASSERT(aFrequencyMatrix.hasMatrixResult());
+    CPPUNIT_ASSERT_EQUAL(static_cast<SCSIZE>(1), aFrequencyMatrix.mnMatrixColumns);
+    CPPUNIT_ASSERT_EQUAL(static_cast<SCSIZE>(3), aFrequencyMatrix.mnMatrixRows);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aFrequencyMatrix.mpMatrixResult->Get(0, 0).fVal, 1e-12);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, aFrequencyMatrix.mpMatrixResult->Get(0, 1).fVal, 1e-12);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, aFrequencyMatrix.mpMatrixResult->Get(0, 2).fVal, 1e-12);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(5, 0, 0), 1e-12);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(5, 1, 0), 1e-12);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(5, 2, 0), 1e-12);
 }
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorConditionalHelper)

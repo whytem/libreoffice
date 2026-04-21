@@ -427,6 +427,95 @@ enum class SumReductionKind : std::uint8_t
     return RpnCoercionResult<double>::success(fSum);
 }
 
+// FREQUENCY(data, bins): sort both numeric input streams, count how many
+// values fall into each bin threshold, and return a single-column matrix
+// with one extra overflow row.
+[[nodiscard]] inline RpnCoercionResult<MatrixOperand> planFrequency(
+    const MatrixOperand& rData, const MatrixOperand& rBins)
+{
+    auto collectSortedNumbers = [](const MatrixOperand& rSource, bool bTrackIndexOrder,
+                                   std::vector<double>& rValues,
+                                   std::vector<std::size_t>& rIndexOrder)
+        -> api::ValueResult<bool> {
+        rValues.clear();
+        rIndexOrder.clear();
+
+        for (std::size_t i = 0; i < rSource.maValues.size(); ++i)
+        {
+            const auto& rValue = rSource.maValues[i];
+            if (rValue.meKind == api::CellValueKind::Error)
+                return api::ValueResult<bool>::failure(api::Error::NoValue);
+
+            if (rValue.meKind != api::CellValueKind::Number
+                && rValue.meKind != api::CellValueKind::Boolean)
+            {
+                continue;
+            }
+
+            rValues.push_back(rValue.mfNumber);
+            if (bTrackIndexOrder)
+                rIndexOrder.push_back(rValues.size() - 1);
+        }
+
+        if (rValues.empty())
+            return api::ValueResult<bool>::failure(api::Error::NoValue);
+
+        if (bTrackIndexOrder)
+        {
+            std::sort(rIndexOrder.begin(), rIndexOrder.end(),
+                [&](std::size_t nLeft, std::size_t nRight) {
+                    return rValues[nLeft] < rValues[nRight];
+                });
+            std::vector<double> aSortedValues;
+            aSortedValues.reserve(rValues.size());
+            for (std::size_t nIndex : rIndexOrder)
+                aSortedValues.push_back(rValues[nIndex]);
+            rValues = std::move(aSortedValues);
+        }
+        else
+        {
+            std::sort(rValues.begin(), rValues.end());
+        }
+
+        return api::ValueResult<bool>::success(true);
+    };
+
+    if (rData.isEmpty() || rBins.isEmpty())
+        return RpnCoercionResult<MatrixOperand>::failure(api::Error::NoValue);
+
+    std::vector<double> aDataValues;
+    std::vector<double> aBinValues;
+    std::vector<std::size_t> aBinIndexOrder;
+    std::vector<std::size_t> aUnusedIndexOrder;
+    const auto aBinsOk = collectSortedNumbers(rBins, true, aBinValues, aBinIndexOrder);
+    if (!aBinsOk)
+        return RpnCoercionResult<MatrixOperand>::failure(aBinsOk.meError);
+    const auto aDataOk = collectSortedNumbers(rData, false, aDataValues, aUnusedIndexOrder);
+    if (!aDataOk)
+        return RpnCoercionResult<MatrixOperand>::failure(aDataOk.meError);
+
+    MatrixOperand aResult;
+    aResult.maDimensions = { 1, static_cast<api::MatrixSize>(aBinValues.size() + 1) };
+    aResult.maValues.assign(aBinValues.size() + 1, api::CellValue::number(0.0));
+    aResult.meProvenance = MatrixProvenance::ComputedResult;
+
+    std::size_t nDataIndex = 0;
+    for (std::size_t nBin = 0; nBin < aBinValues.size(); ++nBin)
+    {
+        std::size_t nCount = 0;
+        while (nDataIndex < aDataValues.size() && aDataValues[nDataIndex] <= aBinValues[nBin])
+        {
+            ++nCount;
+            ++nDataIndex;
+        }
+        aResult.maValues[aBinIndexOrder[nBin]] = api::CellValue::number(static_cast<double>(nCount));
+    }
+    aResult.maValues.back()
+        = api::CellValue::number(static_cast<double>(aDataValues.size() - nDataIndex));
+
+    return RpnCoercionResult<MatrixOperand>::success(aResult);
+}
+
 } // namespace spreadsheetengine::core::rpn
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

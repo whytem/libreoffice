@@ -70,6 +70,7 @@
 #include <spreadsheetengine/runtime/KahanSum.hxx>
 #include <spreadsheetengine/runtime/ConversionRuntime.hxx>
 #include <spreadsheetengine/runtime/ForecastEngine.hxx>
+#include <spreadsheetengine/runtime/ForecastEtsEngine.hxx>
 #include <spreadsheetengine/runtime/NumeralConversion.hxx>
 #include <spreadsheetengine/runtime/LinestEngine.hxx>
 #include <spreadsheetengine/runtime/MathAggregate.hxx>
@@ -1060,10 +1061,22 @@ classifyImportedStoredHostTruthFunction(api::StringView rFunctionName)
     {
         return FunctionKind::StatisticalDistribution;
     }
-    if (rFunctionName == u"ORG.LIBREOFFICE.FORECAST.ETS.MULT"
+    if (rFunctionName == u"GROWTH" || rFunctionName == u"TREND"
+        || rFunctionName == u"LINEST" || rFunctionName == u"LOGEST"
+        || rFunctionName == u"FORECAST.ETS" || rFunctionName == u"FORECAST.ETS.ADD"
+        || rFunctionName == u"FORECAST.ETS.MULT"
+        || rFunctionName == u"FORECAST.ETS.PI.ADD"
+        || rFunctionName == u"FORECAST.ETS.PI.MULT"
+        || rFunctionName == u"FORECAST.ETS.SEASONALITY"
+        || rFunctionName == u"FORECAST.ETS.STAT.ADD"
+        || rFunctionName == u"FORECAST.ETS.STAT.MULT"
+        || rFunctionName == u"ORG.LIBREOFFICE.FORECAST.ETS.MULT"
+        || rFunctionName == u"ORG.LIBREOFFICE.FORECAST.ETS.PI.MULT"
+        || rFunctionName == u"ORG.LIBREOFFICE.FORECAST.ETS.STAT.MULT"
         || rFunctionName == u"COM.MICROSOFT.FORECAST.ETS"
-        || rFunctionName == u"GROWTH" || rFunctionName == u"TREND"
-        || rFunctionName == u"LINEST" || rFunctionName == u"LOGEST")
+        || rFunctionName == u"COM.MICROSOFT.FORECAST.ETS.CONFINT"
+        || rFunctionName == u"COM.MICROSOFT.FORECAST.ETS.SEASONALITY"
+        || rFunctionName == u"COM.MICROSOFT.FORECAST.ETS.STAT")
         return FunctionKind::GrowthProjection;
     if (rFunctionName == u"YEARFRAC" || rFunctionName == u"DAYS360")
         return FunctionKind::DateDifference;
@@ -1310,7 +1323,21 @@ classifyImportedStoredHostTruthFunction(api::StringView rFunctionName)
         return FunctionKind::StatisticalDistribution;
     }
     if (rFunctionName == u"GROWTH" || rFunctionName == u"LINEST"
-        || rFunctionName == u"LOGEST" || rFunctionName == u"TREND")
+        || rFunctionName == u"LOGEST" || rFunctionName == u"TREND"
+        || rFunctionName == u"FORECAST.ETS" || rFunctionName == u"FORECAST.ETS.ADD"
+        || rFunctionName == u"FORECAST.ETS.MULT"
+        || rFunctionName == u"FORECAST.ETS.PI.ADD"
+        || rFunctionName == u"FORECAST.ETS.PI.MULT"
+        || rFunctionName == u"FORECAST.ETS.SEASONALITY"
+        || rFunctionName == u"FORECAST.ETS.STAT.ADD"
+        || rFunctionName == u"FORECAST.ETS.STAT.MULT"
+        || rFunctionName == u"COM.MICROSOFT.FORECAST.ETS"
+        || rFunctionName == u"COM.MICROSOFT.FORECAST.ETS.CONFINT"
+        || rFunctionName == u"COM.MICROSOFT.FORECAST.ETS.SEASONALITY"
+        || rFunctionName == u"COM.MICROSOFT.FORECAST.ETS.STAT"
+        || rFunctionName == u"ORG.LIBREOFFICE.FORECAST.ETS.MULT"
+        || rFunctionName == u"ORG.LIBREOFFICE.FORECAST.ETS.PI.MULT"
+        || rFunctionName == u"ORG.LIBREOFFICE.FORECAST.ETS.STAT.MULT")
         return FunctionKind::GrowthProjection;
     if (rFunctionName == u"ORG.LIBREOFFICE.FOURIER")
     {
@@ -5260,8 +5287,47 @@ materializeGrowthProjectionMatrixFunctionCall(
     namespace serpn = spreadsheetengine::core::rpn;
 
     const api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
+    auto makeScalarOperand = [](double fValue) {
+        serpn::MatrixOperand aOperand;
+        aOperand.maDimensions = { 1, 1 };
+        aOperand.meProvenance = serpn::MatrixProvenance::ComputedResult;
+        aOperand.maValues.push_back(api::CellValue::number(fValue));
+        return aOperand;
+    };
+    const auto oForecastEtsVariant = [&]() -> std::optional<serpn::ForecastEtsVariant> {
+        if (aFunctionName == u"FORECAST.ETS" || aFunctionName == u"FORECAST.ETS.MULT"
+            || aFunctionName == u"COM.MICROSOFT.FORECAST.ETS"
+            || aFunctionName == u"ORG.LIBREOFFICE.FORECAST.ETS.MULT")
+        {
+            return serpn::ForecastEtsVariant::Mult;
+        }
+        if (aFunctionName == u"FORECAST.ETS.ADD")
+            return serpn::ForecastEtsVariant::Add;
+        if (aFunctionName == u"FORECAST.ETS.PI.ADD")
+            return serpn::ForecastEtsVariant::PIAdd;
+        if (aFunctionName == u"FORECAST.ETS.PI.MULT"
+            || aFunctionName == u"COM.MICROSOFT.FORECAST.ETS.CONFINT"
+            || aFunctionName == u"ORG.LIBREOFFICE.FORECAST.ETS.PI.MULT")
+        {
+            return serpn::ForecastEtsVariant::PIMult;
+        }
+        if (aFunctionName == u"FORECAST.ETS.SEASONALITY"
+            || aFunctionName == u"COM.MICROSOFT.FORECAST.ETS.SEASONALITY")
+        {
+            return serpn::ForecastEtsVariant::Seasonality;
+        }
+        if (aFunctionName == u"FORECAST.ETS.STAT.ADD")
+            return serpn::ForecastEtsVariant::StatAdd;
+        if (aFunctionName == u"FORECAST.ETS.STAT.MULT"
+            || aFunctionName == u"COM.MICROSOFT.FORECAST.ETS.STAT"
+            || aFunctionName == u"ORG.LIBREOFFICE.FORECAST.ETS.STAT.MULT")
+        {
+            return serpn::ForecastEtsVariant::StatMult;
+        }
+        return std::nullopt;
+    }();
     if (aFunctionName != u"GROWTH" && aFunctionName != u"TREND" && aFunctionName != u"LINEST"
-        && aFunctionName != u"LOGEST")
+        && aFunctionName != u"LOGEST" && !oForecastEtsVariant)
     {
         return makeUnsupportedMaterialization<serpn::MatrixOperand>(
             FallbackReason::UnsupportedFunction);
@@ -5280,8 +5346,27 @@ materializeGrowthProjectionMatrixFunctionCall(
             return makeMaterializedError<std::optional<serpn::MatrixOperand>>(aOperand.meError);
         return makeMaterializedValue(std::optional<serpn::MatrixOperand> { *aOperand.moValue });
     };
+    const auto materializeOptionalScalarOperand = [&](const core::formula::Node* pArgument)
+        -> Materialization<std::optional<serpn::MatrixOperand>> {
+        if (!pArgument || pArgument->meKind == core::formula::NodeKind::EmptyArgument)
+            return makeMaterializedValue(std::optional<serpn::MatrixOperand> {});
 
-    if (rNode.maChildren.empty() || rNode.maChildren.size() > 4)
+        const auto aScalar
+            = materializeScalarizedReferenceValueNode(*pArgument, rDoc, rContext, rFormulaPos);
+        if (!aScalar.mbSupported)
+            return makeUnsupportedMaterialization<std::optional<serpn::MatrixOperand>>(
+                aScalar.meFallbackReason);
+        if (!aScalar.moValue)
+            return makeMaterializedError<std::optional<serpn::MatrixOperand>>(aScalar.meError);
+
+        const auto aNumber = coerceScalarToNumber(rDoc, rContext, *aScalar.moValue);
+        if (!aNumber)
+            return makeMaterializedError<std::optional<serpn::MatrixOperand>>(aNumber.meError);
+        return makeMaterializedValue(
+            std::optional<serpn::MatrixOperand> { makeScalarOperand(aNumber.maValue) });
+    };
+
+    if (rNode.maChildren.empty() || rNode.maChildren.size() > 7)
     {
         return makeMaterializedValue(
             *matrixRefToMatrixOperand(makeSingleValueMatrix(api::CellValue::error(
@@ -5336,6 +5421,104 @@ materializeGrowthProjectionMatrixFunctionCall(
             return makeMaterializedValue(*matrixRefToMatrixOperand(makeSingleValueMatrix(
                 api::CellValue::error(aPlan.meError))));
         }
+        return makeMaterializedValue(aPlan.maValue.maMatrix);
+    }
+
+    if (oForecastEtsVariant)
+    {
+        const auto eVariant = *oForecastEtsVariant;
+        const bool bSeasonality = eVariant == serpn::ForecastEtsVariant::Seasonality;
+        const bool bPi = eVariant == serpn::ForecastEtsVariant::PIAdd
+                         || eVariant == serpn::ForecastEtsVariant::PIMult;
+
+        const std::size_t nMinArgs = bSeasonality ? 2 : 3;
+        const std::size_t nMaxArgs = bPi ? 7 : (bSeasonality ? 4 : 6);
+        if (rNode.maChildren.size() < nMinArgs || rNode.maChildren.size() > nMaxArgs)
+        {
+            return makeMaterializedValue(*matrixRefToMatrixOperand(makeSingleValueMatrix(
+                api::CellValue::error(api::Error::IllegalArgument))));
+        }
+
+        std::size_t nIndex = 0;
+        std::optional<serpn::MatrixOperand> oTargetOrType;
+        if (!bSeasonality)
+        {
+            const auto aTargetOrType
+                = materializeMatrixOperandNode(*rNode.maChildren[nIndex++], rDoc, rContext, rFormulaPos);
+            if (!aTargetOrType.mbSupported)
+                return makeUnsupportedMaterialization<serpn::MatrixOperand>(aTargetOrType.meFallbackReason);
+            if (!aTargetOrType.moValue)
+                return makeMaterializedError<serpn::MatrixOperand>(aTargetOrType.meError);
+            oTargetOrType = *aTargetOrType.moValue;
+        }
+
+        const auto aObservedY
+            = materializeMatrixOperandNode(*rNode.maChildren[nIndex++], rDoc, rContext, rFormulaPos);
+        if (!aObservedY.mbSupported)
+            return makeUnsupportedMaterialization<serpn::MatrixOperand>(aObservedY.meFallbackReason);
+        if (!aObservedY.moValue)
+            return makeMaterializedError<serpn::MatrixOperand>(aObservedY.meError);
+
+        const auto aKnownX
+            = materializeMatrixOperandNode(*rNode.maChildren[nIndex++], rDoc, rContext, rFormulaPos);
+        if (!aKnownX.mbSupported)
+            return makeUnsupportedMaterialization<serpn::MatrixOperand>(aKnownX.meFallbackReason);
+        if (!aKnownX.moValue)
+            return makeMaterializedError<serpn::MatrixOperand>(aKnownX.meError);
+
+        const auto aConfidence = bPi
+                                     ? materializeOptionalScalarOperand(
+                                           rNode.maChildren.size() > nIndex ? &*rNode.maChildren[nIndex++] : nullptr)
+                                     : makeMaterializedValue(std::optional<serpn::MatrixOperand> {});
+        if (!aConfidence.mbSupported)
+            return makeUnsupportedMaterialization<serpn::MatrixOperand>(aConfidence.meFallbackReason);
+        if (!aConfidence.moValue)
+            return makeMaterializedError<serpn::MatrixOperand>(aConfidence.meError);
+
+        const auto aSeasonality = (!bSeasonality && rNode.maChildren.size() > nIndex)
+                                      ? materializeOptionalScalarOperand(
+                                            &*rNode.maChildren[nIndex++])
+                                      : makeMaterializedValue(std::optional<serpn::MatrixOperand> {});
+        if (!aSeasonality.mbSupported)
+            return makeUnsupportedMaterialization<serpn::MatrixOperand>(aSeasonality.meFallbackReason);
+        if (!aSeasonality.moValue)
+            return makeMaterializedError<serpn::MatrixOperand>(aSeasonality.meError);
+
+        const auto aDataCompletion = (rNode.maChildren.size() > nIndex)
+                                         ? materializeOptionalScalarOperand(&*rNode.maChildren[nIndex++])
+                                         : makeMaterializedValue(std::optional<serpn::MatrixOperand> {});
+        if (!aDataCompletion.mbSupported)
+            return makeUnsupportedMaterialization<serpn::MatrixOperand>(aDataCompletion.meFallbackReason);
+        if (!aDataCompletion.moValue)
+            return makeMaterializedError<serpn::MatrixOperand>(aDataCompletion.meError);
+
+        const auto aAggregation = (rNode.maChildren.size() > nIndex)
+                                      ? materializeOptionalScalarOperand(&*rNode.maChildren[nIndex++])
+                                      : makeMaterializedValue(std::optional<serpn::MatrixOperand> {});
+        if (!aAggregation.mbSupported)
+            return makeUnsupportedMaterialization<serpn::MatrixOperand>(aAggregation.meFallbackReason);
+        if (!aAggregation.moValue)
+            return makeMaterializedError<serpn::MatrixOperand>(aAggregation.meError);
+
+        const auto aPlan = serpn::planForecastEts(
+            eVariant, toApiDateParts(rContext.GetFormatTable()->GetNullDate()),
+            oTargetOrType.has_value() ? *oTargetOrType : makeScalarOperand(0.0), *aObservedY.moValue,
+            *aKnownX.moValue, aConfidence.moValue->has_value() ? &**aConfidence.moValue : nullptr,
+            aSeasonality.moValue->has_value() ? &**aSeasonality.moValue : nullptr,
+            aDataCompletion.moValue->has_value() ? &**aDataCompletion.moValue : nullptr,
+            aAggregation.moValue->has_value() ? &**aAggregation.moValue : nullptr);
+        if (aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
+        {
+            return makeUnsupportedMaterialization<serpn::MatrixOperand>(
+                FallbackReason::UnsupportedFormulaShape);
+        }
+        if (!aPlan)
+        {
+            return makeMaterializedValue(*matrixRefToMatrixOperand(makeSingleValueMatrix(
+                api::CellValue::error(aPlan.meError))));
+        }
+        if (aPlan.maValue.mbIsScalar)
+            return makeMaterializedValue(makeScalarOperand(aPlan.maValue.mfScalar));
         return makeMaterializedValue(aPlan.maValue.maMatrix);
     }
 
@@ -6961,6 +7144,44 @@ materializeGrowthProjectionMatrixFunctionCall(
                 makeSingleValueMatrix(api::CellValue::error(aPlan.meError)));
         }
         const auto aResultMatrix = matrixOperandToMatrixRef(aPlan.maValue.maMatrix);
+        if (!aResultMatrix.mbSupported)
+            return makeUnsupportedMaterialization<ScMatrixRef>(aResultMatrix.meFallbackReason);
+        if (!aResultMatrix.moValue)
+            return makeMaterializedError<ScMatrixRef>(aResultMatrix.meError);
+        return makeMaterializedValue(*aResultMatrix.moValue);
+    }
+    if (aFunctionName == u"FREQUENCY")
+    {
+        if (rNode.maChildren.size() != 2)
+        {
+            return makeMaterializedValue(
+                makeSingleValueMatrix(api::CellValue::error(api::Error::IllegalArgument)));
+        }
+
+        const auto aData = materializeMatrixOperandNode(
+            *rNode.maChildren[0], rDoc, rContext, rFormulaPos);
+        if (!aData.mbSupported)
+            return makeUnsupportedMaterialization<ScMatrixRef>(aData.meFallbackReason);
+        if (!aData.moValue)
+            return makeMaterializedError<ScMatrixRef>(aData.meError);
+
+        const auto aBins = materializeMatrixOperandNode(
+            *rNode.maChildren[1], rDoc, rContext, rFormulaPos);
+        if (!aBins.mbSupported)
+            return makeUnsupportedMaterialization<ScMatrixRef>(aBins.meFallbackReason);
+        if (!aBins.moValue)
+            return makeMaterializedError<ScMatrixRef>(aBins.meError);
+
+        const auto aPlan = spreadsheetengine::core::rpn::planFrequency(
+            *aData.moValue, *aBins.moValue);
+        if (aPlan.meReadiness != spreadsheetengine::core::rpn::RpnCoercionReadiness::Ready)
+            return makeUnsupportedMaterialization<ScMatrixRef>(FallbackReason::UnsupportedFormulaShape);
+        if (!aPlan)
+        {
+            return makeMaterializedValue(
+                makeSingleValueMatrix(api::CellValue::error(aPlan.meError)));
+        }
+        const auto aResultMatrix = matrixOperandToMatrixRef(aPlan.maValue);
         if (!aResultMatrix.mbSupported)
             return makeUnsupportedMaterialization<ScMatrixRef>(aResultMatrix.meFallbackReason);
         if (!aResultMatrix.moValue)
@@ -15470,6 +15691,16 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     ScInterpreterContext& rContext, const ScAddress& rFormulaPos)
 {
     const api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
+    if (aFunctionName == u"FREQUENCY" || aFunctionName == u"ORG.LIBREOFFICE.FOURIER")
+    {
+        const auto aMatrix = materializeMatrixFunctionCall(rNode, rDoc, rContext, rFormulaPos);
+        if (!aMatrix.mbSupported)
+            return makeUnsupported(eFunction, aMatrix.meFallbackReason);
+        if (!aMatrix.moValue)
+            return makeErrorResult(eFunction, aMatrix.meError);
+        return makeScalarAttempt(
+            eFunction, lookupexecution::detail::toApiCellValue((*aMatrix.moValue)->Get(0, 0)));
+    }
     if (aFunctionName != u"MDETERM")
         return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
     if (rNode.maChildren.size() != 1)
@@ -16372,7 +16603,22 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     if (eFunction == FunctionKind::GrowthProjection)
     {
         return aUpperFunctionName == u"GROWTH" || aUpperFunctionName == u"TREND"
-               || aUpperFunctionName == u"LINEST" || aUpperFunctionName == u"LOGEST";
+               || aUpperFunctionName == u"LINEST" || aUpperFunctionName == u"LOGEST"
+               || aUpperFunctionName == u"FORECAST.ETS"
+               || aUpperFunctionName == u"FORECAST.ETS.ADD"
+               || aUpperFunctionName == u"FORECAST.ETS.MULT"
+               || aUpperFunctionName == u"FORECAST.ETS.PI.ADD"
+               || aUpperFunctionName == u"FORECAST.ETS.PI.MULT"
+               || aUpperFunctionName == u"FORECAST.ETS.SEASONALITY"
+               || aUpperFunctionName == u"FORECAST.ETS.STAT.ADD"
+               || aUpperFunctionName == u"FORECAST.ETS.STAT.MULT"
+               || aUpperFunctionName == u"COM.MICROSOFT.FORECAST.ETS"
+               || aUpperFunctionName == u"COM.MICROSOFT.FORECAST.ETS.CONFINT"
+               || aUpperFunctionName == u"COM.MICROSOFT.FORECAST.ETS.SEASONALITY"
+               || aUpperFunctionName == u"COM.MICROSOFT.FORECAST.ETS.STAT"
+               || aUpperFunctionName == u"ORG.LIBREOFFICE.FORECAST.ETS.MULT"
+               || aUpperFunctionName == u"ORG.LIBREOFFICE.FORECAST.ETS.PI.MULT"
+               || aUpperFunctionName == u"ORG.LIBREOFFICE.FORECAST.ETS.STAT.MULT";
     }
     if (aUpperFunctionName == u"PROB")
         return true;

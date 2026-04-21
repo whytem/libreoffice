@@ -149,8 +149,9 @@ more service IDs from the ledger above.
 - `HS6` range iteration / criteria walk:
   `ScSubTotal`, `ScDBArea`
 - `HS5` matrix materialization / matrix frame, often with `HS6`:
-  `ScSortBy`, `ScMatValue`, `ScMatRef`, `ScSumXMY2`, `ScFourier`,
-  `ScFrequency`, `ScForecast_Ets`
+  `ScSortBy`, `ExecuteMatValueTerminal`, `ExecuteMatRefTerminal`,
+  `ExecuteSumXMY2Terminal`, `ExecuteFourierTerminal`,
+  `ExecuteFrequencyTerminal`, `ExecuteForecastEtsTerminal`
 - `HS10` runtime environment / workbook metadata:
   `ScRandom`, `ScRandbetween`, `ScRandArray`, `ScRandomImpl`
 - `HS1` visible scalar read / text parse / formatting plus `HS11` coercion:
@@ -345,18 +346,18 @@ Required host services:
 
 Representative surviving Calc surfaces:
 
-- `ScMatValue`
+- `ExecuteMatValueTerminal`
 - `ScMatInv`
 - `ScMatMult`
 - `ScMatSequence`
 - `ScMatTrans`
 - `ScEMat`
-- `ScMatRef`
-- `ScFrequency`
+- `ExecuteMatRefTerminal`
+- `ExecuteFrequencyTerminal`
 - `ScLinest`
 - `ScLogest`
 - `ScTrend`
-- `ScForecast_Ets`
+- `ExecuteForecastEtsTerminal`
 - `ScChooseColsOrRows`
 - `ScToColOrRow`
 - `ScWrapColsOrRows`

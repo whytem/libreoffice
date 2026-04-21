@@ -5736,6 +5736,15 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorMatrixMathDef
     m_pDoc->SetValue(1, 0, 0, 2.0);
     m_pDoc->SetValue(0, 1, 0, 3.0);
     m_pDoc->SetValue(1, 1, 0, 4.0);
+    m_pDoc->SetValue(0, 2, 0, 1.0);
+    m_pDoc->SetValue(0, 3, 0, 2.0);
+    m_pDoc->SetValue(0, 4, 0, 3.0);
+    m_pDoc->SetValue(0, 5, 0, 4.0);
+    m_pDoc->SetValue(1, 2, 0, 2.0);
+    m_pDoc->SetValue(1, 3, 0, 3.0);
+
+    ScMarkData aMark(m_pDoc->GetSheetLimits());
+    aMark.SelectOneTable(0);
 
     {
         ScopedEnvironmentOverride aMode(
@@ -5744,17 +5753,23 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorMatrixMathDef
 
         m_pDoc->SetString(0, 7, 0, u"=MDETERM(A1:B2)"_ustr);
         m_pDoc->SetString(1, 7, 0, u"=MDETERM({1;2|3;4})"_ustr);
+        m_pDoc->SetString(2, 7, 0, u"=SUMXMY2(A3:A6;{2|3|4|5})"_ustr);
+        m_pDoc->InsertMatrixFormula(3, 7, 3, 9, aMark, u"=FREQUENCY(A3:A6;B3:B4)"_ustr);
 
         CPPUNIT_ASSERT_DOUBLES_EQUAL(-2.0, m_pDoc->GetValue(0, 7, 0), 1.0E-12);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(-2.0, m_pDoc->GetValue(1, 7, 0), 1.0E-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(4.0, m_pDoc->GetValue(2, 7, 0), 1.0E-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(3, 7, 0), 1.0E-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(3, 8, 0), 1.0E-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(3, 9, 0), 1.0E-12);
 
         const auto aStats = setaileval::getStatsSnapshot();
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 2);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 3);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::MatrixMath)]
-            >= 2);
+            >= 3);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
             aStats.maFunctionFallbackCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::MatrixMath)]);
@@ -5774,6 +5789,12 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorRegressionMat
     ScMarkData aMark(m_pDoc->GetSheetLimits());
     aMark.SelectOneTable(0);
 
+    for (SCROW nRow = 0; nRow < 6; ++nRow)
+    {
+        m_pDoc->SetValue(4, nRow, 0, (nRow % 2 == 0) ? 2.0 : 4.0);
+        m_pDoc->SetValue(5, nRow, 0, static_cast<double>(nRow + 1));
+    }
+
     {
         ScopedEnvironmentOverride aMode(
             "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
@@ -5789,6 +5810,10 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorRegressionMat
             u"=GROWTH({6;18;54};{1;2;3};{4;5})"_ustr);
         m_pDoc->InsertMatrixFormula(0, 8, 1, 8, aMark,
             u"=ORG.LIBREOFFICE.FOURIER({5};TRUE();FALSE();FALSE();0)"_ustr);
+        m_pDoc->SetString(4, 8, 0, u"=FORECAST.ETS(7;E1:E6;F1:F6;2;1;1)"_ustr);
+        m_pDoc->SetString(4, 9, 0,
+            u"=ORG.LIBREOFFICE.FORECAST.ETS.MULT(7;E1:E6;F1:F6;2;1;1)"_ustr);
+        m_pDoc->SetString(4, 10, 0, u"=FORECAST.ETS.SEASONALITY(E1:E6;F1:F6;1;1)"_ustr);
 
         CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(0, 0, 0)), 1e-12);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(1, 0, 0)), 1e-12);
@@ -5800,6 +5825,7 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorRegressionMat
         CPPUNIT_ASSERT_DOUBLES_EQUAL(486.0, m_pDoc->GetValue(ScAddress(1, 6, 0)), 1e-9);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(5.0, m_pDoc->GetValue(ScAddress(0, 8, 0)), 1e-12);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, m_pDoc->GetValue(ScAddress(1, 8, 0)), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(4, 10, 0)), 1e-12);
 
         ScFormulaCell* pCell = m_pDoc->GetFormulaCell(ScAddress(0, 0, 0));
         CPPUNIT_ASSERT(pCell);
@@ -5830,13 +5856,37 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorRegressionMat
         ASSERT_DOUBLES_EQUAL(2.0, aAttempt.mpMatrixResult->GetDouble(0, 0));
         ASSERT_DOUBLES_EQUAL(1.0, aAttempt.mpMatrixResult->GetDouble(1, 0));
 
+        const auto aEtsAddAttempt = setaileval::tryEvaluateFormula(
+            *m_pDoc, m_pDoc->GetNonThreadedContext(), ScAddress(4, 8, 0),
+            u"=FORECAST.ETS(7;E1:E6;F1:F6;2;1;1)", false);
+        CPPUNIT_ASSERT(aEtsAddAttempt.mbSupported);
+        CPPUNIT_ASSERT_EQUAL(
+            setaileval::FunctionKind::GrowthProjection, aEtsAddAttempt.meFunction);
+        CPPUNIT_ASSERT_EQUAL(
+            spreadsheetengine::api::formulavalue::ValueType::Value,
+            aEtsAddAttempt.maResult.meType);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(
+            m_pDoc->GetValue(ScAddress(4, 8, 0)), aEtsAddAttempt.maResult.mfValue, 1e-9);
+
+        const auto aEtsMultAttempt = setaileval::tryEvaluateFormula(
+            *m_pDoc, m_pDoc->GetNonThreadedContext(), ScAddress(4, 9, 0),
+            u"=ORG.LIBREOFFICE.FORECAST.ETS.MULT(7;E1:E6;F1:F6;2;1;1)", false);
+        CPPUNIT_ASSERT(aEtsMultAttempt.mbSupported);
+        CPPUNIT_ASSERT_EQUAL(
+            setaileval::FunctionKind::GrowthProjection, aEtsMultAttempt.meFunction);
+        CPPUNIT_ASSERT_EQUAL(
+            spreadsheetengine::api::formulavalue::ValueType::Value,
+            aEtsMultAttempt.maResult.meType);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(
+            m_pDoc->GetValue(ScAddress(4, 9, 0)), aEtsMultAttempt.maResult.mfValue, 1e-9);
+
         const auto aStats = setaileval::getStatsSnapshot();
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 5);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 8);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::GrowthProjection)]
-            >= 4);
+            >= 7);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::MatrixMath)]

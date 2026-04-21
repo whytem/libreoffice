@@ -38,6 +38,7 @@
 #include <globstr.hrc>
 #include <scresid.hxx>
 #include <cellkeytranslator.hxx>
+#include <spreadsheetengine/compat/libreoffice/InterpreterCompatDispatch.hxx>
 #include <formulagroup.hxx>
 #include <vcl/svapp.hxx> //Application::
 #include <spreadsheetengine/compat/libreoffice/InfoInspectionExecution.hxx>
@@ -47,6 +48,8 @@
 
 using namespace formula;
 namespace selibreoffice = spreadsheetengine::compat::libreoffice;
+namespace seinterpcompatdispatch
+    = spreadsheetengine::compat::libreoffice::interpretercompatdispatch;
 namespace seinfoexec = spreadsheetengine::compat::libreoffice::infoinspectionexecution;
 
 namespace {
@@ -461,7 +464,7 @@ sc::RangeMatrix ScInterpreter::GetRangeMatrix()
     return aRet;
 }
 
-void ScInterpreter::ScMatValue()
+void ScInterpreter::ExecuteMatValueTerminal()
 {
     if ( !MustHaveParamCount( GetByte(), 3 ) )
         return;
@@ -1061,90 +1064,14 @@ void ScInterpreter::CalculateSumX2MY2SumX2DY2(bool _bSumX2DY2)
     PushDouble(fSum.get());
 }
 
-void ScInterpreter::ScSumXMY2()
+void ScInterpreter::ExecuteSumXMY2Terminal()
 {
-    if ( !MustHaveParamCount( GetByte(), 2 ) )
-        return;
-
-    ScMatrixRef pMat2 = GetMatrix();
-    ScMatrixRef pMat1 = GetMatrix();
-    if (!pMat2 || !pMat1)
-    {
-        PushIllegalParameter();
-        return;
-    }
-    SCSIZE nC1, nC2;
-    SCSIZE nR1, nR2;
-    pMat2->GetDimensions(nC2, nR2);
-    pMat1->GetDimensions(nC1, nR1);
-    if (nC1 != nC2 || nR1 != nR2)
-    {
-        PushNoValue();
-        return;
-    } // if (nC1 != nC2 || nR1 != nR2)
-    ScMatrixRef pResMat = lcl_MatrixCalculation( *pMat1, *pMat2, this, MatrixSub);
-    if (!pResMat)
-    {
-        PushNoValue();
-    }
-    else
-    {
-        PushDouble(pResMat->SumSquare(false).maAccumulator.get());
-    }
+    seinterpcompatdispatch::Dispatcher::matrixSumXMY2(*this);
 }
 
-void ScInterpreter::ScFrequency()
+void ScInterpreter::ExecuteFrequencyTerminal()
 {
-    if ( !MustHaveParamCount( GetByte(), 2 ) )
-        return;
-
-    std::vector<double>  aBinArray;
-    std::vector<tools::Long>    aBinIndexOrder;
-
-    GetSortArray( 1, aBinArray, &aBinIndexOrder, false, false );
-    SCSIZE nBinSize = aBinArray.size();
-    if (nGlobalError != FormulaError::NONE)
-    {
-        PushNoValue();
-        return;
-    }
-
-    std::vector<double>  aDataArray;
-    GetSortArray( 1, aDataArray, nullptr, false, false );
-    SCSIZE nDataSize = aDataArray.size();
-
-    if (aDataArray.empty() || nGlobalError != FormulaError::NONE)
-    {
-        PushNoValue();
-        return;
-    }
-    ScMatrixRef pResMat = GetNewMat(1, nBinSize+1, /*bEmpty*/true);
-    if (!pResMat)
-    {
-        PushIllegalArgument();
-        return;
-    }
-
-    if (nBinSize != aBinIndexOrder.size())
-    {
-        PushIllegalArgument();
-        return;
-    }
-
-    SCSIZE j;
-    SCSIZE i = 0;
-    for (j = 0; j < nBinSize; ++j)
-    {
-        SCSIZE nCount = 0;
-        while (i < nDataSize && aDataArray[i] <= aBinArray[j])
-        {
-            ++nCount;
-            ++i;
-        }
-        pResMat->PutDouble(static_cast<double>(nCount), aBinIndexOrder[j]);
-    }
-    pResMat->PutDouble(static_cast<double>(nDataSize-i), j);
-    PushMatrix(pResMat);
+    seinterpcompatdispatch::Dispatcher::matrixFrequency(*this);
 }
 
 namespace {
@@ -2425,7 +2352,7 @@ void ScInterpreter::CalculateTrendGrowth(bool _bGrowth)
     PushMatrix(pResMat);
 }
 
-void ScInterpreter::ScMatRef()
+void ScInterpreter::ExecuteMatRefTerminal()
 {
     // In case it contains relative references resolve them as usual.
     Push( *pCur );
