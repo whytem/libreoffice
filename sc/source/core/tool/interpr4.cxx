@@ -12595,9 +12595,9 @@ StackVar ScInterpreter::Interpret()
                         aCaseLabels.push_back(std::move(*oCase));
                     }
 
-                    const std::optional<std::size_t> oDefaultSlot
-                        = bHasDefault ? std::optional<std::size_t>(nPairs)
-                                      : std::nullopt;
+                    std::optional<std::size_t> oDefaultSlot;
+                    if (bHasDefault)
+                        oDefaultSlot = nPairs;
                     const auto aPlan = serpn::planSwitchBranch(
                         *oSelector,
                         std::span<const serpn::RpnValue>(aCaseLabels.data(),
