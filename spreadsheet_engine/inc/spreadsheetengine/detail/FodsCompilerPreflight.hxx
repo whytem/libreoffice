@@ -229,6 +229,28 @@ inline void setFailure(
         return true;
     }
 
+    if (aFunctionName == u"OFFSET")
+    {
+        if (rNode.maChildren.size() < 3 || rNode.maChildren.size() > 5 || !rNode.maChildren[0]
+            || !rNode.maChildren[1] || !rNode.maChildren[2]
+            || !isReferenceLikeNode(*rNode.maChildren[0], rHost, rContext, rResult)
+            || !preflightNode(*rNode.maChildren[1], rHost, rContext, rResult)
+            || !preflightNode(*rNode.maChildren[2], rHost, rContext, rResult))
+        {
+            return false;
+        }
+
+        for (std::size_t nIndex = 3; nIndex < rNode.maChildren.size(); ++nIndex)
+        {
+            if (rNode.maChildren[nIndex]
+                && !preflightNode(*rNode.maChildren[nIndex], rHost, rContext, rResult))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
     return false;
 }
 

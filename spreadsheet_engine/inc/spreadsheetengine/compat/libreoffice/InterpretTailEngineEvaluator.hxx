@@ -2110,6 +2110,10 @@ struct ParsedExternalNamedRefNode
 [[nodiscard]] inline Materialization<ScRange> resolveReferenceRangeNode(
     const core::formula::Node& rNode, const ScDocument& rDoc, const ScAddress& rFormulaPos);
 
+[[nodiscard]] inline Materialization<ScRange> resolveMaterializedReferenceRangeNode(
+    const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
+    const ScAddress& rFormulaPos);
+
 [[nodiscard]] inline std::optional<ScAddress> tryImplicitIntersectionAddress(
     const ScRange& rRange, const ScAddress& rFormulaPos);
 
@@ -4763,6 +4767,121 @@ materializeCriteriaAggregateInput(const core::formula::Node& rArgument, const Sc
     return makeMaterializedValue(*oWhole);
 }
 
+[[nodiscard]] inline Materialization<ScRange> resolveMaterializedReferenceRangeNode(
+    const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
+    const ScAddress& rFormulaPos)
+{
+    using NodeKind = core::formula::NodeKind;
+
+    if (rNode.meKind == NodeKind::CellReference || rNode.meKind == NodeKind::RangeReference
+        || rNode.meKind == NodeKind::NamedReference)
+    {
+        return resolveReferenceRangeNode(rNode, rDoc, rFormulaPos);
+    }
+
+    if (rNode.meKind == NodeKind::RangeConstructor)
+    {
+        if (rNode.maChildren.size() != 2 || !rNode.maChildren[0] || !rNode.maChildren[1])
+            return makeMaterializedError<ScRange>(api::Error::IllegalArgument);
+
+        const auto aLeft = resolveMaterializedReferenceRangeNode(
+            *rNode.maChildren[0], rDoc, rContext, rFormulaPos);
+        if (!aLeft.mbSupported)
+            return makeUnsupportedMaterialization<ScRange>(aLeft.meFallbackReason);
+        if (!aLeft.moValue)
+            return makeMaterializedError<ScRange>(aLeft.meError);
+
+        const auto aRight = resolveMaterializedReferenceRangeNode(
+            *rNode.maChildren[1], rDoc, rContext, rFormulaPos);
+        if (!aRight.mbSupported)
+            return makeUnsupportedMaterialization<ScRange>(aRight.meFallbackReason);
+        if (!aRight.moValue)
+            return makeMaterializedError<ScRange>(aRight.meError);
+
+        ScRange aRange(aLeft.moValue->aStart, aRight.moValue->aEnd);
+        aRange.PutInOrder();
+        return makeMaterializedValue(aRange);
+    }
+
+    if (rNode.meKind != NodeKind::FunctionCall || uppercaseAscii(rNode.maPrimaryText) != u"OFFSET")
+        return makeUnsupportedMaterialization<ScRange>(FallbackReason::UnsupportedFormulaShape);
+
+    if (rNode.maChildren.size() < 3 || rNode.maChildren.size() > 5 || !rNode.maChildren[0]
+        || !rNode.maChildren[1] || !rNode.maChildren[2])
+    {
+        return makeMaterializedError<ScRange>(api::Error::IllegalArgument);
+    }
+
+    const auto aBaseRange = resolveMaterializedReferenceRangeNode(
+        *rNode.maChildren[0], rDoc, rContext, rFormulaPos);
+    if (!aBaseRange.mbSupported)
+        return makeUnsupportedMaterialization<ScRange>(aBaseRange.meFallbackReason);
+    if (!aBaseRange.moValue)
+        return makeMaterializedError<ScRange>(aBaseRange.meError);
+
+    const auto aRowOffset = normalizeWholeMaterializedArgument(
+        *rNode.maChildren[1], rDoc, rContext, rFormulaPos);
+    if (!aRowOffset.mbSupported)
+        return makeUnsupportedMaterialization<ScRange>(aRowOffset.meFallbackReason);
+    if (!aRowOffset.moValue)
+        return makeMaterializedError<ScRange>(aRowOffset.meError);
+
+    const auto aColumnOffset = normalizeWholeMaterializedArgument(
+        *rNode.maChildren[2], rDoc, rContext, rFormulaPos);
+    if (!aColumnOffset.mbSupported)
+        return makeUnsupportedMaterialization<ScRange>(aColumnOffset.meFallbackReason);
+    if (!aColumnOffset.moValue)
+        return makeMaterializedError<ScRange>(aColumnOffset.meError);
+
+    std::optional<api::RowIndex> oHeight;
+    if (rNode.maChildren.size() >= 4
+        && rNode.maChildren[3]->meKind != NodeKind::EmptyArgument)
+    {
+        const auto aHeight = normalizeWholeMaterializedArgument(
+            *rNode.maChildren[3], rDoc, rContext, rFormulaPos);
+        if (!aHeight.mbSupported)
+            return makeUnsupportedMaterialization<ScRange>(aHeight.meFallbackReason);
+        if (!aHeight.moValue)
+            return makeMaterializedError<ScRange>(aHeight.meError);
+        if (*aHeight.moValue <= 0)
+            return makeMaterializedError<ScRange>(api::Error::IllegalArgument);
+        oHeight = *aHeight.moValue;
+    }
+
+    std::optional<api::ColumnIndex> oWidth;
+    if (rNode.maChildren.size() >= 5
+        && rNode.maChildren[4]->meKind != NodeKind::EmptyArgument)
+    {
+        const auto aWidth = normalizeWholeMaterializedArgument(
+            *rNode.maChildren[4], rDoc, rContext, rFormulaPos);
+        if (!aWidth.mbSupported)
+            return makeUnsupportedMaterialization<ScRange>(aWidth.meFallbackReason);
+        if (!aWidth.moValue)
+            return makeMaterializedError<ScRange>(aWidth.meError);
+        if (*aWidth.moValue <= 0)
+            return makeMaterializedError<ScRange>(api::Error::IllegalArgument);
+        oWidth = *aWidth.moValue;
+    }
+
+    const auto aOffsetRange = api::reference::planOffsetRange(
+        toApiCellRange(*aBaseRange.moValue), *aRowOffset.moValue, *aColumnOffset.moValue, oHeight,
+        oWidth, rDoc.MaxCol(), rDoc.MaxRow());
+    if (!aOffsetRange)
+        return makeMaterializedError<ScRange>(aOffsetRange.meError);
+    return makeMaterializedValue(toLibreOfficeRange(aOffsetRange.maValue));
+}
+
+[[nodiscard]] inline bool isMaterializableReferenceRangeNode(
+    const core::formula::Node& rNode)
+{
+    return rNode.meKind == core::formula::NodeKind::CellReference
+           || rNode.meKind == core::formula::NodeKind::RangeReference
+           || rNode.meKind == core::formula::NodeKind::NamedReference
+           || rNode.meKind == core::formula::NodeKind::RangeConstructor
+           || (rNode.meKind == core::formula::NodeKind::FunctionCall
+               && uppercaseAscii(rNode.maPrimaryText) == u"OFFSET");
+}
+
 [[nodiscard]] inline Materialization<ScMatrixRef> materializeXLookupMatrixFunctionCall(
     const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
     const ScAddress& rFormulaPos)
@@ -6129,11 +6248,9 @@ materializeCriteriaAggregateInput(const core::formula::Node& rArgument, const Sc
     if (const auto oExternalSingle = tryParseExternalSingleRefNode(rNode, rDoc, rFormulaPos))
         return materializeExternalSingleRefMatrix(*oExternalSingle, rDoc, rFormulaPos);
 
-    if (rNode.meKind == core::formula::NodeKind::CellReference
-        || rNode.meKind == core::formula::NodeKind::RangeReference
-        || rNode.meKind == core::formula::NodeKind::NamedReference)
+    if (isMaterializableReferenceRangeNode(rNode))
     {
-        const auto aRange = resolveReferenceRangeNode(rNode, rDoc, rFormulaPos);
+        const auto aRange = resolveMaterializedReferenceRangeNode(rNode, rDoc, rContext, rFormulaPos);
         if (!aRange.mbSupported)
             return makeUnsupportedMaterialization<ScMatrixRef>(aRange.meFallbackReason);
         if (!aRange.moValue)
@@ -6193,11 +6310,9 @@ materializeCriteriaAggregateInput(const core::formula::Node& rArgument, const Sc
     const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
     const ScAddress& rFormulaPos)
 {
-    if (rNode.meKind == core::formula::NodeKind::CellReference
-        || rNode.meKind == core::formula::NodeKind::RangeReference
-        || rNode.meKind == core::formula::NodeKind::NamedReference)
+    if (isMaterializableReferenceRangeNode(rNode))
     {
-        const auto aRange = resolveReferenceRangeNode(rNode, rDoc, rFormulaPos);
+        const auto aRange = resolveMaterializedReferenceRangeNode(rNode, rDoc, rContext, rFormulaPos);
         if (!aRange.mbSupported)
         {
             return makeUnsupportedMaterialization<lookupexecution::LookupInputSource>(
@@ -6255,11 +6370,9 @@ materializeCriteriaAggregateInput(const core::formula::Node& rArgument, const Sc
 materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const ScDocument& rDoc,
     ScInterpreterContext& rContext, const ScAddress& rFormulaPos)
 {
-    if (rNode.meKind == core::formula::NodeKind::CellReference
-        || rNode.meKind == core::formula::NodeKind::RangeReference
-        || rNode.meKind == core::formula::NodeKind::NamedReference)
+    if (isMaterializableReferenceRangeNode(rNode))
     {
-        const auto aRange = resolveReferenceRangeNode(rNode, rDoc, rFormulaPos);
+        const auto aRange = resolveMaterializedReferenceRangeNode(rNode, rDoc, rContext, rFormulaPos);
         if (!aRange.mbSupported)
         {
             return makeUnsupportedMaterialization<lookupexecution::LookupInputSource>(
@@ -6295,11 +6408,9 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
     const ScAddress& rFormulaPos)
 {
-    if (rNode.meKind == core::formula::NodeKind::CellReference
-        || rNode.meKind == core::formula::NodeKind::RangeReference
-        || rNode.meKind == core::formula::NodeKind::NamedReference)
+    if (isMaterializableReferenceRangeNode(rNode))
     {
-        const auto aRange = resolveReferenceRangeNode(rNode, rDoc, rFormulaPos);
+        const auto aRange = resolveMaterializedReferenceRangeNode(rNode, rDoc, rContext, rFormulaPos);
         if (!aRange.mbSupported)
             return makeUnsupportedMaterialization<api::CellValue>(aRange.meFallbackReason);
         if (!aRange.moValue)
@@ -6349,11 +6460,9 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
     const ScAddress& rFormulaPos)
 {
-    if (rNode.meKind == core::formula::NodeKind::CellReference
-        || rNode.meKind == core::formula::NodeKind::RangeReference
-        || rNode.meKind == core::formula::NodeKind::NamedReference)
+    if (isMaterializableReferenceRangeNode(rNode))
     {
-        const auto aRange = resolveReferenceRangeNode(rNode, rDoc, rFormulaPos);
+        const auto aRange = resolveMaterializedReferenceRangeNode(rNode, rDoc, rContext, rFormulaPos);
         if (!aRange.mbSupported)
             return makeUnsupportedMaterialization<api::CellValue>(aRange.meFallbackReason);
         if (!aRange.moValue)
@@ -6384,11 +6493,9 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
     const ScAddress& rFormulaPos)
 {
-    if (rNode.meKind == core::formula::NodeKind::CellReference
-        || rNode.meKind == core::formula::NodeKind::RangeReference
-        || rNode.meKind == core::formula::NodeKind::NamedReference)
+    if (isMaterializableReferenceRangeNode(rNode))
     {
-        const auto aRange = resolveReferenceRangeNode(rNode, rDoc, rFormulaPos);
+        const auto aRange = resolveMaterializedReferenceRangeNode(rNode, rDoc, rContext, rFormulaPos);
         if (!aRange.mbSupported)
             return makeUnsupportedMaterialization<api::CellValue>(aRange.meFallbackReason);
         if (!aRange.moValue)
@@ -6419,11 +6526,9 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
     const ScAddress& rFormulaPos)
 {
-    if (rNode.meKind == core::formula::NodeKind::CellReference
-        || rNode.meKind == core::formula::NodeKind::RangeReference
-        || rNode.meKind == core::formula::NodeKind::NamedReference)
+    if (isMaterializableReferenceRangeNode(rNode))
     {
-        const auto aRange = resolveReferenceRangeNode(rNode, rDoc, rFormulaPos);
+        const auto aRange = resolveMaterializedReferenceRangeNode(rNode, rDoc, rContext, rFormulaPos);
         if (!aRange.mbSupported)
             return makeUnsupportedMaterialization<api::CellValue>(aRange.meFallbackReason);
         if (!aRange.moValue)
@@ -7421,6 +7526,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
             const bool bMatrixLike = rxChild->meKind == core::formula::NodeKind::CellReference
                                      || rxChild->meKind == core::formula::NodeKind::RangeReference
                                      || rxChild->meKind == core::formula::NodeKind::NamedReference
+                                     || rxChild->meKind == core::formula::NodeKind::RangeConstructor
                                      || rxChild->meKind == core::formula::NodeKind::ArrayConstant
                                      || rxChild->meKind == core::formula::NodeKind::BinaryOperation
                                      || rxChild->meKind == core::formula::NodeKind::FunctionCall;
@@ -8732,6 +8838,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
             const bool bMatrixLike = rxChild->meKind == core::formula::NodeKind::CellReference
                                      || rxChild->meKind == core::formula::NodeKind::RangeReference
                                      || rxChild->meKind == core::formula::NodeKind::NamedReference
+                                     || rxChild->meKind == core::formula::NodeKind::RangeConstructor
                                      || rxChild->meKind == core::formula::NodeKind::ArrayConstant
                                      || rxChild->meKind == core::formula::NodeKind::BinaryOperation
                                      || rxChild->meKind == core::formula::NodeKind::FunctionCall;
@@ -9115,6 +9222,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         const bool bMatrixLike = rArgument.meKind == core::formula::NodeKind::CellReference
                                  || rArgument.meKind == core::formula::NodeKind::RangeReference
                                  || rArgument.meKind == core::formula::NodeKind::NamedReference
+                                 || rArgument.meKind == core::formula::NodeKind::RangeConstructor
                                  || rArgument.meKind == core::formula::NodeKind::ArrayConstant
                                  || rArgument.meKind == core::formula::NodeKind::BinaryOperation
                                  || rArgument.meKind == core::formula::NodeKind::FunctionCall;
@@ -9400,6 +9508,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
             const bool bMatrixLike = rxChild->meKind == core::formula::NodeKind::CellReference
                                      || rxChild->meKind == core::formula::NodeKind::RangeReference
                                      || rxChild->meKind == core::formula::NodeKind::NamedReference
+                                     || rxChild->meKind == core::formula::NodeKind::RangeConstructor
                                      || rxChild->meKind == core::formula::NodeKind::ArrayConstant
                                      || rxChild->meKind == core::formula::NodeKind::BinaryOperation
                                      || rxChild->meKind == core::formula::NodeKind::FunctionCall;
@@ -9484,6 +9593,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
             const bool bMatrixLike = rxChild->meKind == core::formula::NodeKind::CellReference
                                      || rxChild->meKind == core::formula::NodeKind::RangeReference
                                      || rxChild->meKind == core::formula::NodeKind::NamedReference
+                                     || rxChild->meKind == core::formula::NodeKind::RangeConstructor
                                      || rxChild->meKind == core::formula::NodeKind::ArrayConstant
                                      || rxChild->meKind == core::formula::NodeKind::BinaryOperation
                                      || rxChild->meKind == core::formula::NodeKind::FunctionCall;
@@ -9552,6 +9662,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
             const bool bMatrixLike = rxChild->meKind == core::formula::NodeKind::CellReference
                                      || rxChild->meKind == core::formula::NodeKind::RangeReference
                                      || rxChild->meKind == core::formula::NodeKind::NamedReference
+                                     || rxChild->meKind == core::formula::NodeKind::RangeConstructor
                                      || rxChild->meKind == core::formula::NodeKind::ArrayConstant
                                      || rxChild->meKind == core::formula::NodeKind::BinaryOperation
                                      || rxChild->meKind == core::formula::NodeKind::FunctionCall;
@@ -12167,9 +12278,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     };
     auto materializeFirstValue = [&](const core::formula::Node& rArgument)
         -> Materialization<api::CellValue> {
-        if (rArgument.meKind == core::formula::NodeKind::CellReference
-            || rArgument.meKind == core::formula::NodeKind::RangeReference
-            || rArgument.meKind == core::formula::NodeKind::NamedReference)
+        if (isMaterializableReferenceRangeNode(rArgument))
         {
             const auto aScalar
                 = materializeScalarizedReferenceValueNode(rArgument, rDoc, rContext, rFormulaPos);

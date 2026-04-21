@@ -3580,6 +3580,69 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorNumericAggreg
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorOffsetRangeConstructorDefaultOn)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+        m_pDoc->InsertTab(0, u"EngineOffsetRangeConstructorDefaultOn"_ustr));
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 2.0);
+    m_pDoc->SetValue(0, 2, 0, 4.0);
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(1, 0, 0, u"=SUM(OFFSET(A1;0;0):OFFSET(A1;2;0))"_ustr);
+
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(7.0, m_pDoc->GetValue(1, 0, 0), 1e-12);
+
+        ScFormulaCell* pCell = m_pDoc->GetFormulaCell(ScAddress(1, 0, 0));
+        CPPUNIT_ASSERT(pCell);
+        const OUString aFormulaSource = pCell->GetFormula(FormulaGrammar::GRAM_ODFF);
+        CPPUNIT_ASSERT_MESSAGE(
+            "OFFSET range constructor formula should remain family-local default-on",
+            setaileval::isFamilyLocalDefaultOnFormula(std::u16string_view(
+                aFormulaSource.getStr(), aFormulaSource.getLength())));
+        const OUString aCanonicalFormulaSource = pCell->GetHybridFormula();
+        const auto aAttempt = setaileval::tryEvaluateFormula(
+            *m_pDoc, m_pDoc->GetNonThreadedContext(), ScAddress(1, 0, 0),
+            std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
+            m_pDoc->GetCalcConfig().mbEmptyStringAsZero, pCell->GetCode(),
+            std::u16string_view(aCanonicalFormulaSource.getStr(),
+                aCanonicalFormulaSource.getLength()));
+        const std::string aAttemptLabel
+            = "OFFSET range constructor formula should be supported by tryEvaluateFormula"
+              " fallback_reason="
+              + std::to_string(static_cast<int>(aAttempt.meFallbackReason));
+        CPPUNIT_ASSERT_MESSAGE(aAttemptLabel, aAttempt.mbSupported);
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT_MESSAGE(
+            "OFFSET range constructors should stay authoritative in default-on mode",
+            aStats.mnAuthoritativeCount >= 1);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(
+            "OFFSET range constructors should not need legacy fallback",
+            static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT_MESSAGE(
+            "numeric aggregates should own OFFSET range constructors upstream",
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::NumericAggregate)]
+                >= 1);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(
+            "numeric aggregates should not fall back for OFFSET range constructors",
+            static_cast<sal_uInt64>(0),
+            aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::NumericAggregate)]);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorArrayContextIfDefaultOn)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;

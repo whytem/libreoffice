@@ -59,6 +59,8 @@ namespace
 {
     if (rName == u"COM.MICROSOFT.XLOOKUP")
         return u"XLOOKUP";
+    if (rName == u"OFFSET")
+        return u"OFFSET";
     return rName;
 }
 
@@ -696,7 +698,8 @@ class Parser
                 {
                     const api::StringView aName
                         = normalizeRangeOperandFunction(rNode.maPrimaryText);
-                    return aName == u"CHOOSE" || aName == u"INDEX" || aName == u"XLOOKUP";
+                    return aName == u"CHOOSE" || aName == u"INDEX" || aName == u"XLOOKUP"
+                           || aName == u"OFFSET";
                 }
                 default:
                     return false;

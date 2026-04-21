@@ -4962,6 +4962,25 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorSourceNorm
     CPPUNIT_ASSERT(!setaileval::isHardRoutedFormula(u"=TIMEVALUE(MyTimeName)"));
 }
 
+CPPUNIT_TEST_FIXTURE(TestSharedCases,
+    testInterpretTailEngineEvaluatorStoredOffsetRangeConstructorNormalization)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    const auto aParse = spreadsheetengine::core::formula::parseFormula(
+        setaileval::detail::normalizeFormulaSource(
+            u"{=SUM(OFFSET([.A1];0;0):OFFSET([.A1];2;0))}"));
+    CPPUNIT_ASSERT(aParse && aParse.mpRoot);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::core::formula::NodeKind::FunctionCall,
+        aParse.mpRoot->meKind);
+    CPPUNIT_ASSERT(aParse.mpRoot->maPrimaryText == u"SUM");
+    CPPUNIT_ASSERT_EQUAL(static_cast<size_t>(1), aParse.mpRoot->maChildren.size());
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::core::formula::NodeKind::RangeConstructor,
+        aParse.mpRoot->maChildren[0]->meKind);
+}
+
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testDirectFormulaInspectionAdapter)
 {
     sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);

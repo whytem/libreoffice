@@ -320,6 +320,23 @@ int main()
 
     {
         const auto aResult = parseFormula(
+            u"of:=SUM(OFFSET([.A1];0;0):OFFSET([.A1];2;0))");
+        if (!aResult || aResult.mpRoot->meKind != NodeKind::FunctionCall
+            || aResult.mpRoot->maChildren.size() != 1
+            || aResult.mpRoot->maChildren[0]->meKind != NodeKind::RangeConstructor
+            || aResult.mpRoot->maChildren[0]->maChildren.size() != 2
+            || aResult.mpRoot->maChildren[0]->maChildren[0]->meKind != NodeKind::FunctionCall
+            || aResult.mpRoot->maChildren[0]->maChildren[0]->maPrimaryText != u"OFFSET"
+            || aResult.mpRoot->maChildren[0]->maChildren[1]->meKind != NodeKind::FunctionCall
+            || aResult.mpRoot->maChildren[0]->maChildren[1]->maPrimaryText != u"OFFSET")
+        {
+            return fail("spreadsheetengine_fods_parser_tests",
+                "OFFSET range constructor parse mismatch");
+        }
+    }
+
+    {
+        const auto aResult = parseFormula(
             u"of:=([.A3]=[.D3])AND([.B3]=[.E3])AND([.C3]=[.F3])");
         if (!aResult || aResult.mpRoot->meKind != NodeKind::FunctionCall
             || aResult.mpRoot->maPrimaryText != u"AND"
