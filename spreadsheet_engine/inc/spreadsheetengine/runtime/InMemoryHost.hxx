@@ -30,6 +30,7 @@ class InMemoryEvaluationHost final : public api::EvaluationHost
     std::vector<Sheet> maSheets;
     api::DateParts maNullDate { 1899, 12, 30 };
     api::String maLocaleTag;
+    api::query::SearchType meSearchType = api::query::SearchType::Normal;
     std::map<std::pair<api::String, api::NumberParseMode>, api::NumberParseResult> maParsedNumbers;
     std::map<std::pair<double, api::FormatIndex>, api::String> maFormattedNumbers;
 
@@ -57,6 +58,8 @@ public:
     void setNullDate(const api::DateParts& rNullDate) { maNullDate = rNullDate; }
 
     void setLocaleTag(api::StringView rLocaleTag) { maLocaleTag = api::String(rLocaleTag); }
+
+    void setSearchType(api::query::SearchType eSearchType) { meSearchType = eSearchType; }
 
     void setParsedNumber(api::StringView rText, double fValue, api::FormatIndex nFormat = 0,
         api::NumberParseResult::Kind eKind = api::NumberParseResult::Kind::Number,
@@ -102,6 +105,11 @@ public:
     [[nodiscard]] api::DateParts getNullDate() const override { return maNullDate; }
 
     [[nodiscard]] api::String getLocaleTag() const override { return maLocaleTag; }
+
+    [[nodiscard]] api::query::SearchType getSearchType() const override
+    {
+        return meSearchType;
+    }
 
     [[nodiscard]] api::ValueResult<api::CellValue> getCellValue(
         const api::CellAddress& rAddress) const override

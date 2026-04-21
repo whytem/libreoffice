@@ -1793,12 +1793,7 @@ classifyImportedStoredHostTruthFunction(api::StringView rFunctionName)
 
 [[nodiscard]] inline api::query::SearchType searchTypeFromDocument(const ScDocument& rDoc)
 {
-    const ScDocOptions& rOptions = rDoc.GetDocOptions();
-    if (rOptions.IsFormulaRegexEnabled())
-        return api::query::SearchType::Regex;
-    if (rOptions.IsFormulaWildcardsEnabled())
-        return api::query::SearchType::Wildcard;
-    return api::query::SearchType::Normal;
+    return DocumentEvaluationHost(rDoc).getSearchType();
 }
 
 [[nodiscard]] inline api::Error mapNumericErrorCode(api::StringView rCode)

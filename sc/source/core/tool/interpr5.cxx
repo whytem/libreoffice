@@ -2528,7 +2528,7 @@ void ScInterpreter::ScMatRef()
     }
 }
 
-void ScInterpreter::ScInfo()
+void ScInterpreter::ExecuteInfoTerminal()
 {
     if( !MustHaveParamCount( GetByte(), 1 ) )
         return;

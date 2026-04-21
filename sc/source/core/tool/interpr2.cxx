@@ -462,7 +462,7 @@ void ScInterpreter::ExecuteUnionTerminal()
     PushTokenRef( xRes);
 }
 
-void ScInterpreter::ScCurrent()
+void ScInterpreter::ExecuteCurrentTerminal()
 {
     FormulaConstTokenRef xTok( PopToken());
     if (xTok)
@@ -474,7 +474,7 @@ void ScInterpreter::ScCurrent()
         PushError( FormulaError::UnknownStackVariable);
 }
 
-void ScInterpreter::ScStyle()
+void ScInterpreter::ExecuteStyleTerminal()
 {
     sal_uInt8 nParamCount = GetByte();
     if (!MustHaveParamCount(nParamCount, 1, 3))

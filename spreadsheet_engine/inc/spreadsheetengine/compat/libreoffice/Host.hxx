@@ -280,6 +280,16 @@ public:
         return maLocaleTag;
     }
 
+    [[nodiscard]] spreadsheetengine::api::query::SearchType getSearchType() const override
+    {
+        const ScDocOptions& rOptions = mrDoc.GetDocOptions();
+        if (rOptions.IsFormulaRegexEnabled())
+            return spreadsheetengine::api::query::SearchType::Regex;
+        if (rOptions.IsFormulaWildcardsEnabled())
+            return spreadsheetengine::api::query::SearchType::Wildcard;
+        return spreadsheetengine::api::query::SearchType::Normal;
+    }
+
     [[nodiscard]] spreadsheetengine::api::ValueResult<spreadsheetengine::api::CellValue>
     getCellValue(const spreadsheetengine::api::CellAddress& rAddress) const override
     {

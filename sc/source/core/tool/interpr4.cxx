@@ -4780,12 +4780,12 @@ StackVar ScInterpreter::Interpret()
                         },
                         "family-local default-on text utility reached ScInterpreter");
                 };
-                const auto pushLegacyUnaryTextTransform =
+                const auto dispatchUnaryTextTransformTerminal =
                     [&](std::u16string_view rFunctionName, auto aTransform) {
                         warnTextUtilityDispatch(rFunctionName);
                         PushString(aTransform(GetString().getString()));
                     };
-                const auto pushLegacyTextBeforeAfter = [&](bool bBefore) {
+                const auto dispatchTextBeforeAfterTerminal = [&](bool bBefore) {
                     warnTextUtilityDispatch(bBefore ? u"TEXTBEFORE" : u"TEXTAFTER");
                     sal_uInt8 nParamCount = GetByte();
                     if (!MustHaveParamCount(nParamCount, 1, 6))
@@ -4935,7 +4935,7 @@ StackVar ScInterpreter::Interpret()
                     else
                         PushString(sStr.copy(nDelimiterPos, nLength - nDelimiterPos));
                 };
-                const auto pushLegacyCurrency = [&]() {
+                const auto dispatchCurrencyTerminal = [&]() {
                     warnTextUtilityDispatch(u"DOLLAR");
                     sal_uInt8 nParamCount = GetByte();
                     if (!MustHaveParamCount(nParamCount, 1, 2))
@@ -4978,7 +4978,7 @@ StackVar ScInterpreter::Interpret()
                         mrContext.NFGetOutputString(fVal, nIndex, aStr, &pColor);
                     PushString(aStr);
                 };
-                const auto pushLegacyReplace = [&]() {
+                const auto dispatchReplaceTerminal = [&]() {
                     warnTextUtilityDispatch(u"REPLACE");
                     if (!MustHaveParamCount(GetByte(), 4))
                         return;
@@ -5014,7 +5014,7 @@ StackVar ScInterpreter::Interpret()
                         PushString(aOldStr);
                     }
                 };
-                const auto pushLegacyText = [&]() {
+                const auto dispatchTextTerminal = [&]() {
                     warnTextUtilityDispatch(u"TEXT");
                     if (!MustHaveParamCount(GetByte(), 2))
                         return;
@@ -5089,7 +5089,7 @@ StackVar ScInterpreter::Interpret()
                         }
                     }
                 };
-                const auto pushLegacySubstitute = [&]() {
+                const auto dispatchSubstituteTerminal = [&]() {
                     warnTextUtilityDispatch(u"SUBSTITUTE");
                     sal_uInt8 nParamCount = GetByte();
                     if (!MustHaveParamCount(nParamCount, 3, 4))
@@ -5135,7 +5135,7 @@ StackVar ScInterpreter::Interpret()
                         oResult->append(sStr.subView(nPos, sStr.getLength() - nPos));
                     PushString(oResult ? oResult->makeStringAndClear() : sStr);
                 };
-                const auto pushLegacyRegex = [&]() {
+                const auto dispatchRegexTerminal = [&]() {
                     warnTextUtilityDispatch(u"REGEX");
                     const sal_uInt8 nParamCount = GetByte();
                     if (!MustHaveParamCount(nParamCount, 2, 4))
@@ -5294,7 +5294,7 @@ StackVar ScInterpreter::Interpret()
                         reinterpret_cast<const sal_Unicode*>(aReplaced.getBuffer()),
                         aReplaced.length()));
                 };
-                const auto pushLegacyRightB = [&]() {
+                const auto dispatchRightBTerminal = [&]() {
                     warnTextUtilityDispatch(u"RIGHTB");
                     sal_uInt8 nParamCount = GetByte();
                     if (!MustHaveParamCount(nParamCount, 1, 2))
@@ -5311,7 +5311,7 @@ StackVar ScInterpreter::Interpret()
                     }
                     PushString(lcl_RightB(GetString().getString(), n));
                 };
-                const auto pushLegacyLeftB = [&]() {
+                const auto dispatchLeftBTerminal = [&]() {
                     warnTextUtilityDispatch(u"LEFTB");
                     sal_uInt8 nParamCount = GetByte();
                     if (!MustHaveParamCount(nParamCount, 1, 2))
@@ -5328,7 +5328,7 @@ StackVar ScInterpreter::Interpret()
                     }
                     PushString(lcl_LeftB(GetString().getString(), n));
                 };
-                const auto pushLegacyMidB = [&]() {
+                const auto dispatchMidBTerminal = [&]() {
                     warnTextUtilityDispatch(u"MIDB");
                     if (!MustHaveParamCount(GetByte(), 3))
                         return;
@@ -5344,7 +5344,7 @@ StackVar ScInterpreter::Interpret()
                         PushString(lcl_RightB(aStr, std::max<sal_Int32>(nCnt, 0)));
                     }
                 };
-                const auto pushLegacyReplaceB = [&]() {
+                const auto dispatchReplaceBTerminal = [&]() {
                     warnTextUtilityDispatch(u"REPLACEB");
                     if (!MustHaveParamCount(GetByte(), 4))
                         return;
@@ -5362,7 +5362,7 @@ StackVar ScInterpreter::Interpret()
                         PushString(aStr1 + aNewStr + aStr3);
                     }
                 };
-                const auto pushLegacyFindB = [&]() {
+                const auto dispatchFindBTerminal = [&]() {
                     warnTextUtilityDispatch(u"FINDB");
                     sal_uInt8 nParamCount = GetByte();
                     if (!MustHaveParamCount(nParamCount, 2, 3))
@@ -5387,7 +5387,7 @@ StackVar ScInterpreter::Interpret()
                         }
                     }
                 };
-                const auto pushLegacySearchB = [&]() {
+                const auto dispatchSearchBTerminal = [&]() {
                     warnTextUtilityDispatch(u"SEARCHB");
                     sal_uInt8 nParamCount = GetByte();
                     if (!MustHaveParamCount(nParamCount, 2, 3))
@@ -5429,7 +5429,7 @@ StackVar ScInterpreter::Interpret()
                         }
                     }
                 };
-                const auto pushLegacyEncodeUrl = [&]() {
+                const auto dispatchEncodeUrlTerminal = [&]() {
                     warnTextUtilityDispatch(u"ENCODEURL");
                     sal_uInt8 nParamCount = GetByte();
                     if (!MustHaveParamCount(nParamCount, 1))
@@ -5466,7 +5466,7 @@ StackVar ScInterpreter::Interpret()
                     }
                     PushString(OUString::fromUtf8(aUrlBuf));
                 };
-                const auto pushLegacyTextJoinMs = [&]() {
+                const auto dispatchTextJoinMsTerminal = [&]() {
                     warnTextUtilityDispatch(u"TEXTJOIN");
                     short nParamCount = GetByte();
                     if (!MustHaveParamCountMin(nParamCount, 3))
@@ -5695,7 +5695,7 @@ StackVar ScInterpreter::Interpret()
                     }
                     PushString(aResBuf.makeStringAndClear());
                 };
-                const auto pushLegacyBahtText = [&]() {
+                const auto dispatchBahtTextTerminal = [&]() {
                     warnTextUtilityDispatch(u"BAHTTEXT");
                     sal_uInt8 nParamCount = GetByte();
                     if (!MustHaveParamCount(nParamCount, 1))
@@ -5742,7 +5742,7 @@ StackVar ScInterpreter::Interpret()
                     }
                     PushString(aText.makeStringAndClear());
                 };
-                const auto pushLegacyLeftRight = [&](bool bRight) {
+                const auto dispatchLeftRightTerminal = [&](bool bRight) {
                     warnTextUtilityDispatch(bRight ? u"RIGHT" : u"LEFT");
                     sal_uInt8 nParamCount = GetByte();
                     if (!MustHaveParamCount(nParamCount, 1, 2))
@@ -5786,7 +5786,7 @@ StackVar ScInterpreter::Interpret()
                     }
                     PushString(aStr.copy(nIdx, nLen - nIdx));
                 };
-                const auto pushLegacyConcatMs = [&]() {
+                const auto dispatchConcatMsTerminal = [&]() {
                     warnTextUtilityDispatch(u"CONCAT");
                     OUStringBuffer aResBuf;
                     short nParamCount = GetByte();
@@ -12062,8 +12062,8 @@ StackVar ScInterpreter::Interpret()
                             PushIllegalParameter();
                         }
                         break;
-                    case ocTextAfter        : pushLegacyTextBeforeAfter(false); break;
-                    case ocTextBefore       : pushLegacyTextBeforeAfter(true);  break;
+                    case ocTextAfter        : dispatchTextBeforeAfterTerminal(false); break;
+                    case ocTextBefore       : dispatchTextBeforeAfterTerminal(true);  break;
                     case ocTextSplit        :
                         if (!dispatchSpillTextSplitTerminal())
                         {
@@ -12605,8 +12605,8 @@ StackVar ScInterpreter::Interpret()
                         PushInt(int(bRes));
                     }
                     break;
-                    case ocType             : ScType();                 break;
-                    case ocCell             : ScCell();                     break;
+                    case ocType             : ExecuteTypeTerminal();    break;
+                    case ocCell             : ExecuteCellTerminal();    break;
                     case ocIsRef            :
                     {
                         warnInformationPredicateDispatch(u"ISREF");
@@ -12703,7 +12703,7 @@ StackVar ScInterpreter::Interpret()
                         warnInformationPredicateDispatch(u"ISODD");
                         PushInt(int(!IsEven()));
                         break;
-                    case ocN                : ScN();                    break;
+                    case ocN                : ExecuteNTerminal();       break;
                     case ocGetDateValue     :
                         warnIfLegacyDispatchReached(
                             "literal-only hard-routed", u"DATEVALUE",
@@ -12737,21 +12737,21 @@ StackVar ScInterpreter::Interpret()
                             textInfoTrim(*this);
                         break;
                     case ocUpper            :
-                        pushLegacyUnaryTextTransform(
+                        dispatchUnaryTextTransformTerminal(
                             u"UPPER", [&](const OUString& rText) {
                                 return selibreoffice::uppercase(
                                     ScGlobal::getCharClass(), rText);
                             });
                         break;
                     case ocProper           :
-                        pushLegacyUnaryTextTransform(
+                        dispatchUnaryTextTransformTerminal(
                             u"PROPER", [&](const OUString& rText) {
                                 return selibreoffice::propercase(
                                     ScGlobal::getCharClass(), rText);
                             });
                         break;
                     case ocLower            :
-                        pushLegacyUnaryTextTransform(
+                        dispatchUnaryTextTransformTerminal(
                             u"LOWER", [&](const OUString& rText) {
                                 return selibreoffice::lowercase(
                                     ScGlobal::getCharClass(), rText);
@@ -13824,7 +13824,7 @@ StackVar ScInterpreter::Interpret()
                     break;
                     case ocFilterXML        : ScFilterXML();            break;
                     case ocWebservice       : ScWebservice();           break;
-                    case ocEncodeURL        : pushLegacyEncodeUrl();    break;
+                    case ocEncodeURL        : dispatchEncodeUrlTerminal(); break;
                     case ocColor            :
                     {
                         warnIfLegacyDefaultOnReached(
@@ -14138,8 +14138,8 @@ StackVar ScInterpreter::Interpret()
                     case ocAreas            :
                         dispatchAreaCount();
                         break;
-                    case ocCurrency         : pushLegacyCurrency();     break;
-                    case ocReplace          : pushLegacyReplace();      break;
+                    case ocCurrency         : dispatchCurrencyTerminal(); break;
+                    case ocReplace          : dispatchReplaceTerminal();  break;
                     case ocFixed            :
                         [&]() {
                             warnTextUtilityDispatch(u"FIXED");
@@ -14226,8 +14226,8 @@ StackVar ScInterpreter::Interpret()
                             PushInt(int(s1 == s2));
                         }
                         break;
-                    case ocLeft             : pushLegacyLeftRight(false);   break;
-                    case ocRight            : pushLegacyLeftRight(true);    break;
+                    case ocLeft             : dispatchLeftRightTerminal(false); break;
+                    case ocRight            : dispatchLeftRightTerminal(true);  break;
                     case ocSearch           :
                         [&]() {
                             warnTextUtilityDispatch(u"SEARCH");
@@ -14309,9 +14309,9 @@ StackVar ScInterpreter::Interpret()
                             }
                         }();
                         break;
-                    case ocText             : pushLegacyText();         break;
-                    case ocSubstitute       : pushLegacySubstitute();   break;
-                    case ocRegex            : pushLegacyRegex();        break;
+                    case ocText             : dispatchTextTerminal();       break;
+                    case ocSubstitute       : dispatchSubstituteTerminal(); break;
+                    case ocRegex            : dispatchRegexTerminal();      break;
                     case ocRept             :
                         [&]() {
                             warnTextUtilityDispatch(u"REPT");
@@ -14354,8 +14354,8 @@ StackVar ScInterpreter::Interpret()
                         PushString(aRes.makeStringAndClear());
                     }
                     break;
-                    case ocConcat_MS        : pushLegacyConcatMs();         break;
-                    case ocTextJoin_MS      : pushLegacyTextJoinMs();   break;
+                    case ocConcat_MS        : dispatchConcatMsTerminal();     break;
+                    case ocTextJoin_MS      : dispatchTextJoinMsTerminal();   break;
                     case ocIfs_MS           :
                         if (!dispatchIfsTerminal())
                         {
@@ -15222,8 +15222,8 @@ StackVar ScInterpreter::Interpret()
                             PushNA();
                     }
                     break;
-                    case ocCurrent          : ScCurrent();                  break;
-                    case ocStyle            : ScStyle();                    break;
+                    case ocCurrent          : ExecuteCurrentTerminal();      break;
+                    case ocStyle            : ExecuteStyleTerminal();        break;
                     case ocDde              : ScDde();                      break;
                     case ocBase             :
                     {
@@ -15421,9 +15421,9 @@ StackVar ScInterpreter::Interpret()
                             PushIllegalArgument();
                     }
                     break;
-                    case ocInfo             : ScInfo();                 break;
+                    case ocInfo             : ExecuteInfoTerminal();    break;
                     case ocHyperLink        : ScHyperLink();            break;
-                    case ocBahtText         : pushLegacyBahtText();     break;
+                    case ocBahtText         : dispatchBahtTextTerminal(); break;
                     case ocGetPivotData     : ScGetPivotData();             break;
                     case ocJis              :
                         warnTextUtilityDispatch(u"JIS");
@@ -15439,12 +15439,12 @@ StackVar ScInterpreter::Interpret()
                         warnTextUtilityDispatch(u"LENB");
                         PushDouble(getLengthB(GetString().getString()));
                         break;
-                    case ocRightB           : pushLegacyRightB();       break;
-                    case ocLeftB            : pushLegacyLeftB();        break;
-                    case ocMidB             : pushLegacyMidB();         break;
-                    case ocReplaceB         : pushLegacyReplaceB();     break;
-                    case ocFindB            : pushLegacyFindB();        break;
-                    case ocSearchB          : pushLegacySearchB();      break;
+                    case ocRightB           : dispatchRightBTerminal();   break;
+                    case ocLeftB            : dispatchLeftBTerminal();    break;
+                    case ocMidB             : dispatchMidBTerminal();     break;
+                    case ocReplaceB         : dispatchReplaceBTerminal(); break;
+                    case ocFindB            : dispatchFindBTerminal();    break;
+                    case ocSearchB          : dispatchSearchBTerminal();  break;
                     case ocUnicode          :
                         warnTextUtilityDispatch(u"UNICODE");
                         spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::

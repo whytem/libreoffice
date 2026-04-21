@@ -57,9 +57,9 @@ quietly drift out of date.
 | Named / external / database / structured range resolution | compile-host lookup resolvers, `RangeResolver::resolveRange`, `DocumentRangeResolver` | `already exposed` | query-family range walking, structured-reference materialization follow-ups | One evaluation-time resolver now covers named, DB, external, and INDIRECT-driven range binding; structured references that cannot flatten still round-trip as `TokenBackedSymbol` |
 | Matrix materialization | `materializeHostRangeToMatrixOperand`, `CellValueView::matrixReference`, matrix operand bridges | `already exposed` | `ScMatValue`, `ScMatRef`, `ScFrequency`, `ScForecast_Ets`, matrix-return lookup/stat tails | Stable compat-layer contract; may later move behind public API if non-LO hosts need it |
 | Criteria / range iteration | `CriteriaAggregateMaterializer` stopgap inside query runtime | `missing` | `ScSubTotal`, DB-family tails, COUNTBLANK widening, future streaming criteria work | Needs a standalone `RangeIterator` or equivalent streaming walker |
-| Formula text / inspection | family-local compat helpers for `FORMULA` / `ISFORMULA` | `missing` | `ScCell`, `ScCellExternal`, `ScCurrent`, `ScStyle`, formula inspection residue | Behavior exists, but no explicit engine-facing host interface yet |
-| Format / type inspection | `ValueFormatting`, direct cell-kind checks in compat helpers | `exposed but too broad` | `ScType`, `ScCell`, `ScCellExternal`, `ScCurrent`, `ScStyle`, host-sensitive text/formatting lambdas | Formatting is exposed; cell-kind and style inspection are still Calc-specific |
-| Locale / calendar / date / search policy | `RuntimeEnvironment`, `TextCoercion`, `searchTypeFromDocument` stopgap | `exposed but too broad` | `ScRandom*`, `pushLegacyRegex`, `pushLegacySearch`, `pushLegacyTextBeforeAfter`, date/time parsing tails | Locale and null-date are exposed; search policy still needs a formal host method |
+| Formula text / inspection | `runtime::formulainspection::Provider`, `DirectFormulaInspectionAdapter` | `already exposed` | `ExecuteCellTerminal`, `ExecuteCellExternalTerminal`, `ExecuteInfoTerminal`, formula inspection predicates | Formula-presence and formula-text reads now flow through an explicit inspection provider instead of ad hoc document peeks |
+| Format / type inspection | `runtime::cellinspection::*`, `DirectCellInspectionAdapter`, `DirectHostCellInspectionAdapter` | `already exposed` | `ExecuteTypeTerminal`, `ExecuteCellTerminal`, `ExecuteCellExternalTerminal`, `ExecuteCurrentTerminal`, `ExecuteStyleTerminal`, host-sensitive text terminals | The bounded/value vs. host-property split is now explicit, so remaining Calc ownership is terminal glue rather than hidden evaluator policy |
+| Locale / calendar / date / search policy | `RuntimeEnvironment::getNullDate()`, `RuntimeEnvironment::getLocaleTag()`, `RuntimeEnvironment::getSearchType()`, `TextCoercion` | `already exposed` | `ScRandom*`, host-sensitive text/search terminals, date/time parsing tails | Locale, null-date, and search-mode policy are now explicit host contracts; deterministic random/system policy is the remaining open decision |
 | Spill allocation | `SpillRangeAllocator` | `already exposed` | dynamic-array reshaping / spill-shaping tails | Contract is fixed; binding into `EvaluationHost` remains an adapter step, not a contract-definition gap |
 | Control-flow / interpreter state | engine substrates (`RpnValue`, `RpnControlFlow`), no host method by design | `intentionally unsupported` | `ScLet`, `ScIfJump*`, `ScChooseJump`, jump-matrix state | This state should live inside the engine evaluator, not inside the Host facade |
 | External computation terminals | no engine contract by design | `intentionally unsupported` | `ScMacro`, `ScDde`, `ScWebservice`, `ScFilterXML`, `ScGetPivotData`, `ScHyperLink` | These remain explicit host terminals unless the project makes a separate product decision |
@@ -68,10 +68,11 @@ quietly drift out of date.
 
 ### Surviving `pushLegacy*` clusters
 
-| Legacy cluster | Current surviving surface | Required host-service categories | Contract status summary |
-| --- | --- | --- | --- |
-| Host-sensitive text / formatting / search | `pushLegacyUnaryTextTransform`, `pushLegacyTextBeforeAfter`, `pushLegacyCurrency`, `pushLegacyReplace`, `pushLegacyText`, `pushLegacySubstitute`, `pushLegacyRegex`, `pushLegacyRightB`, `pushLegacyLeftB`, `pushLegacyMidB`, `pushLegacyReplaceB`, `pushLegacyFindB`, `pushLegacySearchB`, `pushLegacyEncodeUrl`, `pushLegacyTextJoinMs`, `pushLegacyBahtText`, `pushLegacyLeftRight`, `pushLegacyConcatMs` | scalar cell read, format/type inspection, locale/calendar/date mode, regex/text services | Blocked mostly on format/type inspection and explicit search-policy contracts, not on raw scalar evaluation |
-| Scalar helper / finance-adjacent | `pushLegacyGcdOrLcm`, `pushLegacyCombin`, `pushLegacyBitwise` | scalar cell read only | No new host contract is required; these are deletion-backed cleanup candidates once exercised retirement evidence is strong enough |
+Phase 6 retired the remaining `pushLegacy*` lambda surface from
+`interpr4.cxx`. Host-sensitive text / formatting / search work still
+exists, but it now hangs off explicitly named dispatch terminals plus
+the `FormulaInspection`, `CellInspection`, and `RuntimeEnvironment`
+contracts above rather than an ad hoc `pushLegacy*` inventory.
 
 ### Surviving `Sc*` clusters
 
@@ -79,20 +80,17 @@ quietly drift out of date.
 | --- | --- | --- | --- |
 | Reference / lookup / addressing | `ExecuteLookupTerminal`, `ExecuteXLookupTerminal`, `ExecuteIndirectTerminal`, `ExecuteAddressTerminal`, `ExecuteIndexTerminal`, `ExecuteMultiAreaTerminal`, `ExecuteExternalTerminal`, `ExecuteMissingTerminal`, `ExecuteRangeReferenceTerminal`, `ExecuteUnionTerminal`, `ExecuteIntersectTerminal` | reference resolution, named/external/database range resolution, matrix materialization | Phase 4 moved evaluator-worthy lookup/address logic behind `RangeResolver`; the remaining Calc terminals are explicit host-owned stack/reference glue |
 | DB / criteria / transform | `ScSubTotal`, `ScDBArea`, `ExecuteSortByTerminal`, `ScColRowNameAuto` | criteria/range iteration, named/database range resolution, spill allocation | The major missing contract here is streaming range iteration; spill is defined but not yet the limiting blocker |
-| Cell / metadata / inspection | `ScType`, `ScCell`, `ScCellExternal`, `ScCurrent`, `ScStyle`, `ScInfo`, `ScN` | scalar cell read, formula text/inspection, format/type inspection | Host interfaces exist only partially; inspection behavior is still mostly Calc-local |
+| Cell / metadata / inspection | `ExecuteTypeTerminal`, `ExecuteCellTerminal`, `ExecuteCellExternalTerminal`, `ExecuteCurrentTerminal`, `ExecuteStyleTerminal`, `ExecuteInfoTerminal`, `ExecuteNTerminal` | scalar cell read, formula text/inspection, format/type inspection | Phase 6 moved the remaining inspection/text-search surface onto explicit runtime contracts plus host-owned terminals; the residual Calc logic is terminal glue rather than hidden evaluator policy |
 | Operator / control / stack state | `ExecuteComparisonKernel`, `ExecuteLogicalFoldKernel`, `ExecuteUnaryMatrixOrScalarKernel`, `ExecuteBinaryMathKernel`, `ExecuteLetKernel` | control-flow/interpreter state, matrix materialization, format propagation | Phase 3 already moved this surface into engine-native runtime helpers; no Host-facade gap remains here |
 | Matrix / statistical tails | `ScMatValue`, `ScMatRef`, `ScFrequency`, `ScForecast_Ets`, `ScFourier`, `ScSumXMY2` | matrix materialization, scalar cell read, criteria/range iteration | Matrix materialization is real; iteration and matrix-frame state still limit wider retirement |
 | Random / system-policy | `ScRandom`, `ScRandbetween`, `ScRandArray`, `ScRandomImpl` | locale/calendar/date mode, deterministic system-state policy | Host environment contract exists, but deterministic/random policy still needs an explicit project decision |
 | External computation terminals | `ScMacro`, `ScDde`, `ScWebservice`, `ScFilterXML`, `ScGetPivotData`, `ScHyperLink` | external computation | Intentionally host-owned and outside the engine-native evaluator contract |
 
-### Missing or fragmented contracts that Phase 3+ depend on
+### Missing or fragmented contracts that Phase 7+ depend on
 
 | Contract | Current status | Why it is still needed |
 | --- | --- | --- |
 | `RangeIterator` | `missing` | Required to stop baking iteration into query/materializer helpers and to widen DB / criteria / COUNTBLANK work honestly |
-| `RuntimeEnvironment::getSearchType()` | `missing` | Required to remove the current direct `ScDocOptions` stopgap from regex / wildcard admissions |
-| Explicit formula inspection host interface | `missing` | Required to finish `FORMULA` / `ISFORMULA`-adjacent and cell-inspection migration without leaning on raw Calc document access |
-| Narrow cell/type inspection API | `exposed but too broad` | Required to shrink the host-sensitive text/formatting tail without growing a catch-all "tell me everything about this cell" surface |
 
 This matrix is the Phase 2 completion artifact the pivot plan refers to. New
 Host-facing work should extend one of the rows above rather than inventing an
@@ -637,18 +635,17 @@ matrix-arithmetic substrate. A streaming primitive only pays off
 when the aggregate does not need a second pass; the first target is
 COUNTBLANK against whole-column references.
 
-### Regex / wildcard mode (partial — currently read from `ScDocOptions` directly)
+### Regex / wildcard mode (landed in Phase 6)
 
-**Current state.** A single compat-layer helper,
-`searchTypeFromDocument(const ScDocument&)` in
-[`InterpretTailEngineEvaluator.hxx`](../../inc/spreadsheetengine/compat/libreoffice/InterpretTailEngineEvaluator.hxx),
-reads `rDoc.GetDocOptions()` and maps `IsFormulaRegexEnabled()` /
-`IsFormulaWildcardsEnabled()` to `api::query::SearchType` (one of
-`Normal`, `Wildcard`, `Regex`). Every lookup / query admission calls
-this helper and threads the result into the pure engine comparator.
+**Current state.** `RuntimeEnvironment` now exposes
+`getSearchType()`, and both the LibreOffice
+`DocumentEvaluationHost` adapter and the standalone in-memory host
+implement it. The compat helper in
+[`InterpretTailEngineEvaluator.hxx`](../../inc/spreadsheetengine/compat/libreoffice/InterpretTailEngineEvaluator.hxx)
+delegates through that host method so lookup / query admissions no
+longer depend on an ad hoc `ScDocOptions` read at the callsite.
 
-**Desired formalization.** Promote the helper to a first-class
-`RuntimeEnvironment` member:
+**Contract.**
 
 ```cpp
 class RuntimeEnvironment {
@@ -658,9 +655,8 @@ public:
 };
 ```
 
-Low-risk rename once the standalone test host grows the same
-surface. Removes one `ScDocument` dependency from the engine-first
-planners.
+This keeps regex / wildcard / normal matching policy in the same
+host-owned environment surface as locale tag and null-date policy.
 
 ### Evaluation-time `RangeResolver` follow-ups
 

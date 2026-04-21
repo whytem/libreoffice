@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <variant>
 
 #include <spreadsheetengine/api/Date.hxx>
@@ -17,6 +18,11 @@
 #include <spreadsheetengine/api/String.hxx>
 
 #include <spreadsheetengine/api/Types.hxx>
+
+namespace spreadsheetengine::api::query
+{
+enum class SearchType : std::uint8_t;
+}
 
 namespace spreadsheetengine::api
 {
@@ -281,6 +287,7 @@ public:
 
     [[nodiscard]] virtual DateParts getNullDate() const = 0;
     [[nodiscard]] virtual String getLocaleTag() const = 0;
+    [[nodiscard]] virtual query::SearchType getSearchType() const = 0;
 };
 
 // Spill-range allocation contract.  See RpnSpill.hxx for the engine-side

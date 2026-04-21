@@ -645,11 +645,11 @@ private:
     void ScRandomImpl( const std::function<double( double fFirst, double fLast )>& RandomFunc,
             double fFirst, double fLast );
     bool IsString();
-    void ScType();
-    void ScCell();
-    void ScCellExternal();
+    void ExecuteTypeTerminal();
+    void ExecuteCellTerminal();
+    void ExecuteCellExternalTerminal();
     bool IsEven();
-    void ScN();
+    void ExecuteNTerminal();
     /** Check for array of references to determine the maximum size of a return
         column vector if in array context. */
     size_t GetRefListArrayMaxSize( short nParamCount );
@@ -725,8 +725,8 @@ public:
             ::std::vector<double>& rSortArray, bool bWeekendMask[ 7 ], bool bWorkdayFunction );
     static inline sal_Int16 GetDayOfWeek( sal_Int32 n );
     void RoundNumber( rtl_math_RoundingMode eMode );
-    void ScCurrent();
-    void ScStyle();
+    void ExecuteCurrentTerminal();
+    void ExecuteStyleTerminal();
     void ScDde();
     static void RoundSignificant( double fX, double fDigits, double &fRes );
 
@@ -787,7 +787,7 @@ private:
     static void QuickSort(::std::vector<double>& rSortArray, ::std::vector<tools::Long>* pIndexOrder);
     static double GetPercentrank( ::std::vector<double> & rArray, double fVal, bool bInclusive );
     void ScFrequency();
-    void ScInfo();
+    void ExecuteInfoTerminal();
 
     void ScFilterXML();
     void ScWebservice();

@@ -1671,7 +1671,7 @@ bool ScInterpreter::IsString()
     return bRes;
 }
 
-void ScInterpreter::ScType()
+void ScInterpreter::ExecuteTypeTerminal()
 {
     short nType = 0;
     switch ( GetStackType() )
@@ -1771,7 +1771,7 @@ FormulaGrammar::AddressConvention resolveCellInfoAddressConvention(
 
 }
 
-void ScInterpreter::ScCell()
+void ScInterpreter::ExecuteCellTerminal()
 {   // ATTRIBUTE ; [REF]
     sal_uInt8 nParamCount = GetByte();
     if( !MustHaveParamCount( nParamCount, 1, 2 ) )
@@ -1786,7 +1786,7 @@ void ScInterpreter::ScCell()
             case svExternalDoubleRef:
             {
                 // Let's handle external reference separately...
-                ScCellExternal();
+                ExecuteCellExternalTerminal();
                 return;
             }
             case svDoubleRef:
@@ -1881,7 +1881,7 @@ void ScInterpreter::ScCell()
     }
 }
 
-void ScInterpreter::ScCellExternal()
+void ScInterpreter::ExecuteCellExternalTerminal()
 {
     sal_uInt16 nFileId;
     OUString aTabName;
@@ -2059,7 +2059,7 @@ bool ScInterpreter::IsEven()
     return bRes;
 }
 
-void ScInterpreter::ScN()
+void ScInterpreter::ExecuteNTerminal()
 {
     FormulaError nErr = nGlobalError;
     nGlobalError = FormulaError::NONE;

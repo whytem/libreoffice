@@ -469,6 +469,12 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testCalcHostAdapter)
     CPPUNIT_ASSERT_EQUAL(static_cast<std::int16_t>(12), aNullDate.mnMonth);
     CPPUNIT_ASSERT_EQUAL(static_cast<std::int16_t>(30), aNullDate.mnDay);
     CPPUNIT_ASSERT_EQUAL(u"en-US"_ustr, spreadsheetengine::compat::libreoffice::toLibreOfficeString(aHost.getLocaleTag()));
+    const auto eExpectedSearchType = m_pDoc->GetDocOptions().IsFormulaRegexEnabled()
+                                         ? spreadsheetengine::api::query::SearchType::Regex
+                                     : m_pDoc->GetDocOptions().IsFormulaWildcardsEnabled()
+                                         ? spreadsheetengine::api::query::SearchType::Wildcard
+                                         : spreadsheetengine::api::query::SearchType::Normal;
+    CPPUNIT_ASSERT_EQUAL(eExpectedSearchType, aHost.getSearchType());
 
     setValueCell(m_pDoc, 0, 42.5);
     setTextCell(m_pDoc, 1, u"hello"_ustr);

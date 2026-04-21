@@ -5641,8 +5641,15 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
     CPPUNIT_ASSERT_MESSAGE("legacy interpreter subroutine metric should scan interpre.hxx",
         nLegacyInterpreterSubroutineCount > 0);
     const auto aLegacyLambdaInventory = countInterp4LegacyLambdas();
-    CPPUNIT_ASSERT_MESSAGE("interp4 legacy lambda metric should scan interpr4.cxx",
-        aLegacyLambdaInventory.mnLambdaCount > 0);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "Phase 6 should retire all pushLegacy* lambdas from interpr4.cxx",
+        std::size_t(0), aLegacyLambdaInventory.mnLambdaCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "Phase 6 should retire all pushLegacy* dispatch callsites from interpr4.cxx",
+        std::size_t(0), aLegacyLambdaInventory.mnDispatchLambdaCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "Phase 6 should retire all pushLegacy* opcode callsites from interpr4.cxx",
+        std::size_t(0), aLegacyLambdaInventory.mnDispatchCallCount);
     CPPUNIT_ASSERT_EQUAL(std::size_t(0),
         aLegacyLambdaInventory.mnQuarantineMissingDispatchLambdaCount);
     const auto aEngineDispatchInventory = countInterp4EngineDispatchAttempts();
