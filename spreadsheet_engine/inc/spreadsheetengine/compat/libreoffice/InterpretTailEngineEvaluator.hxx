@@ -199,10 +199,18 @@ struct EvaluationAttempt
     bool mbSupported = false;
     api::formulavalue::FormulaResultValue maResult
         = api::formulavalue::makeInvalidResult();
+    ScConstMatrixRef mpMatrixResult;
+    SCSIZE mnMatrixColumns = 0;
+    SCSIZE mnMatrixRows = 0;
     SvNumFormatType meFormatType = SvNumFormatType::ALL;
     FallbackReason meFallbackReason = FallbackReason::UnsupportedFormulaShape;
     FunctionKind meFunction = FunctionKind::Unknown;
     RpnCategory meRpnCategory = RpnCategory::General;
+
+    [[nodiscard]] bool hasMatrixResult() const
+    {
+        return mpMatrixResult && mnMatrixColumns > 0 && mnMatrixRows > 0;
+    }
 };
 
 struct StatsSnapshot
@@ -1971,6 +1979,52 @@ template <typename T>
     if (rValue.isNumber())
         return makeNumericResult(eFunction, rValue.mfNumber, SvNumFormatType::NUMBER);
     return makeNumericResult(eFunction, 0.0, SvNumFormatType::NUMBER);
+}
+
+[[nodiscard]] inline EvaluationAttempt makeMatrixResult(
+    FunctionKind eFunction, const ScConstMatrixRef& pMatrix)
+{
+    EvaluationAttempt aAttempt;
+    aAttempt.mbSupported = true;
+    aAttempt.meFunction = eFunction;
+    aAttempt.mpMatrixResult = pMatrix;
+    if (!pMatrix)
+    {
+        aAttempt.maResult = makeErrorResultFromApi(api::Error::IllegalArgument);
+        return aAttempt;
+    }
+
+    pMatrix->GetDimensions(aAttempt.mnMatrixColumns, aAttempt.mnMatrixRows);
+    if (aAttempt.mnMatrixColumns < 1 || aAttempt.mnMatrixRows < 1)
+    {
+        aAttempt.maResult = makeErrorResultFromApi(api::Error::IllegalArgument);
+        return aAttempt;
+    }
+
+    const ScMatrixValue aTopLeftMatrixValue = pMatrix->Get(0, 0);
+    api::CellValue aTopLeft;
+    if (ScMatrix::IsNonValueType(aTopLeftMatrixValue.nType))
+    {
+        if (pMatrix->IsEmptyPath(0, 0) || pMatrix->IsEmptyResult(0, 0) || pMatrix->IsEmpty(0, 0))
+            aTopLeft = api::CellValue::empty();
+        else
+            aTopLeft = api::CellValue::text(toApiString(aTopLeftMatrixValue.GetString().getString()));
+    }
+    else
+    {
+        const FormulaError eError = GetDoubleErrorValue(aTopLeftMatrixValue.fVal);
+        if (eError != FormulaError::NONE)
+            aTopLeft = api::CellValue::error(toApiError(eError));
+        else if (ScMatrix::IsBooleanType(aTopLeftMatrixValue.nType))
+            aTopLeft = api::CellValue::boolean(aTopLeftMatrixValue.GetBoolean());
+        else
+            aTopLeft = api::CellValue::number(aTopLeftMatrixValue.fVal);
+    }
+
+    const auto aScalarAttempt = makeScalarAttempt(eFunction, aTopLeft);
+    aAttempt.maResult = aScalarAttempt.maResult;
+    aAttempt.meFormatType = aScalarAttempt.meFormatType;
+    return aAttempt;
 }
 
 [[nodiscard]] inline FunctionKind classifyDelegatedFunctionNode(
@@ -14934,7 +14988,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     const ScDocument& rDoc, ScInterpreterContext& rContext, const ScAddress& rFormulaPos,
     std::u16string_view rFormulaSource, bool bEmptyStringAsZero,
     const ScTokenArray* pTokenArray = nullptr,
-    std::u16string_view rCanonicalFormulaSource = {})
+    std::u16string_view rCanonicalFormulaSource = {}, bool bPreserveMatrixResult = false)
 {
     const api::String aNormalized = detail::normalizeFormulaSource(rFormulaSource);
     const api::String aTokenBackedCanonical
@@ -14992,6 +15046,17 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     {
         return finalizeAttempt(
             detail::makeErrorResult(eRootFunction, detail::mapErrorLiteral(rRoot.maPrimaryText)));
+    }
+
+    if (bPreserveMatrixResult)
+    {
+        const auto aMatrix = detail::materializeMatrixNode(rRoot, rDoc, rContext, rFormulaPos);
+        if (aMatrix.mbSupported)
+        {
+            if (!aMatrix.moValue)
+                return finalizeAttempt(detail::makeErrorResult(eRootFunction, aMatrix.meError));
+            return finalizeAttempt(detail::makeMatrixResult(eRootFunction, *aMatrix.moValue));
+        }
     }
 
     if (rRoot.meKind != core::formula::NodeKind::FunctionCall)
@@ -15104,7 +15169,9 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
            || eFunction == FunctionKind::CalendarUtility
            || eFunction == FunctionKind::DateDifference
            || eFunction == FunctionKind::DateConstructExtract
-           || eFunction == FunctionKind::MatrixMath;
+           || eFunction == FunctionKind::MatrixMath
+           || eFunction == FunctionKind::Selector
+           || eFunction == FunctionKind::SpillArray;
 }
 
 [[nodiscard]] inline bool isUnknownSupportedFormula(std::u16string_view rFormulaSource)

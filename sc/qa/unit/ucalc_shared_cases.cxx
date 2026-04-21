@@ -3708,6 +3708,15 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorSelectorHe
         aChooseRowsAlias.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(7.0, aChooseRowsAlias.maResult.mfValue, 1e-12);
 
+    const auto aChooseColsMatrix = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=CHOOSECOLS(A1:C3;3;1)", false, nullptr, {}, true);
+    CPPUNIT_ASSERT(aChooseColsMatrix.mbSupported);
+    CPPUNIT_ASSERT(aChooseColsMatrix.hasMatrixResult());
+    CPPUNIT_ASSERT_EQUAL(static_cast<SCSIZE>(2), aChooseColsMatrix.mnMatrixColumns);
+    CPPUNIT_ASSERT_EQUAL(static_cast<SCSIZE>(3), aChooseColsMatrix.mnMatrixRows);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, aChooseColsMatrix.mpMatrixResult->Get(0, 0).fVal, 1e-12);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(7.0, aChooseColsMatrix.mpMatrixResult->Get(1, 2).fVal, 1e-12);
+
     const auto aInvalid = setaileval::tryEvaluateFormula(
         *m_pDoc, rContext, aFormulaPos, u"=CHOOSECOLS(A1:C3;0)", false);
     CPPUNIT_ASSERT(aInvalid.mbSupported);
@@ -4249,6 +4258,16 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorSpillArray
     CPPUNIT_ASSERT_EQUAL(
         spreadsheetengine::api::formulavalue::ValueType::Value, aHStack.maResult.meType);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(10.0, aHStack.maResult.mfValue, 1e-12);
+
+    const auto aUniqueMatrix = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=COM.MICROSOFT.UNIQUE(D1:D5;;TRUE())", false, nullptr,
+        {}, true);
+    CPPUNIT_ASSERT(aUniqueMatrix.mbSupported);
+    CPPUNIT_ASSERT(aUniqueMatrix.hasMatrixResult());
+    CPPUNIT_ASSERT_EQUAL(static_cast<SCSIZE>(1), aUniqueMatrix.mnMatrixColumns);
+    CPPUNIT_ASSERT_EQUAL(static_cast<SCSIZE>(3), aUniqueMatrix.mnMatrixRows);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, aUniqueMatrix.mpMatrixResult->Get(0, 0).fVal, 1e-12);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aUniqueMatrix.mpMatrixResult->Get(0, 2).fVal, 1e-12);
 }
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorStatisticalDistributionHelper)

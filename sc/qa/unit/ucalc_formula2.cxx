@@ -3923,6 +3923,216 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorBroadcastMatr
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2,
+    testInterpretTailEngineEvaluatorMultiCellSelectorMatrixDefaultOn)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+        m_pDoc->InsertTab(0, u"EngineMultiCellSelectorMatrixDefaultOn"_ustr));
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(1, 0, 0, 2.0);
+    m_pDoc->SetValue(2, 0, 0, 3.0);
+    m_pDoc->SetValue(0, 1, 0, 4.0);
+    m_pDoc->SetValue(1, 1, 0, 5.0);
+    m_pDoc->SetValue(2, 1, 0, 6.0);
+    m_pDoc->SetValue(0, 2, 0, 7.0);
+    m_pDoc->SetValue(1, 2, 0, 8.0);
+    m_pDoc->SetValue(2, 2, 0, 9.0);
+
+    ScMarkData aMark(m_pDoc->GetSheetLimits());
+    aMark.SelectOneTable(0);
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+        setaileval::resetStats();
+
+        m_pDoc->InsertMatrixFormula(0, 7, 1, 9, aMark, u"=CHOOSECOLS(A1:C3;3;1)"_ustr);
+
+        ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(0, 7, 0));
+        ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(1, 7, 0));
+        ASSERT_DOUBLES_EQUAL(6.0, m_pDoc->GetValue(0, 8, 0));
+        ASSERT_DOUBLES_EQUAL(4.0, m_pDoc->GetValue(1, 8, 0));
+        ASSERT_DOUBLES_EQUAL(9.0, m_pDoc->GetValue(0, 9, 0));
+        ASSERT_DOUBLES_EQUAL(7.0, m_pDoc->GetValue(1, 9, 0));
+
+        ScFormulaCell* pCell = m_pDoc->GetFormulaCell(ScAddress(0, 7, 0));
+        CPPUNIT_ASSERT(pCell);
+        CPPUNIT_ASSERT_EQUAL(ScMatrixMode::Formula, pCell->GetMatrixFlag());
+        SCCOL nCols = 0;
+        SCROW nRows = 0;
+        pCell->GetMatColsRows(nCols, nRows);
+        CPPUNIT_ASSERT_EQUAL(static_cast<SCCOL>(2), nCols);
+        CPPUNIT_ASSERT_EQUAL(static_cast<SCROW>(3), nRows);
+        CPPUNIT_ASSERT(pCell->GetMatrix());
+
+        const OUString aFormulaSource = pCell->GetFormula(FormulaGrammar::GRAM_ODFF);
+        const OUString aCanonicalFormulaSource = pCell->GetHybridFormula();
+        const auto aAttempt = setaileval::tryEvaluateFormula(
+            *m_pDoc, m_pDoc->GetNonThreadedContext(), ScAddress(0, 7, 0),
+            std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
+            m_pDoc->GetCalcConfig().mbEmptyStringAsZero, pCell->GetCode(),
+            std::u16string_view(aCanonicalFormulaSource.getStr(),
+                aCanonicalFormulaSource.getLength()),
+            true);
+        CPPUNIT_ASSERT(aAttempt.mbSupported);
+        CPPUNIT_ASSERT(aAttempt.hasMatrixResult());
+        CPPUNIT_ASSERT_EQUAL(static_cast<SCSIZE>(2), aAttempt.mnMatrixColumns);
+        CPPUNIT_ASSERT_EQUAL(static_cast<SCSIZE>(3), aAttempt.mnMatrixRows);
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT_MESSAGE(
+            "multi-cell selector matrix formulas should stay authoritative in default-on mode",
+            aStats.mnAuthoritativeCount >= 1);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(
+            "multi-cell selector matrix formulas should not need legacy fallback",
+            static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT_MESSAGE(
+            "selector roots should own multi-cell matrix formulas upstream",
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::Selector)]
+                >= 1);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(
+            "selector roots should not fall back for multi-cell matrix formulas",
+            static_cast<sal_uInt64>(0),
+            aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::Selector)]);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestFormula2,
+    testInterpretTailEngineEvaluatorMultiCellSpillMatrixDefaultOn)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+        m_pDoc->InsertTab(0, u"EngineMultiCellSpillMatrixDefaultOn"_ustr));
+
+    ScMarkData aMark(m_pDoc->GetSheetLimits());
+    aMark.SelectOneTable(0);
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+        setaileval::resetStats();
+
+        m_pDoc->InsertMatrixFormula(
+            3, 7, 4, 8, aMark, u"=COM.MICROSOFT.HSTACK({10|11};{20|21})"_ustr);
+
+        ASSERT_DOUBLES_EQUAL(10.0, m_pDoc->GetValue(3, 7, 0));
+        ASSERT_DOUBLES_EQUAL(20.0, m_pDoc->GetValue(4, 7, 0));
+        ASSERT_DOUBLES_EQUAL(11.0, m_pDoc->GetValue(3, 8, 0));
+        ASSERT_DOUBLES_EQUAL(21.0, m_pDoc->GetValue(4, 8, 0));
+
+        ScFormulaCell* pCell = m_pDoc->GetFormulaCell(ScAddress(3, 7, 0));
+        CPPUNIT_ASSERT(pCell);
+        CPPUNIT_ASSERT_EQUAL(ScMatrixMode::Formula, pCell->GetMatrixFlag());
+        SCCOL nCols = 0;
+        SCROW nRows = 0;
+        pCell->GetMatColsRows(nCols, nRows);
+        CPPUNIT_ASSERT_EQUAL(static_cast<SCCOL>(2), nCols);
+        CPPUNIT_ASSERT_EQUAL(static_cast<SCROW>(2), nRows);
+        CPPUNIT_ASSERT(pCell->GetMatrix());
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT_MESSAGE(
+            "multi-cell spill matrix formulas should stay authoritative in default-on mode",
+            aStats.mnAuthoritativeCount >= 1);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(
+            "multi-cell spill matrix formulas should not need legacy fallback",
+            static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT_MESSAGE(
+            "spill roots should own multi-cell matrix formulas upstream",
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::SpillArray)]
+                >= 1);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(
+            "spill roots should not fall back for multi-cell matrix formulas",
+            static_cast<sal_uInt64>(0),
+            aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::SpillArray)]);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestFormula2,
+    testInterpretTailEngineEvaluatorMultiCellConditionalMatrixDefaultOn)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+        m_pDoc->InsertTab(0, u"EngineMultiCellConditionalMatrixDefaultOn"_ustr));
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 0.0);
+
+    ScMarkData aMark(m_pDoc->GetSheetLimits());
+    aMark.SelectOneTable(0);
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+        setaileval::resetStats();
+
+        m_pDoc->InsertMatrixFormula(6, 7, 6, 8, aMark, u"=IF(A1:A2;10;20)"_ustr);
+
+        ASSERT_DOUBLES_EQUAL(10.0, m_pDoc->GetValue(6, 7, 0));
+        ASSERT_DOUBLES_EQUAL(20.0, m_pDoc->GetValue(6, 8, 0));
+
+        ScFormulaCell* pCell = m_pDoc->GetFormulaCell(ScAddress(6, 7, 0));
+        CPPUNIT_ASSERT(pCell);
+        CPPUNIT_ASSERT_EQUAL(ScMatrixMode::Formula, pCell->GetMatrixFlag());
+        SCCOL nCols = 0;
+        SCROW nRows = 0;
+        pCell->GetMatColsRows(nCols, nRows);
+        CPPUNIT_ASSERT_EQUAL(static_cast<SCCOL>(1), nCols);
+        CPPUNIT_ASSERT_EQUAL(static_cast<SCROW>(2), nRows);
+        CPPUNIT_ASSERT(pCell->GetMatrix());
+
+        const OUString aFormulaSource = pCell->GetFormula(FormulaGrammar::GRAM_ODFF);
+        const OUString aCanonicalFormulaSource = pCell->GetHybridFormula();
+        const auto aAttempt = setaileval::tryEvaluateFormula(
+            *m_pDoc, m_pDoc->GetNonThreadedContext(), ScAddress(6, 7, 0),
+            std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
+            m_pDoc->GetCalcConfig().mbEmptyStringAsZero, pCell->GetCode(),
+            std::u16string_view(aCanonicalFormulaSource.getStr(),
+                aCanonicalFormulaSource.getLength()),
+            true);
+        CPPUNIT_ASSERT(aAttempt.mbSupported);
+        CPPUNIT_ASSERT(aAttempt.hasMatrixResult());
+        CPPUNIT_ASSERT_EQUAL(static_cast<SCSIZE>(1), aAttempt.mnMatrixColumns);
+        CPPUNIT_ASSERT_EQUAL(static_cast<SCSIZE>(2), aAttempt.mnMatrixRows);
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT_MESSAGE(
+            "multi-cell IF matrix formulas should stay authoritative in default-on mode",
+            aStats.mnAuthoritativeCount >= 1);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(
+            "multi-cell IF matrix formulas should not need legacy fallback",
+            static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT_MESSAGE(
+            "conditional roots should own multi-cell IF matrix formulas upstream",
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::Conditional)]
+                >= 1);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(
+            "conditional roots should not fall back for multi-cell IF matrix formulas",
+            static_cast<sal_uInt64>(0),
+            aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::Conditional)]);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorRankedAggregateAuthoritative)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;

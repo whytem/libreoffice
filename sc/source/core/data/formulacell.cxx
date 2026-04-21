@@ -1942,7 +1942,12 @@ namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval
 
 void recordInterpretTailShadowOutcome(const setaileval::EvaluationAttempt& rAttempt,
     const sc::FormulaResultValue& rCalcValue,
+    const ScMatrix* pCalcMatrix = nullptr,
     std::optional<SvNumFormatType> oCalcFormatType = std::nullopt);
+
+formula::FormulaConstTokenRef makeMatrixUpperLeftResultToken(const ScMatrix& rMatrix);
+
+bool matrixResultsEqual(const ScMatrix* pCalcMatrix, const ScMatrix* pEngineMatrix);
 
 setaileval::FunctionKind classifyDelegatedInterpretTailFunction(std::u16string_view rFormula);
 
@@ -1978,25 +1983,14 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
         }
         return *oEngineDelegatedFunction;
     };
-    const bool bScalarMatrixFormulaTailEligible = [&]() {
-        if (cMatrixFlag != ScMatrixMode::Formula)
-            return false;
-
-        // The upper seam still projects only scalar results back into
-        // ScFormulaCell. Admit only 1x1 matrix origins here so we can route
-        // scalar-result array formulas upstream without claiming multi-cell
-        // matrix ownership before the broader matrix-frame handoff lands.
-        SCCOL nCols = 0;
-        SCROW nRows = 0;
-        GetMatColsRows(nCols, nRows);
-        return nCols == 1 && nRows == 1;
-    }();
+    const bool bMatrixFormulaTailEligible = cMatrixFlag == ScMatrixMode::Formula;
     const bool bTailEligible = eTailParam == SCITP_NORMAL && !bIsIterCell
                                && (cMatrixFlag == ScMatrixMode::NONE
-                                   || bScalarMatrixFormulaTailEligible)
+                                   || bMatrixFormulaTailEligible)
                                && !pCode->IsHyperLink()
                                && !rContext.pInterpreter
                                && !rDocument.IsThreadedGroupCalcInProgress();
+    const bool bPreserveEngineMatrixResult = cMatrixFlag == ScMatrixMode::Formula;
     // Family-local default-on rollout stays intentionally narrower than the
     // frozen hard-route frontier so legacy retirement can proceed slice by
     // slice with explicit ownership.
@@ -2031,7 +2025,8 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
             std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
             rDocument.GetCalcConfig().mbEmptyStringAsZero, pCode,
             std::u16string_view(aCanonicalFormulaSource.getStr(),
-                aCanonicalFormulaSource.getLength()));
+                aCanonicalFormulaSource.getLength()),
+            bPreserveEngineMatrixResult);
         const auto eAttemptFunction
             = aAttempt.meFunction != setaileval::FunctionKind::Unknown
                   ? aAttempt.meFunction
@@ -2119,7 +2114,31 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
 
         FormulaError nOldErrCode = aResult.GetResultError();
         ScFormulaResult aNewResult;
-        if (rAttempt.maResult.meType
+        if (rAttempt.hasMatrixResult())
+        {
+            if (cMatrixFlag != ScMatrixMode::Formula)
+                return false;
+
+            SCCOL nExpectedCols = 0;
+            SCROW nExpectedRows = 0;
+            GetMatColsRows(nExpectedCols, nExpectedRows);
+            if (nExpectedCols <= 0 || nExpectedRows <= 0
+                || static_cast<SCSIZE>(nExpectedCols) != rAttempt.mnMatrixColumns
+                || static_cast<SCSIZE>(nExpectedRows) != rAttempt.mnMatrixRows)
+            {
+                return false;
+            }
+
+            formula::FormulaConstTokenRef xUpperLeft
+                = makeMatrixUpperLeftResultToken(*rAttempt.mpMatrixResult);
+            if (!xUpperLeft)
+                return false;
+
+            rAttempt.mpMatrixResult->SetImmutable();
+            aNewResult.SetMatrix(nExpectedCols, nExpectedRows, rAttempt.mpMatrixResult,
+                xUpperLeft.get());
+        }
+        else if (rAttempt.maResult.meType
             == spreadsheetengine::api::formulavalue::ValueType::Error)
         {
             aNewResult.SetResultError(
@@ -2165,21 +2184,33 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
 
         StackVar eOld = aResult.GetCellResultType();
         StackVar eNew = aNewResult.GetCellResultType();
+        const bool bOldMatrixResult = aResult.GetMatrix().get() != nullptr;
+        const bool bNewMatrixResult = aNewResult.GetMatrix().get() != nullptr;
         bChanged = bSetNumberFormat || aNewResult.GetResultError() != nOldErrCode
                    || aResult.GetResultError() != aNewResult.GetResultError()
+                   || (bOldMatrixResult != bNewMatrixResult)
                    || (eOld != eNew)
-                   || (eNew == svDouble
+                   || (bNewMatrixResult
+                       && !matrixResultsEqual(
+                           aResult.GetMatrix().get(), aNewResult.GetMatrix().get()))
+                   || (!bNewMatrixResult && eNew == svDouble
                        && !rtl::math::approxEqual(
                            aResult.GetDouble(), aNewResult.GetDouble()))
-                   || (eNew == svString && aResult.GetString() != aNewResult.GetString());
+                   || (!bNewMatrixResult && eNew == svString
+                       && aResult.GetString() != aNewResult.GetString());
 
         if (bChanged && rDocument.IsStreamValid(aPos.Tab()))
         {
-            if (!((eOld == svUnknown
-                   && (eNew == svError || (eNew == svDouble && aNewResult.GetDouble() == 0.0)))
-                  || (eOld == svDouble && eNew == svDouble
-                      && rtl::math::approxEqual(
-                          aResult.GetDouble(), aNewResult.GetDouble()))))
+            if (bNewMatrixResult)
+            {
+                bContentChanged = true;
+            }
+            else if (!((eOld == svUnknown
+                        && (eNew == svError
+                            || (eNew == svDouble && aNewResult.GetDouble() == 0.0)))
+                       || (eOld == svDouble && eNew == svDouble
+                           && rtl::math::approxEqual(
+                               aResult.GetDouble(), aNewResult.GetDouble()))))
             {
                 bContentChanged = true;
             }
@@ -2275,7 +2306,8 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
             std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
             rDocument.GetCalcConfig().mbEmptyStringAsZero, pCode,
             std::u16string_view(aCanonicalFormulaSource.getStr(),
-                aCanonicalFormulaSource.getLength()));
+                aCanonicalFormulaSource.getLength()),
+            bPreserveEngineMatrixResult);
 
         setaileval::recordRpnAttempt(aAttempt);
         if (aAttempt.mbSupported)
@@ -2378,7 +2410,8 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
                     std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
                     rDocument.GetCalcConfig().mbEmptyStringAsZero, pCode,
                     std::u16string_view(aCanonicalFormulaSource.getStr(),
-                        aCanonicalFormulaSource.getLength()));
+                        aCanonicalFormulaSource.getLength()),
+                    bPreserveEngineMatrixResult);
                 setaileval::recordRpnAttempt(*oEngineAttempt);
                 if (!oEngineAttempt->mbSupported)
                 {
@@ -2487,7 +2520,8 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
         {
             const ScFormulaResult aInterpreterResult(pInterpreter->GetResultToken().get());
             recordInterpretTailShadowOutcome(
-                *oEngineAttempt, aInterpreterResult.GetResult(), pInterpreter->GetRetFormatType());
+                *oEngineAttempt, aInterpreterResult.GetResult(),
+                aInterpreterResult.GetMatrix().get(), pInterpreter->GetRetFormatType());
         }
 
         if (rDocument.GetRecursionHelper().IsInReturn() && eTailParam != SCITP_CLOSE_ITERATION_CIRCLE)
@@ -5183,9 +5217,130 @@ setaileval::FunctionKind classifyDelegatedInterpretTailFunction(std::u16string_v
     return setaileval::detail::classifyDelegatedFunctionNode(*aParse.mpRoot);
 }
 
-void recordInterpretTailShadowOutcome(const setaileval::EvaluationAttempt& rAttempt,
-    const sc::FormulaResultValue& rCalcValue, std::optional<SvNumFormatType> oCalcFormatType)
+formula::FormulaConstTokenRef makeMatrixUpperLeftResultToken(const ScMatrix& rMatrix)
 {
+    SCSIZE nColumns = 0;
+    SCSIZE nRows = 0;
+    rMatrix.GetDimensions(nColumns, nRows);
+    if (nColumns < 1 || nRows < 1)
+        return nullptr;
+
+    const ScMatrixValue aValue = rMatrix.Get(0, 0);
+    if (ScMatrix::IsNonValueType(aValue.nType))
+    {
+        if (rMatrix.IsEmptyPath(0, 0))
+            return new formula::FormulaDoubleToken(0.0);
+        if (rMatrix.IsEmptyResult(0, 0))
+            return new ScEmptyCellToken(true, true);
+        if (rMatrix.IsEmpty(0, 0))
+            return new ScEmptyCellToken(false, true);
+        return new formula::FormulaStringToken(aValue.GetString());
+    }
+
+    const FormulaError eError = GetDoubleErrorValue(aValue.fVal);
+    if (eError != FormulaError::NONE)
+        return new FormulaErrorToken(eError);
+    return new formula::FormulaDoubleToken(aValue.fVal);
+}
+
+std::optional<setaileval::MismatchReason> compareMatrixResults(
+    const ScMatrix& rCalcMatrix, const ScMatrix& rEngineMatrix)
+{
+    SCSIZE nCalcColumns = 0;
+    SCSIZE nCalcRows = 0;
+    SCSIZE nEngineColumns = 0;
+    SCSIZE nEngineRows = 0;
+    rCalcMatrix.GetDimensions(nCalcColumns, nCalcRows);
+    rEngineMatrix.GetDimensions(nEngineColumns, nEngineRows);
+    if (nCalcColumns != nEngineColumns || nCalcRows != nEngineRows)
+        return setaileval::MismatchReason::ResultType;
+
+    for (SCSIZE nRow = 0; nRow < nCalcRows; ++nRow)
+    {
+        for (SCSIZE nColumn = 0; nColumn < nCalcColumns; ++nColumn)
+        {
+            const ScMatrixValue aCalcValue = rCalcMatrix.Get(nColumn, nRow);
+            const ScMatrixValue aEngineValue = rEngineMatrix.Get(nColumn, nRow);
+            if (aCalcValue.nType != aEngineValue.nType)
+                return setaileval::MismatchReason::ResultType;
+
+            if (ScMatrix::IsNonValueType(aCalcValue.nType))
+            {
+                if (rCalcMatrix.IsEmptyPath(nColumn, nRow) != rEngineMatrix.IsEmptyPath(nColumn, nRow)
+                    || rCalcMatrix.IsEmptyResult(nColumn, nRow)
+                           != rEngineMatrix.IsEmptyResult(nColumn, nRow)
+                    || rCalcMatrix.IsEmpty(nColumn, nRow) != rEngineMatrix.IsEmpty(nColumn, nRow))
+                {
+                    return setaileval::MismatchReason::ResultType;
+                }
+
+                if (ScMatrix::IsRealStringType(aCalcValue.nType)
+                    && aCalcValue.GetString() != aEngineValue.GetString())
+                {
+                    return setaileval::MismatchReason::StringValue;
+                }
+                continue;
+            }
+
+            const FormulaError eCalcError = GetDoubleErrorValue(aCalcValue.fVal);
+            const FormulaError eEngineError = GetDoubleErrorValue(aEngineValue.fVal);
+            if (eCalcError != FormulaError::NONE || eEngineError != FormulaError::NONE)
+            {
+                if (eCalcError != eEngineError)
+                    return setaileval::MismatchReason::Error;
+                continue;
+            }
+
+            if (ScMatrix::IsBooleanType(aCalcValue.nType))
+            {
+                if (aCalcValue.GetBoolean() != aEngineValue.GetBoolean())
+                    return setaileval::MismatchReason::NumericValue;
+                continue;
+            }
+
+            if (!rtl::math::approxEqual(aCalcValue.fVal, aEngineValue.fVal))
+                return setaileval::MismatchReason::NumericValue;
+        }
+    }
+
+    return std::nullopt;
+}
+
+bool matrixResultsEqual(const ScMatrix* pCalcMatrix, const ScMatrix* pEngineMatrix)
+{
+    if (!pCalcMatrix || !pEngineMatrix)
+        return pCalcMatrix == pEngineMatrix;
+    return !compareMatrixResults(*pCalcMatrix, *pEngineMatrix).has_value();
+}
+
+void recordInterpretTailShadowOutcome(const setaileval::EvaluationAttempt& rAttempt,
+    const sc::FormulaResultValue& rCalcValue, const ScMatrix* pCalcMatrix,
+    std::optional<SvNumFormatType> oCalcFormatType)
+{
+    if (rAttempt.hasMatrixResult())
+    {
+        if (!pCalcMatrix)
+        {
+            setaileval::recordMismatch(setaileval::MismatchReason::ResultType);
+            return;
+        }
+
+        if (const auto oMismatch = compareMatrixResults(*pCalcMatrix, *rAttempt.mpMatrixResult))
+        {
+            setaileval::recordMismatch(*oMismatch);
+            return;
+        }
+
+        setaileval::recordShadowMatch();
+        return;
+    }
+
+    if (pCalcMatrix)
+    {
+        setaileval::recordMismatch(setaileval::MismatchReason::ResultType);
+        return;
+    }
+
     const sc::FormulaResultValue aEngineValue
         = spreadsheetengine::compat::libreoffice::toLibreOfficeFormulaResultValue(
             rAttempt.maResult);
@@ -5274,7 +5429,8 @@ void maybeRecordFormulaGroupInterpretTailRouting(
             std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
             rDocument.GetCalcConfig().mbEmptyStringAsZero, pCell->GetCode(),
             std::u16string_view(aCanonicalFormulaSource.getStr(),
-                aCanonicalFormulaSource.getLength()));
+                aCanonicalFormulaSource.getLength()),
+            pCell->GetMatrixFlag() == ScMatrixMode::Formula);
         const auto eAttemptFunction
             = aAttempt.meFunction != setaileval::FunctionKind::Unknown ? aAttempt.meFunction
                                                                        : eDelegatedFunction;
@@ -5294,7 +5450,9 @@ void maybeRecordFormulaGroupInterpretTailRouting(
         }
 
         setaileval::recordShadowCompareSupport(aCellPos, aAttempt.meFunction);
-        recordInterpretTailShadowOutcome(aAttempt, static_cast<const ScFormulaCell&>(*pCell).GetResult());
+        recordInterpretTailShadowOutcome(
+            aAttempt, static_cast<const ScFormulaCell&>(*pCell).GetResult(),
+            const_cast<ScFormulaCell&>(*pCell).GetMatrix());
     }
 }
 
