@@ -217,7 +217,6 @@ Members (16):
 - `ScHStack`, `ScVStack`, `ScTake`
 - `ScTextSplit`, `ScToCol`, `ScToRow`
 - `ScWrapCols`, `ScWrapRows`
-- `ScRandArray`
 
 Engine-side partial coverage:
 - `api::Array` (`searray::`) namespace already provides geometry planners:
@@ -265,13 +264,15 @@ The following remain `ScInterpreter::Sc*()` and do not enter any batch:
 - External I/O: `ScExternal`, `ScMacro`, `ScDde`, `ScHyperLink`,
   `ScWebservice`, `ScFilterXML`, `ScEncodeURL`, `ScBahtText`,
   `ScGetPivotData`
-- Non-deterministic: `ScRandom`, `ScRandbetween`, `ScCurrent`,
-  `ScGetActDate`, `ScGetActTime`
+- Non-deterministic clock/time policy: `ScCurrent`, `ScGetActDate`,
+  `ScGetActTime`
 - Host-integrated oddities: `ScTTT`, `ScDebugVar`, `ScNoName`, `ScBadName`
   (already retired), `ScMissing`, `ScStyle`, `ScColor`
 
-These belong in Calc permanently. The corresponding opcodes can be marked
-as non-migration scope in a future initiative closeout.
+These belong in Calc permanently. `ScRandom`, `ScRandbetween`, and
+`ScRandArray` were later moved by the stack-machine relocation closeout via
+`RuntimeEnvironment::sampleUniformReal()` plus engine-native random planners,
+so they are no longer part of this non-goal set.
 
 ## Success Criteria (end of five batches)
 

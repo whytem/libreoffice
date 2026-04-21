@@ -299,6 +299,11 @@ public:
     [[nodiscard]] virtual DateParts getNullDate() const = 0;
     [[nodiscard]] virtual String getLocaleTag() const = 0;
     [[nodiscard]] virtual query::SearchType getSearchType() const = 0;
+    // Stateful random draw primitive. The host owns RNG state; engine-side
+    // planners own shape/range policy such as RANDARRAY sizing and
+    // RANDBETWEEN integer rounding.
+    [[nodiscard]] virtual ValueResult<double> sampleUniformReal(
+        double fLowerInclusive, double fUpperExclusive) const = 0;
 };
 
 // Spill-range allocation contract.  See RpnSpill.hxx for the engine-side

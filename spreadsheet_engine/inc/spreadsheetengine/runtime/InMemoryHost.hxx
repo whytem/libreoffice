@@ -10,6 +10,7 @@
 #pragma once
 
 #include <map>
+#include <random>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -34,6 +35,7 @@ class InMemoryEvaluationHost final : public api::EvaluationHost
     api::query::SearchType meSearchType = api::query::SearchType::Normal;
     std::map<std::pair<api::String, api::NumberParseMode>, api::NumberParseResult> maParsedNumbers;
     std::map<std::pair<double, api::FormatIndex>, api::String> maFormattedNumbers;
+    mutable std::mt19937 maRandomGenerator;
 
     [[nodiscard]] const Sheet* getSheet(api::SheetId nSheet) const
     {
@@ -61,6 +63,8 @@ public:
     void setLocaleTag(api::StringView rLocaleTag) { maLocaleTag = api::String(rLocaleTag); }
 
     void setSearchType(api::query::SearchType eSearchType) { meSearchType = eSearchType; }
+
+    void seedRandomGenerator(std::uint32_t nSeed) { maRandomGenerator.seed(nSeed); }
 
     void setParsedNumber(api::StringView rText, double fValue, api::FormatIndex nFormat = 0,
         api::NumberParseResult::Kind eKind = api::NumberParseResult::Kind::Number,
@@ -139,6 +143,16 @@ public:
     [[nodiscard]] api::query::SearchType getSearchType() const override
     {
         return meSearchType;
+    }
+
+    [[nodiscard]] api::ValueResult<double> sampleUniformReal(
+        double fLowerInclusive, double fUpperExclusive) const override
+    {
+        if (fUpperExclusive < fLowerInclusive)
+            return api::ValueResult<double>::failure(api::Error::IllegalArgument);
+
+        std::uniform_real_distribution<double> aDistribution(fLowerInclusive, fUpperExclusive);
+        return api::ValueResult<double>::success(aDistribution(maRandomGenerator));
     }
 
     [[nodiscard]] api::ValueResult<api::CellValue> getCellValue(

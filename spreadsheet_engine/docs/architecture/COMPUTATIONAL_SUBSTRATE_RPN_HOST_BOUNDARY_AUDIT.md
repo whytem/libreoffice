@@ -153,7 +153,8 @@ more service IDs from the ledger above.
   `ExecuteSumXMY2Terminal`, `ExecuteFourierTerminal`,
   `ExecuteFrequencyTerminal`, `ExecuteForecastEtsTerminal`
 - `HS10` runtime environment / workbook metadata:
-  `ScRandom`, `ScRandbetween`, `ScRandArray`, `ScRandomImpl`
+  `ExecuteRandomTerminal`, `ExecuteRandbetweenTerminal`,
+  `ExecuteRandArrayTerminal`
 - `HS1` visible scalar read / text parse / formatting plus `HS11` coercion:
   `ScN`
 - `HS12` intentionally unsupported host terminals:
@@ -375,15 +376,14 @@ Required host services:
 
 - locale and collation behavior
 - calendar/date-system behavior
-- deterministic random source policy
+- deterministic random source policy via `RuntimeEnvironment::sampleUniformReal()`
 - regex/text-search runtime behavior
 
 Representative surviving Calc surfaces:
 
-- `ScRandom`
-- `ScRandbetween`
-- `ScRandArray`
-- `ScRandomImpl`
+- `ExecuteRandomTerminal`
+- `ExecuteRandbetweenTerminal`
+- `ExecuteRandArrayTerminal`
 - `pushLegacySearch`
 - `pushLegacyRegex`
 - `pushLegacyTextBeforeAfter`
@@ -391,9 +391,10 @@ Representative surviving Calc surfaces:
 
 Immediate implication:
 
-- the engine contract should separate deterministic system services from
-  document services so the standalone package does not silently re-grow broad
-  host state
+- the engine contract now separates deterministic system services from
+  document services explicitly: random draws come from
+  `RuntimeEnvironment::sampleUniformReal()`, while Calc keeps only the
+  terminal-level matrix/stack-shape bridge
 
 ## Category 8: External Computation
 

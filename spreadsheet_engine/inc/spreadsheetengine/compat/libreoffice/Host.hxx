@@ -15,6 +15,7 @@
 #include <formulacell.hxx>
 #include <global.hxx>
 #include <interpretercontext.hxx>
+#include <random>
 
 #include <spreadsheetengine/api/Host.hxx>
 #include <spreadsheetengine/api/Query.hxx>
@@ -232,6 +233,7 @@ class DocumentEvaluationHost final : public spreadsheetengine::api::EvaluationHo
     const ScDocument& mrDoc;
     ScInterpreterContext* mpContext;
     spreadsheetengine::api::String maLocaleTag;
+    mutable std::mt19937 maFallbackRng;
 
 public:
     explicit DocumentEvaluationHost(
@@ -325,6 +327,26 @@ public:
         if (rOptions.IsFormulaWildcardsEnabled())
             return spreadsheetengine::api::query::SearchType::Wildcard;
         return spreadsheetengine::api::query::SearchType::Normal;
+    }
+
+    [[nodiscard]] spreadsheetengine::api::ValueResult<double> sampleUniformReal(
+        double fLowerInclusive, double fUpperExclusive) const override
+    {
+        if (fUpperExclusive < fLowerInclusive)
+        {
+            return spreadsheetengine::api::ValueResult<double>::failure(
+                spreadsheetengine::api::Error::IllegalArgument);
+        }
+
+        std::uniform_real_distribution<double> aDistribution(fLowerInclusive, fUpperExclusive);
+        if (mpContext)
+        {
+            return spreadsheetengine::api::ValueResult<double>::success(
+                aDistribution(mpContext->aRNG));
+        }
+
+        return spreadsheetengine::api::ValueResult<double>::success(
+            aDistribution(maFallbackRng));
     }
 
     [[nodiscard]] spreadsheetengine::api::ValueResult<spreadsheetengine::api::CellValue>

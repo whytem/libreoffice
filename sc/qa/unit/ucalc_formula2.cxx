@@ -5724,6 +5724,109 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorMatrixMathAut
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testEngineRandomTerminalMigration)
+{
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, false);
+
+    {
+        CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+            m_pDoc->InsertTab(0, u"EngineRandomScalar"_ustr));
+
+        m_pDoc->SetString(0, 0, 0, u"=RAND()"_ustr);
+        ScFormulaCell* pFormula = m_pDoc->GetFormulaCell(ScAddress(0, 0, 0));
+        CPPUNIT_ASSERT(pFormula);
+        pFormula->SetDirty();
+        pFormula->Interpret();
+        const double fValue = m_pDoc->GetValue(ScAddress(0, 0, 0));
+        CPPUNIT_ASSERT(fValue >= 0.0);
+        CPPUNIT_ASSERT(fValue < 1.0);
+
+        m_pDoc->DeleteTab(0);
+    }
+
+    {
+        CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+            m_pDoc->InsertTab(0, u"EngineRandomMatrix"_ustr));
+
+        ScMarkData aMark(m_pDoc->GetSheetLimits());
+        aMark.SelectOneTable(0);
+
+        m_pDoc->InsertMatrixFormula(0, 0, 1, 1, aMark, u"=RAND()"_ustr);
+        ScFormulaCell* pFormula = m_pDoc->GetFormulaCell(ScAddress(0, 0, 0));
+        CPPUNIT_ASSERT(pFormula);
+        pFormula->SetDirty();
+        pFormula->Interpret();
+        CPPUNIT_ASSERT_EQUAL(ScMatrixMode::Formula, pFormula->GetMatrixFlag());
+        SCCOL nColumns = 0;
+        SCROW nRows = 0;
+        pFormula->GetMatColsRows(nColumns, nRows);
+        CPPUNIT_ASSERT_EQUAL(static_cast<SCCOL>(2), nColumns);
+        CPPUNIT_ASSERT_EQUAL(static_cast<SCROW>(2), nRows);
+
+        const double f00 = m_pDoc->GetValue(ScAddress(0, 0, 0));
+        const double f01 = m_pDoc->GetValue(ScAddress(0, 1, 0));
+        const double f10 = m_pDoc->GetValue(ScAddress(1, 0, 0));
+        const double f11 = m_pDoc->GetValue(ScAddress(1, 1, 0));
+        CPPUNIT_ASSERT(f00 >= 0.0 && f00 < 1.0);
+        CPPUNIT_ASSERT(f01 >= 0.0 && f01 < 1.0);
+        CPPUNIT_ASSERT(f10 >= 0.0 && f10 < 1.0);
+        CPPUNIT_ASSERT(f11 >= 0.0 && f11 < 1.0);
+        CPPUNIT_ASSERT(f00 != f01 || f00 != f10 || f00 != f11);
+
+        m_pDoc->DeleteTab(0);
+    }
+
+    {
+        CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+            m_pDoc->InsertTab(0, u"EngineRandbetween"_ustr));
+
+        m_pDoc->SetString(0, 0, 0, u"=RANDBETWEEN.NV(2;5)"_ustr);
+        ScFormulaCell* pFormula = m_pDoc->GetFormulaCell(ScAddress(0, 0, 0));
+        CPPUNIT_ASSERT(pFormula);
+        pFormula->SetDirty();
+        pFormula->Interpret();
+        const double fValue = m_pDoc->GetValue(ScAddress(0, 0, 0));
+        CPPUNIT_ASSERT(fValue >= 2.0);
+        CPPUNIT_ASSERT(fValue <= 5.0);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(std::floor(fValue), fValue, 1.0e-12);
+
+        m_pDoc->DeleteTab(0);
+    }
+
+    {
+        CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+            m_pDoc->InsertTab(0, u"EngineRandArray"_ustr));
+
+        ScMarkData aMark(m_pDoc->GetSheetLimits());
+        aMark.SelectOneTable(0);
+
+        m_pDoc->InsertMatrixFormula(0, 0, 1, 1, aMark, u"=RANDARRAY(2;2;1;3;TRUE())"_ustr);
+        ScFormulaCell* pFormula = m_pDoc->GetFormulaCell(ScAddress(0, 0, 0));
+        CPPUNIT_ASSERT(pFormula);
+        pFormula->SetDirty();
+        pFormula->Interpret();
+        CPPUNIT_ASSERT_EQUAL(ScMatrixMode::Formula, pFormula->GetMatrixFlag());
+        SCCOL nColumns = 0;
+        SCROW nRows = 0;
+        pFormula->GetMatColsRows(nColumns, nRows);
+        CPPUNIT_ASSERT_EQUAL(static_cast<SCCOL>(2), nColumns);
+        CPPUNIT_ASSERT_EQUAL(static_cast<SCROW>(2), nRows);
+
+        for (SCROW nRow = 0; nRow < 2; ++nRow)
+        {
+            for (SCCOL nColumn = 0; nColumn < 2; ++nColumn)
+            {
+                const double fValue = m_pDoc->GetValue(ScAddress(nColumn, nRow, 0));
+                CPPUNIT_ASSERT(fValue >= 1.0);
+                CPPUNIT_ASSERT(fValue <= 3.0);
+                CPPUNIT_ASSERT_DOUBLES_EQUAL(std::floor(fValue), fValue, 1.0e-12);
+            }
+        }
+
+        m_pDoc->DeleteTab(0);
+    }
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorMatrixMathDefaultOn)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;

@@ -24,11 +24,14 @@
 #include <spreadsheetengine/api/Parsing.hxx>
 #include <spreadsheetengine/detail/OdfFormulaParser.hxx>
 #include <spreadsheetengine/detail/HostValueAccess.hxx>
+#include <spreadsheetengine/runtime/RpnRandom.hxx>
 
+#include <cfloat>
 #include <cmath>
 #include <cstdint>
 #include <fstream>
 #include <optional>
+#include <random>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -3966,9 +3969,82 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorMatrixMath
     CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aFrequencyMatrix.mpMatrixResult->Get(0, 0).fVal, 1e-12);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, aFrequencyMatrix.mpMatrixResult->Get(0, 1).fVal, 1e-12);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, aFrequencyMatrix.mpMatrixResult->Get(0, 2).fVal, 1e-12);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(5, 0, 0), 1e-12);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(5, 1, 0), 1e-12);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(5, 2, 0), 1e-12);
+CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(5, 0, 0), 1e-12);
+CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(5, 1, 0), 1e-12);
+CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(5, 2, 0), 1e-12);
+}
+
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testDocumentEvaluationHostRandomRuntimeHelper)
+{
+    namespace serpn = spreadsheetengine::core::rpn;
+
+    ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
+    spreadsheetengine::compat::libreoffice::DocumentEvaluationHost aHost(*m_pDoc, rContext,
+        u"en-US");
+
+    std::mt19937 aExpectedRng(91);
+    std::uniform_real_distribution<double> aUnitDistribution(0.0, 1.0);
+    rContext.aRNG.seed(91);
+
+    const auto aScalarRandom = serpn::planRandom(aHost, serpn::RandomOutputFrame {});
+    CPPUNIT_ASSERT(aScalarRandom);
+    CPPUNIT_ASSERT(aScalarRandom.maValue.mbIsScalar);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(
+        aUnitDistribution(aExpectedRng), aScalarRandom.maValue.mfScalar, 1e-12);
+
+    const auto aCompatRandom = serpn::planRandom(
+        aHost, serpn::RandomOutputFrame { true, true, { 1, 1 } });
+    CPPUNIT_ASSERT(aCompatRandom);
+    CPPUNIT_ASSERT(aCompatRandom.maValue.mbIsScalar);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(
+        aUnitDistribution(aExpectedRng), aCompatRandom.maValue.mfScalar, 1e-12);
+
+    const auto aMatrixRandom = serpn::planRandom(
+        aHost, serpn::RandomOutputFrame { true, false, { 2, 2 } });
+    CPPUNIT_ASSERT(aMatrixRandom);
+    CPPUNIT_ASSERT(!aMatrixRandom.maValue.mbIsScalar);
+    CPPUNIT_ASSERT_EQUAL(static_cast<spreadsheetengine::api::MatrixSize>(2),
+        aMatrixRandom.maValue.maMatrix.maDimensions.mnColumns);
+    CPPUNIT_ASSERT_EQUAL(static_cast<spreadsheetengine::api::MatrixSize>(2),
+        aMatrixRandom.maValue.maMatrix.maDimensions.mnRows);
+    const double fExpected00 = aUnitDistribution(aExpectedRng);
+    const double fExpected01 = aUnitDistribution(aExpectedRng);
+    const double fExpected10 = aUnitDistribution(aExpectedRng);
+    const double fExpected11 = aUnitDistribution(aExpectedRng);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(
+        fExpected00, aMatrixRandom.maValue.maMatrix.maValues[0].mfNumber, 1e-12);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(
+        fExpected10, aMatrixRandom.maValue.maMatrix.maValues[1].mfNumber, 1e-12);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(
+        fExpected01, aMatrixRandom.maValue.maMatrix.maValues[2].mfNumber, 1e-12);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(
+        fExpected11, aMatrixRandom.maValue.maMatrix.maValues[3].mfNumber, 1e-12);
+
+    std::uniform_real_distribution<double> aBetweenDistribution(
+        2.0, std::nextafter(6.0, -DBL_MAX));
+    const auto aRandbetween
+        = serpn::planRandbetween(aHost, serpn::RandomOutputFrame { true, false, { 2, 1 } }, 2.0,
+            5.0);
+    CPPUNIT_ASSERT(aRandbetween);
+    CPPUNIT_ASSERT(!aRandbetween.maValue.mbIsScalar);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(std::floor(aBetweenDistribution(aExpectedRng)),
+        aRandbetween.maValue.maMatrix.maValues[0].mfNumber, 1e-12);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(std::floor(aBetweenDistribution(aExpectedRng)),
+        aRandbetween.maValue.maMatrix.maValues[1].mfNumber, 1e-12);
+
+    std::uniform_real_distribution<double> aWholeArrayDistribution(
+        1.0, std::nextafter(4.0, -DBL_MAX));
+    const auto aRandArray = serpn::planRandArray(aHost, { 2, 2 }, 1.0, 3.0, true);
+    CPPUNIT_ASSERT(aRandArray);
+    CPPUNIT_ASSERT(!aRandArray.maValue.mbIsScalar);
+    const double fArray00 = std::floor(aWholeArrayDistribution(aExpectedRng));
+    const double fArray01 = std::floor(aWholeArrayDistribution(aExpectedRng));
+    const double fArray10 = std::floor(aWholeArrayDistribution(aExpectedRng));
+    const double fArray11 = std::floor(aWholeArrayDistribution(aExpectedRng));
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(fArray00, aRandArray.maValue.maMatrix.maValues[0].mfNumber, 1e-12);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(fArray10, aRandArray.maValue.maMatrix.maValues[1].mfNumber, 1e-12);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(fArray01, aRandArray.maValue.maMatrix.maValues[2].mfNumber, 1e-12);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(fArray11, aRandArray.maValue.maMatrix.maValues[3].mfNumber, 1e-12);
 }
 
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorConditionalHelper)

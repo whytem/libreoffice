@@ -12000,10 +12000,10 @@ StackVar ScInterpreter::Interpret()
                             u"PI", "family-local default-on math scalar reached ScInterpreter");
                         PushDouble(semath::computePi());
                         break;
-                    case ocRandom           : ScRandom();                   break;
-                    case ocRandArray        : ScRandArray();                break;
-                    case ocRandomNV         : ScRandom();                   break;
-                    case ocRandbetweenNV    : ScRandbetween();              break;
+                    case ocRandom           : ExecuteRandomTerminal();      break;
+                    case ocRandArray        : ExecuteRandArrayTerminal();   break;
+                    case ocRandomNV         : ExecuteRandomTerminal();      break;
+                    case ocRandbetweenNV    : ExecuteRandbetweenTerminal(); break;
                     case ocFilter           :
                         if (!dispatchSpillFilterTerminal())
                         {

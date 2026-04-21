@@ -21,6 +21,7 @@
 #include <spreadsheetengine/runtime/ForecastEngine.hxx>
 #include <spreadsheetengine/runtime/ForecastEtsEngine.hxx>
 #include <spreadsheetengine/runtime/RpnMatrix.hxx>
+#include <spreadsheetengine/runtime/RpnRandom.hxx>
 
 namespace spreadsheetengine::compat::libreoffice::interpretercompatdispatch
 {
@@ -154,7 +155,7 @@ inline void putScalarIntoMatrix(
     return aOperand;
 }
 
-[[nodiscard]] constexpr serpn::ForecastEtsVariant toForecastEtsVariant(ScETSType eType)
+    [[nodiscard]] constexpr serpn::ForecastEtsVariant toForecastEtsVariant(ScETSType eType)
 {
     switch (eType)
     {
@@ -176,14 +177,66 @@ inline void putScalarIntoMatrix(
     return serpn::ForecastEtsVariant::Add;
 }
 
-struct Dispatcher
-{
-    [[nodiscard]] static FormulaError toCalcMathFormulaError(spreadsheetengine::api::Error eError)
+    struct Dispatcher
     {
-        if (eError == spreadsheetengine::api::Error::Domain)
-            return FormulaError::IllegalArgument;
-        return selibreoffice::toFormulaError(eError);
-    }
+        [[nodiscard]] static serpn::RandomOutputFrame randomOutputFrame(ScInterpreter& rCalc)
+        {
+            serpn::RandomOutputFrame aFrame;
+            if (!SEIC.bMatrixFormula)
+                return aFrame;
+
+            aFrame.mbArrayContext = true;
+            aFrame.mbSingleCellScalarCompat = true;
+
+            SCCOL nColumns = 0;
+            SCROW nRows = 0;
+            if (GetStackType(1) == svJumpMatrix)
+            {
+                SCSIZE nJumpColumns = 0;
+                SCSIZE nJumpRows = 0;
+                pStack[sp - 1]->GetJumpMatrix()->GetDimensions(nJumpColumns, nJumpRows);
+                nColumns = std::max<SCCOL>(0, static_cast<SCCOL>(nJumpColumns));
+                nRows = std::max<SCROW>(0, static_cast<SCROW>(nJumpRows));
+            }
+            else if (SEIC.pMyFormulaCell)
+            {
+                SEIC.pMyFormulaCell->GetMatColsRows(nColumns, nRows);
+            }
+
+            aFrame.maDimensions
+                = { static_cast<spreadsheetengine::api::MatrixSize>(std::max<SCCOL>(0, nColumns)),
+                    static_cast<spreadsheetengine::api::MatrixSize>(std::max<SCROW>(0, nRows)) };
+            return aFrame;
+        }
+
+        [[nodiscard]] static FormulaError toCalcMathFormulaError(spreadsheetengine::api::Error eError)
+        {
+            if (eError == spreadsheetengine::api::Error::Domain)
+                return FormulaError::IllegalArgument;
+            return selibreoffice::toFormulaError(eError);
+        }
+
+        static void pushRandomPlanResult(ScInterpreter& rCalc, const serpn::RandomPlanResult& rResult)
+        {
+            if (rResult.mbIsScalar)
+            {
+                PushDouble(rResult.mfScalar);
+                return;
+            }
+
+            PushMatrix(matrixOperandToMatrixRef(rResult.maMatrix));
+        }
+
+        static void pushRandomPlanError(ScInterpreter& rCalc, spreadsheetengine::api::Error eError)
+        {
+            if (eError == spreadsheetengine::api::Error::IllegalArgument)
+            {
+                PushIllegalArgument();
+                return;
+            }
+
+            PushError(selibreoffice::toFormulaError(eError));
+        }
 
     template <typename TResult> static void pushCalcMathValueResult(
         ScInterpreter& rCalc, const TResult& rResult)
@@ -1529,6 +1582,9 @@ struct Dispatcher
     static void aggregateStDev(ScInterpreter& rCalc, bool bTextAsZero);
     static void aggregateStDevP(ScInterpreter& rCalc, bool bTextAsZero);
     static void matrixDeterminant(ScInterpreter& rCalc);
+    static void random(ScInterpreter& rCalc);
+    static void randArray(ScInterpreter& rCalc);
+    static void randbetween(ScInterpreter& rCalc);
     static void matrixSumXMY2(ScInterpreter& rCalc);
     static void matrixFrequency(ScInterpreter& rCalc);
     static void fourier(ScInterpreter& rCalc);
@@ -2014,6 +2070,87 @@ inline void Dispatcher::matrixSumXMY2(ScInterpreter& rCalc)
         return;
     }
     PushDouble(aResult.maValue);
+}
+
+inline void Dispatcher::random(ScInterpreter& rCalc)
+{
+    selibreoffice::DocumentEvaluationHost aHost(mrDoc, mrContext);
+    const auto aResult = serpn::planRandom(aHost, randomOutputFrame(rCalc));
+    if (!aResult)
+    {
+        pushRandomPlanError(rCalc, aResult.meError);
+        return;
+    }
+
+    pushRandomPlanResult(rCalc, aResult.maValue);
+}
+
+inline void Dispatcher::randArray(ScInterpreter& rCalc)
+{
+    const sal_uInt8 nParamCount = GetByte();
+
+    bool bWholeNumber = false;
+    if (nParamCount == 5)
+        bWholeNumber = SEIC.GetBoolWithDefault(false);
+
+    double fMax = 1.0;
+    if (nParamCount >= 4)
+        fMax = GetDoubleWithDefault(1.0);
+
+    double fMin = 0.0;
+    if (nParamCount >= 3)
+        fMin = GetDoubleWithDefault(0.0);
+
+    SCCOL nColumns = 1;
+    if (nParamCount >= 2)
+        nColumns = static_cast<SCCOL>(SEIC.GetInt32WithDefault(1));
+
+    SCROW nRows = 1;
+    if (nParamCount >= 1)
+        nRows = static_cast<SCROW>(SEIC.GetInt32WithDefault(1));
+
+    if (nGlobalError != FormulaError::NONE)
+    {
+        PushIllegalArgument();
+        return;
+    }
+
+    selibreoffice::DocumentEvaluationHost aHost(mrDoc, mrContext);
+    const auto aResult = serpn::planRandArray(aHost,
+        { static_cast<spreadsheetengine::api::MatrixSize>(nColumns),
+          static_cast<spreadsheetengine::api::MatrixSize>(nRows) },
+        fMin, fMax, bWholeNumber);
+    if (!aResult)
+    {
+        pushRandomPlanError(rCalc, aResult.meError);
+        return;
+    }
+
+    pushRandomPlanResult(rCalc, aResult.maValue);
+}
+
+inline void Dispatcher::randbetween(ScInterpreter& rCalc)
+{
+    if (!MustHaveParamCount(GetByte(), 2))
+        return;
+
+    const double fMax = CalcGetDouble();
+    const double fMin = CalcGetDouble();
+    if (nGlobalError != FormulaError::NONE)
+    {
+        PushIllegalArgument();
+        return;
+    }
+
+    selibreoffice::DocumentEvaluationHost aHost(mrDoc, mrContext);
+    const auto aResult = serpn::planRandbetween(aHost, randomOutputFrame(rCalc), fMin, fMax);
+    if (!aResult)
+    {
+        pushRandomPlanError(rCalc, aResult.meError);
+        return;
+    }
+
+    pushRandomPlanResult(rCalc, aResult.maValue);
 }
 
 inline void Dispatcher::matrixFrequency(ScInterpreter& rCalc)

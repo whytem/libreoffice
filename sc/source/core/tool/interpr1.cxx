@@ -1432,177 +1432,19 @@ void ScInterpreter::ScMatchOp(bool bExtended)
     PushDouble(static_cast<double>(aResolvedIndex.maValue + 1));
 }
 
-void ScInterpreter::ScRandomImpl( const std::function<double( double fFirst, double fLast )>& RandomFunc,
-        double fFirst, double fLast )
+void ScInterpreter::ExecuteRandomTerminal()
 {
-    if (bMatrixFormula)
-    {
-        SCCOL nCols = 0;
-        SCROW nRows = 0;
-        // In JumpMatrix context use its dimensions for the return matrix; the
-        // formula cell range selected may differ, for example if the result is
-        // to be transposed.
-        if (GetStackType(1) == svJumpMatrix)
-        {
-            SCSIZE nC, nR;
-            pStack[sp-1]->GetJumpMatrix()->GetDimensions( nC, nR);
-            nCols = std::max<SCCOL>(0, static_cast<SCCOL>(nC));
-            nRows = std::max<SCROW>(0, static_cast<SCROW>(nR));
-        }
-        else if (pMyFormulaCell)
-            pMyFormulaCell->GetMatColsRows( nCols, nRows);
-
-        if (nCols == 1 && nRows == 1)
-        {
-            // For compatibility with existing
-            // com.sun.star.sheet.FunctionAccess.callFunction() calls that per
-            // default are executed in array context unless
-            // FA.setPropertyValue("IsArrayFunction",False) was set, return a
-            // scalar double instead of a 1x1 matrix object. tdf#128218
-            PushDouble( RandomFunc( fFirst, fLast));
-            return;
-        }
-
-        // ScViewFunc::EnterMatrix() might be asking for
-        // ScFormulaCell::GetResultDimensions(), which here are none so create
-        // a 1x1 matrix at least which exactly is the case when EnterMatrix()
-        // asks for a not selected range.
-        if (nCols == 0)
-            nCols = 1;
-        if (nRows == 0)
-            nRows = 1;
-        ScMatrixRef pResMat = GetNewMat( static_cast<SCSIZE>(nCols), static_cast<SCSIZE>(nRows), /*bEmpty*/true );
-        if (!pResMat)
-            PushError( FormulaError::MatrixSize);
-        else
-        {
-            for (SCCOL i=0; i < nCols; ++i)
-            {
-                for (SCROW j=0; j < nRows; ++j)
-                {
-                    pResMat->PutDouble( RandomFunc( fFirst, fLast),
-                            static_cast<SCSIZE>(i), static_cast<SCSIZE>(j));
-                }
-            }
-            PushMatrix( pResMat);
-        }
-    }
-    else
-    {
-        PushDouble( RandomFunc( fFirst, fLast));
-    }
+    seinterpcompatdispatch::Dispatcher::random(*this);
 }
 
-void ScInterpreter::ScRandom()
+void ScInterpreter::ExecuteRandArrayTerminal()
 {
-    auto RandomFunc = [this]( double, double )
-    {
-        std::uniform_real_distribution<double> dist(0.0, 1.0);
-        return dist(mrContext.aRNG);
-    };
-    ScRandomImpl( RandomFunc, 0.0, 0.0 );
+    seinterpcompatdispatch::Dispatcher::randArray(*this);
 }
 
-void ScInterpreter::ScRandArray()
+void ScInterpreter::ExecuteRandbetweenTerminal()
 {
-    sal_uInt8 nParamCount = GetByte();
-    // optional 5th para:
-    // TRUE for a whole number
-    // FALSE for a decimal number - default.
-    bool bWholeNumber = false;
-    if (nParamCount == 5)
-        bWholeNumber = GetBoolWithDefault(false);
-
-    // optional 4th para: The maximum value of the random numbers
-    double fMax = 1.0;
-    if (nParamCount >= 4)
-        fMax = GetDoubleWithDefault(1.0);
-
-    // optional 3rd para: The minimum value of the random numbers
-    double fMin = 0.0;
-    if (nParamCount >= 3)
-        fMin = GetDoubleWithDefault(0.0);
-
-    // optional 2nd para: The number of columns of the return array
-    SCCOL nCols = 1;
-    if (nParamCount >= 2)
-        nCols = static_cast<SCCOL>(GetInt32WithDefault(1));
-
-    // optional 1st para: The number of rows of the return array
-    SCROW nRows = 1;
-    if (nParamCount >= 1)
-        nRows = static_cast<SCROW>(GetInt32WithDefault(1));
-
-    if (bWholeNumber)
-    {
-        fMax = rtl::math::round(fMax, 0, rtl_math_RoundingMode_Up);
-        fMin = rtl::math::round(fMin, 0, rtl_math_RoundingMode_Up);
-    }
-
-    if (nGlobalError != FormulaError::NONE || fMin > fMax || nCols <= 0 || nRows <= 0)
-    {
-        PushIllegalArgument();
-        return;
-    }
-
-    if (bWholeNumber)
-        fMax = std::nextafter(fMax + 1, -DBL_MAX);
-    else
-        fMax = std::nextafter(fMax, DBL_MAX);
-
-    auto RandomFunc = [this](double fFirst, double fLast, bool bWholeNum)
-        {
-            std::uniform_real_distribution<double> dist(fFirst, fLast);
-            if (bWholeNum)
-                return floor(dist(mrContext.aRNG));
-            else
-                return dist(mrContext.aRNG);
-        };
-
-    if (nCols == 1 && nRows == 1)
-    {
-        PushDouble(RandomFunc(fMin, fMax, bWholeNumber));
-        return;
-    }
-
-    ScMatrixRef pResMat = GetNewMat(static_cast<SCSIZE>(nCols), static_cast<SCSIZE>(nRows), /*bEmpty*/true);
-    if (!pResMat)
-        PushError(FormulaError::MatrixSize);
-    else
-    {
-        for (SCCOL i = 0; i < nCols; ++i)
-        {
-            for (SCROW j = 0; j < nRows; ++j)
-            {
-                pResMat->PutDouble(RandomFunc(fMin, fMax, bWholeNumber),
-                    static_cast<SCSIZE>(i), static_cast<SCSIZE>(j));
-            }
-        }
-        PushMatrix(pResMat);
-    }
-}
-
-void ScInterpreter::ScRandbetween()
-{
-    if (!MustHaveParamCount( GetByte(), 2))
-        return;
-
-    // Same like scaddins/source/analysis/analysis.cxx
-    // AnalysisAddIn::getRandbetween()
-    double fMax = rtl::math::round( GetDouble(), 0, rtl_math_RoundingMode_Up);
-    double fMin = rtl::math::round( GetDouble(), 0, rtl_math_RoundingMode_Up);
-    if (nGlobalError != FormulaError::NONE || fMin > fMax)
-    {
-        PushIllegalArgument();
-        return;
-    }
-    fMax = std::nextafter( fMax+1, -DBL_MAX);
-    auto RandomFunc = [this]( double fFirst, double fLast )
-    {
-        std::uniform_real_distribution<double> dist(fFirst, fLast);
-        return floor(dist(mrContext.aRNG));
-    };
-    ScRandomImpl( RandomFunc, fMin, fMax);
+    seinterpcompatdispatch::Dispatcher::randbetween(*this);
 }
 
 bool ScInterpreter::IsString()

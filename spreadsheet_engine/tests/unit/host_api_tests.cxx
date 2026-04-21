@@ -1,10 +1,14 @@
 /* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 
+#include <cfloat>
+#include <cmath>
 #include <iostream>
+#include <random>
 
 #include <spreadsheetengine/api/Host.hxx>
 #include <spreadsheetengine/detail/HostValueAccess.hxx>
 #include <spreadsheetengine/runtime/InMemoryHost.hxx>
+#include <spreadsheetengine/runtime/RpnRandom.hxx>
 
 #include "TestSupport.hxx"
 
@@ -21,6 +25,10 @@ int main()
     using spreadsheetengine::core::host::coerceValueViewElementToNumber;
     using spreadsheetengine::core::host::formatValue;
     using spreadsheetengine::core::host::InMemoryEvaluationHost;
+    using spreadsheetengine::core::rpn::planRandArray;
+    using spreadsheetengine::core::rpn::planRandbetween;
+    using spreadsheetengine::core::rpn::planRandom;
+    using spreadsheetengine::core::rpn::RandomOutputFrame;
     using spreadsheetengine::core::host::readValueView;
     using spreadsheetengine::core::host::readValueViewElement;
     using spreadsheetengine::standalone::test::almostEqual;
@@ -53,6 +61,96 @@ int main()
         || aHost.getNullDate().mnDay != 30 || aHost.getLocaleTag() != u"en-US")
     {
         return fail("spreadsheetengine_host_tests", "runtime environment mismatch");
+    }
+
+    aHost.seedRandomGenerator(1337);
+    std::mt19937 aExpectedRandom(1337);
+    std::uniform_real_distribution<double> aUnitDistribution(0.0, 1.0);
+    const auto aRandomSample = aHost.sampleUniformReal(0.0, 1.0);
+    if (!aRandomSample || !almostEqual(aRandomSample.maValue, aUnitDistribution(aExpectedRandom)))
+    {
+        return fail("spreadsheetengine_host_tests", "sampleUniformReal() mismatch");
+    }
+
+    const auto aInvalidRandomRange = aHost.sampleUniformReal(3.0, 2.0);
+    if (aInvalidRandomRange || aInvalidRandomRange.meError != Error::IllegalArgument)
+        return fail("spreadsheetengine_host_tests", "sampleUniformReal() error mismatch");
+
+    aHost.seedRandomGenerator(2026);
+    std::mt19937 aExpectedRuntime(2026);
+
+    const auto aScalarRandom = planRandom(aHost, RandomOutputFrame {});
+    if (!aScalarRandom || !aScalarRandom.maValue.mbIsScalar
+        || !almostEqual(aScalarRandom.maValue.mfScalar, aUnitDistribution(aExpectedRuntime)))
+    {
+        return fail("spreadsheetengine_host_tests", "planRandom() scalar mismatch");
+    }
+
+    const auto aCompatRandom = planRandom(
+        aHost, RandomOutputFrame { true, true, spreadsheetengine::api::MatrixDimensions { 1, 1 } });
+    if (!aCompatRandom || !aCompatRandom.maValue.mbIsScalar
+        || !almostEqual(aCompatRandom.maValue.mfScalar, aUnitDistribution(aExpectedRuntime)))
+    {
+        return fail("spreadsheetengine_host_tests", "planRandom() compat scalar mismatch");
+    }
+
+    const auto aZeroDimMatrixRandom = planRandom(
+        aHost, RandomOutputFrame { true, true, spreadsheetengine::api::MatrixDimensions { 0, 0 } });
+    if (!aZeroDimMatrixRandom || aZeroDimMatrixRandom.maValue.mbIsScalar
+        || aZeroDimMatrixRandom.maValue.maMatrix.maDimensions.mnColumns != 1
+        || aZeroDimMatrixRandom.maValue.maMatrix.maDimensions.mnRows != 1
+        || !almostEqual(aZeroDimMatrixRandom.maValue.maMatrix.maValues.front().mfNumber,
+               aUnitDistribution(aExpectedRuntime)))
+    {
+        return fail("spreadsheetengine_host_tests", "planRandom() zero-dimension matrix mismatch");
+    }
+
+    const auto aMatrixRandom = planRandom(
+        aHost, RandomOutputFrame { true, false, spreadsheetengine::api::MatrixDimensions { 2, 2 } });
+    const double fExpected00 = aUnitDistribution(aExpectedRuntime);
+    const double fExpected01 = aUnitDistribution(aExpectedRuntime);
+    const double fExpected10 = aUnitDistribution(aExpectedRuntime);
+    const double fExpected11 = aUnitDistribution(aExpectedRuntime);
+    if (!aMatrixRandom || aMatrixRandom.maValue.mbIsScalar
+        || aMatrixRandom.maValue.maMatrix.maDimensions.mnColumns != 2
+        || aMatrixRandom.maValue.maMatrix.maDimensions.mnRows != 2
+        || !almostEqual(aMatrixRandom.maValue.maMatrix.maValues[0].mfNumber, fExpected00)
+        || !almostEqual(aMatrixRandom.maValue.maMatrix.maValues[1].mfNumber, fExpected10)
+        || !almostEqual(aMatrixRandom.maValue.maMatrix.maValues[2].mfNumber, fExpected01)
+        || !almostEqual(aMatrixRandom.maValue.maMatrix.maValues[3].mfNumber, fExpected11))
+    {
+        return fail("spreadsheetengine_host_tests", "planRandom() matrix mismatch");
+    }
+
+    std::uniform_real_distribution<double> aBetweenDistribution(
+        2.0, std::nextafter(6.0, -DBL_MAX));
+    const auto aRandbetween = planRandbetween(aHost,
+        RandomOutputFrame { true, false, spreadsheetengine::api::MatrixDimensions { 2, 1 } }, 2.0,
+        5.0);
+    if (!aRandbetween || aRandbetween.maValue.mbIsScalar
+        || !almostEqual(aRandbetween.maValue.maMatrix.maValues[0].mfNumber,
+               std::floor(aBetweenDistribution(aExpectedRuntime)))
+        || !almostEqual(aRandbetween.maValue.maMatrix.maValues[1].mfNumber,
+               std::floor(aBetweenDistribution(aExpectedRuntime))))
+    {
+        return fail("spreadsheetengine_host_tests", "planRandbetween() mismatch");
+    }
+
+    std::uniform_real_distribution<double> aWholeArrayDistribution(
+        1.0, std::nextafter(4.0, -DBL_MAX));
+    const auto aRandArray = planRandArray(
+        aHost, spreadsheetengine::api::MatrixDimensions { 2, 2 }, 1.0, 3.0, true);
+    const double fArray00 = std::floor(aWholeArrayDistribution(aExpectedRuntime));
+    const double fArray01 = std::floor(aWholeArrayDistribution(aExpectedRuntime));
+    const double fArray10 = std::floor(aWholeArrayDistribution(aExpectedRuntime));
+    const double fArray11 = std::floor(aWholeArrayDistribution(aExpectedRuntime));
+    if (!aRandArray || aRandArray.maValue.mbIsScalar
+        || !almostEqual(aRandArray.maValue.maMatrix.maValues[0].mfNumber, fArray00)
+        || !almostEqual(aRandArray.maValue.maMatrix.maValues[1].mfNumber, fArray10)
+        || !almostEqual(aRandArray.maValue.maMatrix.maValues[2].mfNumber, fArray01)
+        || !almostEqual(aRandArray.maValue.maMatrix.maValues[3].mfNumber, fArray11))
+    {
+        return fail("spreadsheetengine_host_tests", "planRandArray() matrix mismatch");
     }
 
     if (!aHost.setCellValue({ nSheet0, 0, 0 }, CellValue::number(42.5))

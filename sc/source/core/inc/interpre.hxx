@@ -639,11 +639,9 @@ private:
     void ExecuteIntersectTerminal();
     void ExecuteRangeReferenceTerminal();
     void ExecuteUnionTerminal();
-    void ScRandom();
-    void ScRandbetween();
-    void ScRandArray();
-    void ScRandomImpl( const std::function<double( double fFirst, double fLast )>& RandomFunc,
-            double fFirst, double fLast );
+    void ExecuteRandomTerminal();
+    void ExecuteRandbetweenTerminal();
+    void ExecuteRandArrayTerminal();
     bool IsString();
     void ExecuteTypeTerminal();
     void ExecuteCellTerminal();
