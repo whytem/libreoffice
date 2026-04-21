@@ -4297,6 +4297,111 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorMatrixMathDef
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorExternalReferenceRoutes)
+{
+#ifndef DISABLE_NAN_TESTS
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    ScDocShellRef xExtDocSh = new ScDocShell;
+    OUString aExtDocName(u"file:///extdata.fake"_ustr);
+    SfxMedium* pMed = new SfxMedium(aExtDocName, StreamMode::STD_READWRITE);
+    xExtDocSh->DoLoad(pMed);
+    CPPUNIT_ASSERT_MESSAGE("external document instance not loaded.",
+                           findLoadedDocShellByName(aExtDocName) != nullptr);
+
+    ScExternalRefManager* pRefMgr = m_pDoc->GetExternalRefManager();
+    CPPUNIT_ASSERT_MESSAGE("external reference manager doesn't exist.", pRefMgr);
+    sal_uInt16 nFileId = pRefMgr->getExternalFileId(aExtDocName);
+    const OUString* pFileName = pRefMgr->getExternalFileName(nFileId);
+    CPPUNIT_ASSERT_MESSAGE("file name registration has somehow failed.", pFileName);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("file name registration has somehow failed.", aExtDocName,
+                                 *pFileName);
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+                           m_pDoc->InsertTab(0, u"EngineExternalRefRoutes"_ustr));
+
+    ScDocument& rExtDoc = xExtDocSh->GetDocument();
+    rExtDoc.InsertTab(0, u"Data"_ustr);
+    rExtDoc.InsertTab(1, u"Matrix"_ustr);
+    rExtDoc.SetValue(0, 0, 0, 1.0); // Data.A1
+    rExtDoc.SetValue(0, 1, 0, 2.0); // Data.A2
+    rExtDoc.SetValue(0, 0, 1, 1.0); // Matrix.A1
+    rExtDoc.SetValue(1, 0, 1, 2.0); // Matrix.B1
+    rExtDoc.SetValue(0, 1, 1, 3.0); // Matrix.A2
+    rExtDoc.SetValue(1, 1, 1, 4.0); // Matrix.B2
+
+    const auto verifyResultsAndStats = [&]() {
+        ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(0, 7, 0)));
+        ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(ScAddress(1, 7, 0)));
+        CPPUNIT_ASSERT_EQUAL(u"Value=2"_ustr, m_pDoc->GetString(ScAddress(2, 7, 0)));
+        ASSERT_DOUBLES_EQUAL(0.0, m_pDoc->GetValue(ScAddress(3, 7, 0)));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(4, 7, 0)), 1.0E-12);
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 5);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::ScalarRoot)]
+            >= 4);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::MatrixMath)]
+            >= 1);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
+            aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::ScalarRoot)]);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
+            aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::MatrixMath)]);
+    };
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
+        ScopedEnvironmentOverride aAuthorityWhileOff(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF", "false");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(0, 7, 0, u"='file:///extdata.fake'#Data.A1"_ustr);
+        m_pDoc->SetString(1, 7, 0,
+                          u"='file:///extdata.fake'#Data.A1+'file:///extdata.fake'#Data.A2"_ustr);
+        m_pDoc->SetString(2, 7, 0,
+                          u"=\"Value=\"&'file:///extdata.fake'#Data.A2"_ustr);
+        m_pDoc->SetString(3, 7, 0,
+                          u"='file:///extdata.fake'#Data.A1='file:///extdata.fake'#Data.A2"_ustr);
+        m_pDoc->SetString(4, 7, 0, u"=MDETERM('file:///extdata.fake'#Matrix.A1)"_ustr);
+
+        verifyResultsAndStats();
+    }
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+        ScopedEnvironmentOverride aAuthorityWhileOff(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF", "true");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(0, 7, 0, u"='file:///extdata.fake'#Data.A1"_ustr);
+        m_pDoc->SetString(1, 7, 0,
+                          u"='file:///extdata.fake'#Data.A1+'file:///extdata.fake'#Data.A2"_ustr);
+        m_pDoc->SetString(2, 7, 0,
+                          u"=\"Value=\"&'file:///extdata.fake'#Data.A2"_ustr);
+        m_pDoc->SetString(3, 7, 0,
+                          u"='file:///extdata.fake'#Data.A1='file:///extdata.fake'#Data.A2"_ustr);
+        m_pDoc->SetString(4, 7, 0, u"=MDETERM('file:///extdata.fake'#Matrix.A1)"_ustr);
+
+        verifyResultsAndStats();
+    }
+
+    xExtDocSh->DoClose();
+    CPPUNIT_ASSERT_MESSAGE("external document instance should have been unloaded.",
+                           !findLoadedDocShellByName(aExtDocName));
+    m_pDoc->DeleteTab(0);
+#endif
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorConditionalAuthoritative)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;

@@ -367,6 +367,10 @@ Implemented result:
   `svExternalSingleRef` / `svExternalDoubleRef` by reusing the shared
   external-reference cache helpers and projecting them back into one
   `serpn::MatrixOperand` path instead of declining immediately to legacy
+- the authoritative upper seam now materializes direct external single-cell
+  refs through shared helpers in `materializeScalarNode` /
+  `materializeMatrixNode`, so scalar-root formulas and single-cell `MDETERM`
+  can run under `InterpretTail` authority/default-on without falling back
 - `testRpnSubstrateExercisedThroughUpperSeam` in
   [interpret_tail_corpus.cxx](/home/ubuntu/repos/libreoffice/sc/qa/unit/interpret_tail_corpus.cxx)
   enforces that both the Operator and ControlFlow RPN categories show
@@ -377,9 +381,10 @@ Implemented result:
   now consumes engine-native RPN contracts for binary/unary operators and IF
   branch planning rather than only lower-seam pilots doing so
 - remaining Phase 4 work stays explicitly open only for the still-deferred
-  edges: authoritative upper-seam external-reference execution plus
-  broadcast-compatible / jump-matrix matrix-frame semantics that are still
-  intentionally left on the Calc side
+  edges: broader authoritative upper-seam external-reference execution
+  (notably external ranges and external names) plus broadcast-compatible /
+  jump-matrix matrix-frame semantics that are still intentionally left on the
+  Calc side
 
 ## Phase 5: Ambient Default-On Pilot
 

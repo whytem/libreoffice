@@ -411,9 +411,12 @@ MatrixOperand bridge now also accepts `svExternalSingleRef` /
 external-reference cache helpers before rejoining the same
 MatrixOperand path, so forced-core audit coverage now proves
 external TRANSPOSE / MDETERM / MMULT / MINVERSE parity as well.
-svRefList and multi-sheet surfaces still decline, and the remaining
-Phase 4 external-reference work is now the authoritative upper-seam
-story rather than this lower-seam matrix bridge.
+The upper seam now also materializes direct external single-cell refs for
+authoritative/default-on scalar roots and single-cell `MDETERM`, so promoted
+single-cell external formulas no longer have to drop to legacy first.
+svRefList and multi-sheet surfaces still decline, and the remaining Phase 4
+external-reference work is now the broader authoritative upper-seam
+external-range / external-name story rather than this lower-seam matrix bridge.
 The contract for this primitive is tracked in
 [architecture/HOST_FACADE_CONTRACTS.md](architecture/HOST_FACADE_CONTRACTS.md);
 Phase I will extend that document with the remaining address /

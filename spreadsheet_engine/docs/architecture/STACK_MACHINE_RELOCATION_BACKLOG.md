@@ -62,6 +62,13 @@ Definition of done:
 Goal: finish the Phase 4 "external refs" item at the authoritative seam rather
 than only in lower-seam audit lanes.
 
+Current landing on the tree:
+
+- direct external single-cell refs now materialize authoritatively for
+  scalar-root formulas and the first matrix-math consumer
+- broader authoritative external-range / external-name support still remains
+  open
+
 Scope:
 
 - unify remaining external-ref scalar/range resolution in the compat AST walker
