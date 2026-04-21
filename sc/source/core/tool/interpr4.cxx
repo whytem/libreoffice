@@ -2376,6 +2376,7 @@ void ScInterpreter::PushExternalSingleRef(
     {
         ScSingleRefData aRef;
         aRef.InitAddress(ScAddress(nCol,nRow,nTab));
+        aRef.SetFlag3D(true);
         PushTempTokenWithoutError( new ScExternalSingleRefToken(nFileId,
                     mrDoc.GetSharedStringPool().intern( rTabName), aRef)) ;
     }
@@ -2389,6 +2390,8 @@ void ScInterpreter::PushExternalDoubleRef(
     {
         ScComplexRefData aRef;
         aRef.InitRange(ScRange(nCol1,nRow1,nTab1,nCol2,nRow2,nTab2));
+        aRef.Ref1.SetFlag3D(true);
+        aRef.Ref2.SetFlag3D(true);
         PushTempTokenWithoutError( new ScExternalDoubleRefToken(nFileId,
                     mrDoc.GetSharedStringPool().intern( rTabName), aRef) );
     }

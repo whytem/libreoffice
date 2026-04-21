@@ -40,7 +40,13 @@ families that are explicitly not yet relocated.
    Verified with `CppunitTest_sc_ucalc_formula2` covering
    `testInterpretTailEngineEvaluatorExternalReferenceRoutes` and
    `testExternalRefFunctions`.
-2. Slice 2: pending
+2. Slice 2: complete
+   Verified with `CppunitTest_sc_ucalc_formula2` covering
+   `testInterpretTailEngineEvaluatorAuthoritativeWithFallback`,
+   `testInterpretTailEngineEvaluatorInformationPredicateDefaultOn`,
+   `testInterpretTailEngineEvaluatorExternalReferenceRoutes`,
+   `testExternalRefFunctions`, and
+   `testSharedInterpreterReferenceOffsetDispatch`.
 3. Slice 3: pending
 4. Slice 4: pending
 5. Slice 5: pending
@@ -74,6 +80,8 @@ Definition of done:
 - targeted matrix dispatch tests pass in forced-core mode
 
 ### Slice 2: Upper-seam external-reference completion
+
+Status: complete
 
 Goal: finish the Phase 4 "external refs" item at the authoritative seam rather
 than only in lower-seam audit lanes.

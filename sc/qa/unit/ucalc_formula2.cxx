@@ -1451,24 +1451,31 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterReferenceOffsetDispatch)
     // Set up a target value at C3 that the offset reference should
     // resolve to.
     m_pDoc->SetValue(ScAddress(2, 2, 0), 42.0);
+    m_pDoc->SetValue(ScAddress(0, 1, 0), 17.0);
+    m_pDoc->SetValue(ScAddress(1, 0, 0), 99.0);
+
+    // Use an asymmetric shift so we prove row/column offsets are not
+    // accidentally swapped in the engine path.
+    m_pDoc->SetString(ScAddress(5, 0, 0), u"=OFFSET(A1;1;0)"_ustr);
+    ASSERT_DOUBLES_EQUAL(17.0, m_pDoc->GetValue(ScAddress(5, 0, 0)));
 
     // OFFSET(A1; 2; 2) -> C3 -> 42
-    m_pDoc->SetString(ScAddress(5, 0, 0), u"=OFFSET(A1;2;2)"_ustr);
-    ASSERT_DOUBLES_EQUAL(42.0, m_pDoc->GetValue(ScAddress(5, 0, 0)));
+    m_pDoc->SetString(ScAddress(5, 1, 0), u"=OFFSET(A1;2;2)"_ustr);
+    ASSERT_DOUBLES_EQUAL(42.0, m_pDoc->GetValue(ScAddress(5, 1, 0)));
 
     // OFFSET with double-ref base resolves to the shifted range's top-left
     // when used in a scalar context. A2:A5 + (2,0) -> A4:A7; A4 is empty
     // so the implicit-intersection scalar should be 0.
     m_pDoc->SetValue(ScAddress(0, 5, 0), 7.0);
-    m_pDoc->SetString(ScAddress(5, 1, 0), u"=OFFSET(A2:A5;2;0)"_ustr);
+    m_pDoc->SetString(ScAddress(5, 2, 0), u"=OFFSET(A2:A5;2;0)"_ustr);
     // The actual value depends on Calc's scalar-from-range rules; just
     // assert no parse error so we know dispatch succeeded.
-    CPPUNIT_ASSERT(m_pDoc->GetString(ScAddress(5, 1, 0)) != u"Err:502"_ustr);
+    CPPUNIT_ASSERT(m_pDoc->GetString(ScAddress(5, 2, 0)) != u"Err:502"_ustr);
 
     // Phase G1 widened OFFSET to cover the 5-argument form; engine now
     // handles it directly rather than declining to legacy.
-    m_pDoc->SetString(ScAddress(5, 2, 0), u"=OFFSET(A1;1;1;2;2)"_ustr);
-    CPPUNIT_ASSERT(m_pDoc->GetString(ScAddress(5, 2, 0)) != u"Err:502"_ustr);
+    m_pDoc->SetString(ScAddress(5, 3, 0), u"=OFFSET(A1;1;1;2;2)"_ustr);
+    CPPUNIT_ASSERT(m_pDoc->GetString(ScAddress(5, 3, 0)) != u"Err:502"_ustr);
 
     // Array-context OFFSET should stay on the reference engine path too.
     std::vector<std::vector<const char*>> aData = { { "abc" }, { "bcd" }, { "cde" } };
@@ -1476,10 +1483,10 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterReferenceOffsetDispatch)
     ScMarkData aMark(m_pDoc->GetSheetLimits());
     aMark.SelectOneTable(0);
     m_pDoc->InsertMatrixFormula(
-        5, 4, 5, 6, aMark, u"=FIND(\"c\";OFFSET(A8:A10;0;COLUMN()-6))"_ustr);
-    ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(ScAddress(5, 4, 0)));
-    ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(5, 5, 0)));
-    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(5, 6, 0)));
+        5, 5, 5, 7, aMark, u"=FIND(\"c\";OFFSET(A8:A10;0;COLUMN()-6))"_ustr);
+    ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(ScAddress(5, 5, 0)));
+    ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(5, 6, 0)));
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(5, 7, 0)));
 
     const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
     const std::string aLabel
@@ -3284,6 +3291,7 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         m_pDoc->SetString(3, 11, 0, u"=XLOOKUP(A5;B5:B7;C5:C7)"_ustr);
         m_pDoc->SetString(3, 12, 0, u"=IFERROR(VLOOKUP(25;B5:C7;2;0);\"missing\")"_ustr);
         m_pDoc->SetString(3, 13, 0, u"=IFNA(XLOOKUP(25;B5:B7;C5:C7);\"missing\")"_ustr);
+        m_pDoc->SetString(4, 12, 0, u"=VLOOKUP(A5;B5:C7;2;0)"_ustr);
         m_pDoc->SetString(4, 11, 0, u"=LOOKUP(4;B12:D12*2;B13:D13/3)"_ustr);
         m_pDoc->SetString(23, 14, 0,
             u"=XLOOKUP(\"Sales\";{\"Product\";\"Sales\";\"Profit\"};XLOOKUP(\"B\";{\"A\"|\"B\"};{10;20;30|40;50;60}))"_ustr);
@@ -3372,6 +3380,7 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         CPPUNIT_ASSERT_EQUAL(u"twenty"_ustr, m_pDoc->GetString(3, 11, 0));
         CPPUNIT_ASSERT_EQUAL(u"missing"_ustr, m_pDoc->GetString(3, 12, 0));
         CPPUNIT_ASSERT_EQUAL(u"missing"_ustr, m_pDoc->GetString(3, 13, 0));
+        CPPUNIT_ASSERT_EQUAL(u"twenty"_ustr, m_pDoc->GetString(4, 12, 0));
         ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(4, 11, 0));
         ASSERT_DOUBLES_EQUAL(50.0, m_pDoc->GetValue(23, 14, 0));
         ASSERT_DOUBLES_EQUAL(200.0, m_pDoc->GetValue(23, 15, 0));
@@ -3412,37 +3421,69 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorAuthoritative
         CPPUNIT_ASSERT_EQUAL(u"11 2"_ustr, m_pDoc->GetString(13, 5, 0));
 
         const auto aStats = setaileval::getStatsSnapshot();
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 27);
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeFallbackCount <= 3);
-        CPPUNIT_ASSERT(
+        const std::string aStatsLabel
+            = "auth=" + std::to_string(aStats.mnAuthoritativeCount)
+              + " fallback=" + std::to_string(aStats.mnAuthoritativeFallbackCount)
+              + " lookup="
+              + std::to_string(aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                    setaileval::FunctionKind::Lookup)])
+              + " xlookup="
+              + std::to_string(aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                    setaileval::FunctionKind::XLookup)])
+              + " match="
+              + std::to_string(aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                    setaileval::FunctionKind::Match)])
+              + " xmatch="
+              + std::to_string(aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                    setaileval::FunctionKind::XMatch)])
+              + " index="
+              + std::to_string(aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                    setaileval::FunctionKind::Index)])
+              + " value="
+              + std::to_string(aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                    setaileval::FunctionKind::Value)])
+              + " vlookup="
+              + std::to_string(aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                    setaileval::FunctionKind::VLookup)]);
+        CPPUNIT_ASSERT_MESSAGE(aStatsLabel, aStats.mnAuthoritativeCount >= 27);
+        CPPUNIT_ASSERT_MESSAGE(aStatsLabel, aStats.mnAuthoritativeFallbackCount <= 3);
+        CPPUNIT_ASSERT_MESSAGE(
+            aStatsLabel,
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::Lookup)]
             >= 8);
-        CPPUNIT_ASSERT(
+        CPPUNIT_ASSERT_MESSAGE(
+            aStatsLabel,
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::XLookup)]
             >= 8);
-        CPPUNIT_ASSERT(
+        CPPUNIT_ASSERT_MESSAGE(
+            aStatsLabel,
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::Match)]
             >= 5);
-        CPPUNIT_ASSERT(
+        CPPUNIT_ASSERT_MESSAGE(
+            aStatsLabel,
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::XMatch)]
             >= 4);
-        CPPUNIT_ASSERT(
+        CPPUNIT_ASSERT_MESSAGE(
+            aStatsLabel,
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::Index)]
             >= 3);
-        CPPUNIT_ASSERT(
+        CPPUNIT_ASSERT_MESSAGE(
+            aStatsLabel,
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::Value)]
             >= 2);
-        CPPUNIT_ASSERT(
+        CPPUNIT_ASSERT_MESSAGE(
+            aStatsLabel,
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::VLookup)]
             >= 1);
-        CPPUNIT_ASSERT(
+        CPPUNIT_ASSERT_MESSAGE(
+            aStatsLabel,
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::XLookup)]
             >= 5);
@@ -4957,6 +4998,8 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorExternalRefer
     rExtDoc.InsertTab(1, u"Matrix"_ustr);
     rExtDoc.SetValue(0, 0, 0, 1.0); // Data.A1
     rExtDoc.SetValue(0, 1, 0, 2.0); // Data.A2
+    rExtDoc.SetValue(1, 0, 0, 10.0); // Data.B1
+    rExtDoc.SetString(1, 1, 0, u"=A1+A2"_ustr); // Data.B2
     rExtDoc.SetValue(0, 0, 1, 1.0); // Matrix.A1
     rExtDoc.SetValue(1, 0, 1, 2.0); // Matrix.B1
     rExtDoc.SetValue(0, 1, 1, 3.0); // Matrix.A2
@@ -4972,8 +5015,12 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorExternalRefer
         ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
         ScFormulaCell* pExtValueCell = m_pDoc->GetFormulaCell(ScAddress(5, 7, 0));
         ScFormulaCell* pExtMatrixCell = m_pDoc->GetFormulaCell(ScAddress(6, 7, 0));
+        ScFormulaCell* pExtIsRefCell = m_pDoc->GetFormulaCell(ScAddress(11, 7, 0));
+        ScFormulaCell* pExtIsFormulaCell = m_pDoc->GetFormulaCell(ScAddress(12, 7, 0));
         CPPUNIT_ASSERT(pExtValueCell);
         CPPUNIT_ASSERT(pExtMatrixCell);
+        CPPUNIT_ASSERT(pExtIsRefCell);
+        CPPUNIT_ASSERT(pExtIsFormulaCell);
         const OUString aStoredExtValueFormula
             = pExtValueCell->GetFormula(formula::FormulaGrammar::GRAM_ODFF, &rContext);
         const OUString aStoredExtMatrixFormula
@@ -4990,6 +5037,18 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorExternalRefer
             *m_pDoc, rContext, ScAddress(6, 7, 0),
             std::u16string_view(aStoredExtMatrixFormula.getStr(), aStoredExtMatrixFormula.getLength()),
             false, pExtMatrixCell->GetCode());
+        const OUString aStoredIsRefFormula
+            = pExtIsRefCell->GetFormula(formula::FormulaGrammar::GRAM_ODFF, &rContext);
+        const OUString aStoredIsFormulaFormula
+            = pExtIsFormulaCell->GetFormula(formula::FormulaGrammar::GRAM_ODFF, &rContext);
+        const auto aStoredIsRef = setaileval::tryEvaluateFormula(
+            *m_pDoc, rContext, ScAddress(11, 7, 0),
+            std::u16string_view(aStoredIsRefFormula.getStr(), aStoredIsRefFormula.getLength()),
+            false, pExtIsRefCell->GetCode());
+        const auto aStoredIsFormula = setaileval::tryEvaluateFormula(
+            *m_pDoc, rContext, ScAddress(12, 7, 0),
+            std::u16string_view(aStoredIsFormulaFormula.getStr(), aStoredIsFormulaFormula.getLength()),
+            false, pExtIsFormulaCell->GetCode());
         const std::string aStoredExtValueLabel
             = "stored_value_default_on=" + std::to_string(bStoredExtValueDefaultOn)
               + " stored_value_supported=" + std::to_string(aStoredExtValue.mbSupported)
@@ -4997,6 +5056,21 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorExternalRefer
               + std::to_string(static_cast<int>(aStoredExtValue.meFallbackReason))
               + " stored_value_type="
               + std::to_string(static_cast<int>(aStoredExtValue.maResult.meType))
+              + " stored_value_token_len="
+              + std::to_string(pExtValueCell->GetCode() ? pExtValueCell->GetCode()->GetLen() : 0)
+              + " stored_value_rpn_len="
+              + std::to_string(
+                    pExtValueCell->GetCode() ? pExtValueCell->GetCode()->GetCodeLen() : 0)
+              + " stored_value_first_token_type="
+              + std::to_string(
+                    pExtValueCell->GetCode() && pExtValueCell->GetCode()->FirstToken()
+                        ? static_cast<int>(pExtValueCell->GetCode()->FirstToken()->GetType())
+                        : -1)
+              + " stored_value_first_rpn_type="
+              + std::to_string(
+                    pExtValueCell->GetCode() && pExtValueCell->GetCode()->FirstRPNToken()
+                        ? static_cast<int>(pExtValueCell->GetCode()->FirstRPNToken()->GetType())
+                        : -1)
               + " stored_value_len=" + std::to_string(aStoredExtValueFormula.getLength())
               + " stored_value_formula=" + std::string(aStoredExtValueFormula.toUtf8().getStr());
         const std::string aStoredExtMatrixLabel
@@ -5008,17 +5082,50 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorExternalRefer
               + std::to_string(static_cast<int>(aStoredExtMatrix.maResult.meType))
               + " stored_matrix_len=" + std::to_string(aStoredExtMatrixFormula.getLength())
               + " stored_matrix_formula="
-              + std::string(aStoredExtMatrixFormula.toUtf8().getStr());
+              + std::string(aStoredExtMatrixFormula.toUtf8().getStr())
+              + " stored_isref_supported=" + std::to_string(aStoredIsRef.mbSupported)
+              + " stored_isref_reason="
+              + std::to_string(static_cast<int>(aStoredIsRef.meFallbackReason))
+              + " stored_isref_function="
+              + std::to_string(static_cast<int>(aStoredIsRef.meFunction))
+              + " stored_isformula_supported=" + std::to_string(aStoredIsFormula.mbSupported)
+              + " stored_isformula_reason="
+              + std::to_string(static_cast<int>(aStoredIsFormula.meFallbackReason))
+              + " stored_isformula_function="
+              + std::to_string(static_cast<int>(aStoredIsFormula.meFunction));
+        const std::string aStoredIsRefLabel
+            = "stored_isref_supported=" + std::to_string(aStoredIsRef.mbSupported)
+              + " stored_isref_reason="
+              + std::to_string(static_cast<int>(aStoredIsRef.meFallbackReason))
+              + " stored_isref_function="
+              + std::to_string(static_cast<int>(aStoredIsRef.meFunction))
+              + " stored_isref_formula=" + std::string(aStoredIsRefFormula.toUtf8().getStr());
+        const std::string aStoredIsFormulaLabel
+            = "stored_isformula_supported=" + std::to_string(aStoredIsFormula.mbSupported)
+              + " stored_isformula_reason="
+              + std::to_string(static_cast<int>(aStoredIsFormula.meFallbackReason))
+              + " stored_isformula_function="
+              + std::to_string(static_cast<int>(aStoredIsFormula.meFunction))
+              + " stored_isformula_formula="
+              + std::string(aStoredIsFormulaFormula.toUtf8().getStr());
         CPPUNIT_ASSERT_MESSAGE(aStoredExtValueLabel, bStoredExtValueDefaultOn);
         CPPUNIT_ASSERT_MESSAGE(aStoredExtMatrixLabel, bStoredExtMatrixDefaultOn);
         CPPUNIT_ASSERT_MESSAGE(aStoredExtValueLabel, aStoredExtValue.mbSupported);
         CPPUNIT_ASSERT_MESSAGE(aStoredExtMatrixLabel, aStoredExtMatrix.mbSupported);
+        CPPUNIT_ASSERT_MESSAGE(aStoredIsRefLabel, aStoredIsRef.mbSupported);
+        CPPUNIT_ASSERT_MESSAGE(aStoredIsFormulaLabel, aStoredIsFormula.mbSupported);
         CPPUNIT_ASSERT_EQUAL_MESSAGE(aStoredExtValueLabel,
             spreadsheetengine::api::formulavalue::ValueType::Value,
             aStoredExtValue.maResult.meType);
         CPPUNIT_ASSERT_EQUAL_MESSAGE(aStoredExtMatrixLabel,
             spreadsheetengine::api::formulavalue::ValueType::Value,
             aStoredExtMatrix.maResult.meType);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(
+            aStoredIsRefLabel, spreadsheetengine::api::formulavalue::ValueType::Value,
+            aStoredIsRef.maResult.meType);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(
+            aStoredIsFormulaLabel, spreadsheetengine::api::formulavalue::ValueType::Value,
+            aStoredIsFormula.maResult.meType);
         CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(aStoredExtValueLabel, 1.0,
             aStoredExtValue.maResult.mfValue, 1.0E-12);
         CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(aStoredExtMatrixLabel, -2.0,
@@ -5031,6 +5138,12 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorExternalRefer
         CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(4, 7, 0)), 1.0E-12);
         ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(5, 7, 0)));
         CPPUNIT_ASSERT_DOUBLES_EQUAL(-2.0, m_pDoc->GetValue(ScAddress(6, 7, 0)), 1.0E-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(7, 7, 0)), 1.0E-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(4.0, m_pDoc->GetValue(ScAddress(8, 7, 0)), 1.0E-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(4.0, m_pDoc->GetValue(ScAddress(9, 7, 0)), 1.0E-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(4.0, m_pDoc->GetValue(ScAddress(10, 7, 0)), 1.0E-12);
+        CPPUNIT_ASSERT_EQUAL(u"TRUE"_ustr, m_pDoc->GetString(ScAddress(11, 7, 0)));
+        CPPUNIT_ASSERT_EQUAL(u"TRUE"_ustr, m_pDoc->GetString(ScAddress(12, 7, 0)));
 
         const auto aStats = setaileval::getStatsSnapshot();
         const std::string aStatsLabel
@@ -5042,13 +5155,28 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorExternalRefer
               + " matrix_auth="
               + std::to_string(aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                     setaileval::FunctionKind::MatrixMath)])
+              + " match_auth="
+              + std::to_string(aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                    setaileval::FunctionKind::Match)])
+              + " vlookup_auth="
+              + std::to_string(aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                    setaileval::FunctionKind::VLookup)])
+              + " xlookup_auth="
+              + std::to_string(aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                    setaileval::FunctionKind::XLookup)])
+              + " index_auth="
+              + std::to_string(aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                    setaileval::FunctionKind::Index)])
+              + " info_auth="
+              + std::to_string(aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                    setaileval::FunctionKind::InformationPredicate)])
               + " scalar_fallback="
               + std::to_string(aStats.maFunctionFallbackCount[static_cast<std::size_t>(
                     setaileval::FunctionKind::ScalarRoot)])
               + " matrix_fallback="
               + std::to_string(aStats.maFunctionFallbackCount[static_cast<std::size_t>(
                     setaileval::FunctionKind::MatrixMath)]);
-        CPPUNIT_ASSERT_MESSAGE(aStatsLabel, aStats.mnAuthoritativeCount >= 7);
+        CPPUNIT_ASSERT_MESSAGE(aStatsLabel, aStats.mnAuthoritativeCount >= 13);
         CPPUNIT_ASSERT_EQUAL_MESSAGE(aStatsLabel, static_cast<sal_uInt64>(0),
             aStats.mnAuthoritativeFallbackCount);
         CPPUNIT_ASSERT_MESSAGE(aStatsLabel,
@@ -5058,6 +5186,26 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorExternalRefer
         CPPUNIT_ASSERT_MESSAGE(aStatsLabel,
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::MatrixMath)]
+                >= 2);
+        CPPUNIT_ASSERT_MESSAGE(aStatsLabel,
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::Match)]
+                >= 1);
+        CPPUNIT_ASSERT_MESSAGE(aStatsLabel,
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::VLookup)]
+                >= 1);
+        CPPUNIT_ASSERT_MESSAGE(aStatsLabel,
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::XLookup)]
+                >= 1);
+        CPPUNIT_ASSERT_MESSAGE(aStatsLabel,
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::Index)]
+                >= 1);
+        CPPUNIT_ASSERT_MESSAGE(aStatsLabel,
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::InformationPredicate)]
                 >= 2);
         CPPUNIT_ASSERT_EQUAL_MESSAGE(aStatsLabel, static_cast<sal_uInt64>(0),
             aStats.maFunctionFallbackCount[static_cast<std::size_t>(
@@ -5084,6 +5232,14 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorExternalRefer
         m_pDoc->SetString(4, 7, 0, u"=MDETERM('file:///extdata.fake'#Matrix.A1)"_ustr);
         m_pDoc->SetString(5, 7, 0, u"='file:///extdata.fake'#ExtValue"_ustr);
         m_pDoc->SetString(6, 7, 0, u"=MDETERM('file:///extdata.fake'#ExtMatrix)"_ustr);
+        m_pDoc->SetString(7, 7, 0, u"=MATCH(3;'file:///extdata.fake'#Matrix.A1:A2;0)"_ustr);
+        m_pDoc->SetString(8, 7, 0, u"=VLOOKUP(3;'file:///extdata.fake'#Matrix.A1:B2;2;0)"_ustr);
+        m_pDoc->SetString(9, 7, 0, u"=INDEX('file:///extdata.fake'#ExtMatrix;2;2)"_ustr);
+        m_pDoc->SetString(
+            10, 7, 0,
+            u"=XLOOKUP(3;'file:///extdata.fake'#Matrix.A1:A2;'file:///extdata.fake'#Matrix.B1:B2)"_ustr);
+        m_pDoc->SetString(11, 7, 0, u"=ISREF('file:///extdata.fake'#ExtMatrix)"_ustr);
+        m_pDoc->SetString(12, 7, 0, u"=ISFORMULA('file:///extdata.fake'#Data.B2)"_ustr);
 
         verifyResultsAndStats();
     }
@@ -5105,6 +5261,14 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorExternalRefer
         m_pDoc->SetString(4, 7, 0, u"=MDETERM('file:///extdata.fake'#Matrix.A1)"_ustr);
         m_pDoc->SetString(5, 7, 0, u"='file:///extdata.fake'#ExtValue"_ustr);
         m_pDoc->SetString(6, 7, 0, u"=MDETERM('file:///extdata.fake'#ExtMatrix)"_ustr);
+        m_pDoc->SetString(7, 7, 0, u"=MATCH(3;'file:///extdata.fake'#Matrix.A1:A2;0)"_ustr);
+        m_pDoc->SetString(8, 7, 0, u"=VLOOKUP(3;'file:///extdata.fake'#Matrix.A1:B2;2;0)"_ustr);
+        m_pDoc->SetString(9, 7, 0, u"=INDEX('file:///extdata.fake'#ExtMatrix;2;2)"_ustr);
+        m_pDoc->SetString(
+            10, 7, 0,
+            u"=XLOOKUP(3;'file:///extdata.fake'#Matrix.A1:A2;'file:///extdata.fake'#Matrix.B1:B2)"_ustr);
+        m_pDoc->SetString(11, 7, 0, u"=ISREF('file:///extdata.fake'#ExtMatrix)"_ustr);
+        m_pDoc->SetString(12, 7, 0, u"=ISFORMULA('file:///extdata.fake'#Data.B2)"_ustr);
 
         verifyResultsAndStats();
     }
@@ -8047,11 +8211,46 @@ void TestFormula2::testExtRefFuncOFFSET(ScDocument* pDoc, ScDocument& rExtDoc)
     clearRange(&rExtDoc, ScRange(0, 0, 0, 1, 9, 0));
 
     sc::AutoCalcSwitch aACSwitch(*pDoc, true);
+    resetScInterpreterDispatchRuntimeStats();
 
     // External document has sheet named 'Data', and the internal doc has sheet named 'Test'.
+    rExtDoc.SetValue(ScAddress(0, 0, 0), 4.4); // Set 4.4 to A1.
     rExtDoc.SetValue(ScAddress(0, 1, 0), 1.2); // Set 1.2 to A2.
+    rExtDoc.SetValue(ScAddress(1, 0, 0), 9.9); // Set 9.9 to B1.
+    rExtDoc.SetValue(ScAddress(1, 1, 0), 8.8); // Set 8.8 to B2.
     pDoc->SetString(ScAddress(0, 0, 0), u"=OFFSET('file:///extdata.fake'#Data.$A$1;1;0;1;1)"_ustr);
-    CPPUNIT_ASSERT_EQUAL(1.2, pDoc->GetValue(ScAddress(0, 0, 0)));
+    const ScAddress aFormulaPos(0, 0, 0);
+    ScFormulaCell* pFormula = pDoc->GetFormulaCell(aFormulaPos);
+    ScInterpreterContext& rContext = pDoc->GetNonThreadedContext();
+    const OUString aStoredFormula = pFormula
+        ? pFormula->GetFormula(formula::FormulaGrammar::GRAM_ODFF, &rContext)
+        : OUString();
+    const auto aEngineAttempt = pFormula
+        ? spreadsheetengine::compat::libreoffice::interprettaileval::tryEvaluateFormula(
+              *pDoc, rContext, aFormulaPos, std::u16string_view(aStoredFormula.getStr(), aStoredFormula.getLength()),
+              false, pFormula->GetCode())
+        : spreadsheetengine::compat::libreoffice::interprettaileval::EvaluationAttempt();
+    const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
+    const std::string aOffsetLabel
+        = "err=" + std::to_string(static_cast<int>(pDoc->GetErrCode(aFormulaPos)))
+          + " text=" + std::string(pDoc->GetString(aFormulaPos).toUtf8().getStr())
+          + " code_err="
+          + std::to_string(static_cast<int>(
+                pFormula && pFormula->GetCode() ? pFormula->GetCode()->GetCodeError()
+                                                : FormulaError::UnknownState))
+          + " code_len="
+          + std::to_string(pFormula && pFormula->GetCode() ? pFormula->GetCode()->GetCodeLen() : 0)
+          + " engine_supported=" + std::to_string(aEngineAttempt.mbSupported)
+          + " engine_reason="
+          + std::to_string(static_cast<int>(aEngineAttempt.meFallbackReason))
+          + " engine_function="
+          + std::to_string(static_cast<int>(aEngineAttempt.meFunction))
+          + " engine_type="
+          + std::to_string(static_cast<int>(aEngineAttempt.maResult.meType))
+          + " attempted=" + std::to_string(aDispatchStats.mnReferenceEngineAttemptedCount)
+          + " succeeded=" + std::to_string(aDispatchStats.mnReferenceEngineSucceededCount)
+          + " declined=" + std::to_string(aDispatchStats.mnReferenceEngineDeclinedCount);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(aOffsetLabel, 1.2, pDoc->GetValue(aFormulaPos), 1.0E-12);
 }
 
 void TestFormula2::testExtRefFuncVLOOKUP(ScDocument* pDoc, ScDocument& rExtDoc)
