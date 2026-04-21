@@ -12,9 +12,9 @@ This backlog starts from the current tree state:
 - Phase 4 is now complete: external-reference execution and
   broadcast/jump-matrix matrix-frame semantics have both landed at the upper
   seam through Slices 1-3
-- Phase 6 is still partial because `ScInterpreter::Interpret()` still carries
-  lower-seam `tryPlanEngine*` admissions for classes that have already started
-  moving upstream
+- Phase 6 is now complete: duplicate lower-seam `tryPlanEngine*` overlap has
+  been retired, and the remaining `tryPlanEngine*` admissions are the
+  engine-backed residual classic-entry set rather than duplicate ownership
 
 The intended end state is one production execution story:
 
@@ -89,7 +89,22 @@ families that are explicitly not yet relocated.
    `testInterpretTailEngineEvaluatorRegressionMatrixHelper`, and
    `testInterpretTailEngineEvaluatorForecastHelper`, plus
    `spreadsheetengine_execution_tests`.
-7. Slice 7: pending
+7. Slice 7: complete
+   Verified with `CppunitTest_sc_ucalc_formula2` covering
+   `testSharedInterpreterCriteriaCountIfDispatch`,
+   `testSharedInterpreterDatabaseDispatch`,
+   `testSharedInterpreterDatabaseGetDispatch`,
+   `testSharedInterpreterCountEmptyCellsDispatch`,
+   `testSharedInterpreterDatabaseVarianceDispatch`,
+   `testSharedInterpreterDatabaseCountDispatch`,
+   `testSharedInterpreterReferenceAddressDispatch`,
+   `testSharedInterpreterLinestEngineDispatch`,
+   `testSharedInterpreterControlFlowIfDispatch`, and
+   `testSharedInterpreterSpillEngineDispatch`, plus
+   `CppunitTest_sc_interpret_tail_corpus` covering
+   `testSeamReconciliationTryPushWrapperFloor`,
+   `testLowerSeamEngineAttemptsCarryPivotRationale`, and
+   `testProjectStatusOwnsCanonicalDashboardMetrics`.
 8. Slice 8: pending
 
 ## Backlog
@@ -283,6 +298,23 @@ Definition of done:
 - forecast/regression no longer need interpreter-resident execution kernels
 
 ### Slice 7: Seam reconciliation, residual wave
+
+Status: complete
+
+Current landing on the tree:
+
+- duplicate lower-seam `tryPlanEngine*` overlap is now retired for the
+  criteria/database wave, the regression/forecast wave, and the remaining
+  promoted legacy-fallback helpers `ADDRESS`, `INDIRECT`, and
+  `ORG.LIBREOFFICE.FOURIER`
+- `interp4_dispatch_plan_engine_attempt_count` now measures only duplicate
+  overlap, and that count is `0`
+- the remaining `21` lower-seam `tryPlanEngine*` sites are now tracked
+  separately as engine-backed residual classic entry points for
+  `IF` / `IFERROR` / `IFNA` / `CHOOSE` / `IFS` / `SWITCH` and the spill
+  family, not as evidence of two owners for the same promoted class
+- Phase 6 can therefore be marked complete; Slice 8 is now a documentation
+  and handoff close-out rather than another authority-transfer code wave
 
 Goal: finish Phase 6 by deleting the remaining overlapping lower-seam
 admissions once Slices 5-6 land.

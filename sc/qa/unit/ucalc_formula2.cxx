@@ -993,12 +993,16 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterCriteriaCountIfDispatch)
           + std::to_string(aDispatchStats.mnCriteriaEngineSucceededCount)
           + " declined="
           + std::to_string(aDispatchStats.mnCriteriaEngineDeclinedCount);
-    CPPUNIT_ASSERT_MESSAGE(
-        "COUNTIF should attempt engine dispatch: " + aLabel,
-        aDispatchStats.mnCriteriaEngineAttemptedCount > 0);
-    CPPUNIT_ASSERT_MESSAGE(
-        "scalar COUNTIF should succeed through engine: " + aLabel,
-        aDispatchStats.mnCriteriaEngineSucceededCount > 0);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "COUNTIF lower-seam pilot should be retired once the upper seam owns criteria tails: "
+            + aLabel,
+        sal_uInt64(0), aDispatchStats.mnCriteriaEngineAttemptedCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "retired COUNTIF lower-seam pilot should not report synthetic successes: " + aLabel,
+        sal_uInt64(0), aDispatchStats.mnCriteriaEngineSucceededCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "retired COUNTIF lower-seam pilot should not report synthetic declines: " + aLabel,
+        sal_uInt64(0), aDispatchStats.mnCriteriaEngineDeclinedCount);
 
     m_pDoc->DeleteTab(0);
 }
@@ -1076,12 +1080,18 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterDatabaseDispatch)
           + std::to_string(aDispatchStats.mnCriteriaEngineSucceededCount)
           + " declined="
           + std::to_string(aDispatchStats.mnCriteriaEngineDeclinedCount);
-    CPPUNIT_ASSERT_MESSAGE(
-        "DB functions should attempt engine dispatch: " + aLabel,
-        aDispatchStats.mnCriteriaEngineAttemptedCount >= 5);
-    CPPUNIT_ASSERT_MESSAGE(
-        "DB functions should succeed through engine: " + aLabel,
-        aDispatchStats.mnCriteriaEngineSucceededCount >= 5);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "DB aggregate lower-seam pilot should be retired once the upper seam owns DB tails: "
+            + aLabel,
+        sal_uInt64(0), aDispatchStats.mnCriteriaEngineAttemptedCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "retired DB aggregate lower-seam pilot should not report synthetic successes: "
+            + aLabel,
+        sal_uInt64(0), aDispatchStats.mnCriteriaEngineSucceededCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "retired DB aggregate lower-seam pilot should not report synthetic declines: "
+            + aLabel,
+        sal_uInt64(0), aDispatchStats.mnCriteriaEngineDeclinedCount);
 
     m_pDoc->DeleteTab(0);
 }
@@ -1136,12 +1146,16 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterDatabaseGetDispatch)
           + std::to_string(aDispatchStats.mnCriteriaEngineSucceededCount)
           + " declined="
           + std::to_string(aDispatchStats.mnCriteriaEngineDeclinedCount);
-    CPPUNIT_ASSERT_MESSAGE(
-        "DGET should attempt engine dispatch: " + aLabel,
-        aDispatchStats.mnCriteriaEngineAttemptedCount >= 1);
-    CPPUNIT_ASSERT_MESSAGE(
-        "DGET should succeed through engine: " + aLabel,
-        aDispatchStats.mnCriteriaEngineSucceededCount >= 1);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "DGET lower-seam pilot should be retired once the upper seam owns DB tails: "
+            + aLabel,
+        sal_uInt64(0), aDispatchStats.mnCriteriaEngineAttemptedCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "retired DGET lower-seam pilot should not report synthetic successes: " + aLabel,
+        sal_uInt64(0), aDispatchStats.mnCriteriaEngineSucceededCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "retired DGET lower-seam pilot should not report synthetic declines: " + aLabel,
+        sal_uInt64(0), aDispatchStats.mnCriteriaEngineDeclinedCount);
 
     m_pDoc->DeleteTab(0);
 }
@@ -1181,12 +1195,18 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterCountEmptyCellsDispatch)
           + std::to_string(aDispatchStats.mnCriteriaEngineSucceededCount)
           + " declined="
           + std::to_string(aDispatchStats.mnCriteriaEngineDeclinedCount);
-    CPPUNIT_ASSERT_MESSAGE(
-        "COUNTBLANK should attempt engine dispatch: " + aLabel,
-        aDispatchStats.mnCriteriaEngineAttemptedCount >= 1);
-    CPPUNIT_ASSERT_MESSAGE(
-        "COUNTBLANK should succeed through engine: " + aLabel,
-        aDispatchStats.mnCriteriaEngineSucceededCount >= 1);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "COUNTBLANK lower-seam pilot should be retired once the upper seam owns criteria tails: "
+            + aLabel,
+        sal_uInt64(0), aDispatchStats.mnCriteriaEngineAttemptedCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "retired COUNTBLANK lower-seam pilot should not report synthetic successes: "
+            + aLabel,
+        sal_uInt64(0), aDispatchStats.mnCriteriaEngineSucceededCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "retired COUNTBLANK lower-seam pilot should not report synthetic declines: "
+            + aLabel,
+        sal_uInt64(0), aDispatchStats.mnCriteriaEngineDeclinedCount);
 
     m_pDoc->DeleteTab(0);
 }
@@ -1259,12 +1279,18 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterDatabaseVarianceDispatch
           + std::to_string(aDispatchStats.mnCriteriaEngineSucceededCount)
           + " declined="
           + std::to_string(aDispatchStats.mnCriteriaEngineDeclinedCount);
-    CPPUNIT_ASSERT_MESSAGE(
-        "DB variance family should attempt engine dispatch: " + aLabel,
-        aDispatchStats.mnCriteriaEngineAttemptedCount >= 4);
-    CPPUNIT_ASSERT_MESSAGE(
-        "DB variance family should succeed through engine: " + aLabel,
-        aDispatchStats.mnCriteriaEngineSucceededCount >= 4);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "DB variance lower-seam pilot should be retired once the upper seam owns DB tails: "
+            + aLabel,
+        sal_uInt64(0), aDispatchStats.mnCriteriaEngineAttemptedCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "retired DB variance lower-seam pilot should not report synthetic successes: "
+            + aLabel,
+        sal_uInt64(0), aDispatchStats.mnCriteriaEngineSucceededCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "retired DB variance lower-seam pilot should not report synthetic declines: "
+            + aLabel,
+        sal_uInt64(0), aDispatchStats.mnCriteriaEngineDeclinedCount);
 
     m_pDoc->DeleteTab(0);
 }
@@ -1326,12 +1352,18 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterDatabaseCountDispatch)
           + std::to_string(aDispatchStats.mnCriteriaEngineSucceededCount)
           + " declined="
           + std::to_string(aDispatchStats.mnCriteriaEngineDeclinedCount);
-    CPPUNIT_ASSERT_MESSAGE(
-        "DCOUNT/DCOUNTA should attempt engine dispatch: " + aLabel,
-        aDispatchStats.mnCriteriaEngineAttemptedCount >= 2);
-    CPPUNIT_ASSERT_MESSAGE(
-        "DCOUNT/DCOUNTA should succeed through engine: " + aLabel,
-        aDispatchStats.mnCriteriaEngineSucceededCount >= 2);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "DB count lower-seam pilot should be retired once the upper seam owns DB tails: "
+            + aLabel,
+        sal_uInt64(0), aDispatchStats.mnCriteriaEngineAttemptedCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "retired DB count lower-seam pilot should not report synthetic successes: "
+            + aLabel,
+        sal_uInt64(0), aDispatchStats.mnCriteriaEngineSucceededCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "retired DB count lower-seam pilot should not report synthetic declines: "
+            + aLabel,
+        sal_uInt64(0), aDispatchStats.mnCriteriaEngineDeclinedCount);
 
     m_pDoc->DeleteTab(0);
 }
@@ -1360,6 +1392,12 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterReferenceAddressDispatch
     m_pDoc->SetString(ScAddress(0, 2, 0), u"=ADDRESS(1;1;4)"_ustr);
     CPPUNIT_ASSERT_EQUAL(u"A1"_ustr, m_pDoc->GetString(ScAddress(0, 2, 0)));
 
+    // INDIRECT should also evaluate through the classic implementation
+    // only once the lower-seam overlap is retired.
+    m_pDoc->SetValue(ScAddress(2, 5, 0), 77.0); // C6
+    m_pDoc->SetString(ScAddress(0, 3, 0), u"=INDIRECT(\"C6\")"_ustr);
+    ASSERT_DOUBLES_EQUAL(77.0, m_pDoc->GetValue(ScAddress(0, 3, 0)));
+
     const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
     const std::string aLabel
         = "ref_attempted="
@@ -1368,15 +1406,18 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterReferenceAddressDispatch
           + std::to_string(aDispatchStats.mnReferenceEngineSucceededCount)
           + " declined="
           + std::to_string(aDispatchStats.mnReferenceEngineDeclinedCount);
-    CPPUNIT_ASSERT_MESSAGE(
-        "ADDRESS should attempt engine dispatch: " + aLabel,
-        aDispatchStats.mnReferenceEngineAttemptedCount > 0);
-    CPPUNIT_ASSERT_MESSAGE(
-        "2-arg ADDRESS should succeed through engine: " + aLabel,
-        aDispatchStats.mnReferenceEngineSucceededCount > 0);
-    CPPUNIT_ASSERT_MESSAGE(
-        "3-arg ADDRESS should produce an engine decline: " + aLabel,
-        aDispatchStats.mnReferenceEngineDeclinedCount > 0);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "ADDRESS/INDIRECT lower-seam pilot should be retired once the upper seam owns promoted reference helpers: "
+            + aLabel,
+        sal_uInt64(0), aDispatchStats.mnReferenceEngineAttemptedCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "retired ADDRESS/INDIRECT lower-seam pilot should not report synthetic successes: "
+            + aLabel,
+        sal_uInt64(0), aDispatchStats.mnReferenceEngineSucceededCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "retired ADDRESS/INDIRECT lower-seam pilot should not report synthetic declines: "
+            + aLabel,
+        sal_uInt64(0), aDispatchStats.mnReferenceEngineDeclinedCount);
 
     m_pDoc->DeleteTab(0);
 }
@@ -1859,14 +1900,18 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterLinestEngineDispatch)
           + std::to_string(aLinestDispatchStats.mnMatrixEngineSucceededCount)
           + " declined="
           + std::to_string(aLinestDispatchStats.mnMatrixEngineDeclinedCount);
-    CPPUNIT_ASSERT_MESSAGE(
-        "LINEST/LOGEST/TREND/GROWTH/FORECAST should attempt engine dispatch: "
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "regression/forecast lower-seam pilot should be retired once the upper seam owns the family: "
             + aLinestLabel,
-        aLinestDispatchStats.mnMatrixEngineAttemptedCount > 0);
-    CPPUNIT_ASSERT_MESSAGE(
-        "LINEST/LOGEST/TREND/GROWTH/FORECAST should succeed through engine: "
+        sal_uInt64(0), aLinestDispatchStats.mnMatrixEngineAttemptedCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "retired regression/forecast lower-seam pilot should not report synthetic successes: "
             + aLinestLabel,
-        aLinestDispatchStats.mnMatrixEngineSucceededCount > 0);
+        sal_uInt64(0), aLinestDispatchStats.mnMatrixEngineSucceededCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "retired regression/forecast lower-seam pilot should not report synthetic declines: "
+            + aLinestLabel,
+        sal_uInt64(0), aLinestDispatchStats.mnMatrixEngineDeclinedCount);
 
     m_pDoc->DeleteTab(0);
 }

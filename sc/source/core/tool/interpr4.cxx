@@ -4623,6 +4623,13 @@ StackVar ScInterpreter::Interpret()
                             "family-local default-on statistical aggregate reached "
                             "ScInterpreter");
                     };
+                const auto warnIfLegacyCriteriaAggregateReached =
+                    [&](std::u16string_view rLabel) {
+                        warnIfLegacyDefaultOnReached(
+                            rLabel,
+                            "family-local default-on criteria aggregate reached "
+                            "ScInterpreter");
+                    };
                 const auto warnIfLegacyGrowthProjectionReached =
                     [&](std::u16string_view rLabel) {
                         warnIfLegacyDefaultOnReached(
@@ -4641,6 +4648,12 @@ StackVar ScInterpreter::Interpret()
                             rLabel,
                             "family-local default-on statistical distribution reached "
                             "ScInterpreter");
+                    };
+                const auto warnIfLegacyMatrixMathReached =
+                    [&](std::u16string_view rLabel) {
+                        warnIfLegacyDefaultOnReached(
+                            rLabel,
+                            "family-local default-on matrix math reached ScInterpreter");
                     };
                 const auto pushValueResult = [&](const auto& rResult) {
                     if (!rResult)
@@ -6410,7 +6423,7 @@ StackVar ScInterpreter::Interpret()
                     return true;
                 };
 
-                const auto tryPlanEngineSingleCriterionAggregate
+                [[maybe_unused]] const auto tryPlanEngineSingleCriterionAggregate
                     = [&](sequery::CriteriaAggregateKind eKind,
                           bool bWithTargetRange) -> bool {
                     addDispatchRuntimeStat(
@@ -6596,86 +6609,6 @@ StackVar ScInterpreter::Interpret()
                             PushError(FormulaError::IllegalArgument);
                             break;
                     }
-                    return true;
-                };
-
-                const auto tryPlanEngineCountIf = [&]() -> bool {
-                    return tryPlanEngineSingleCriterionAggregate(
-                        sequery::CriteriaAggregateKind::Count, false);
-                };
-
-                // Batch 3 tail ocCountEmptyCells admission. COUNTBLANK
-                // takes a single range argument and counts cells whose
-                // content is empty (blank cell, or formula cell whose
-                // result is an empty string). Scope fence: single-sheet
-                // svDoubleRef only; svSingleRef / svRefList / svMatrix /
-                // external refs defer to legacy.
-                const auto tryPlanEngineCountEmptyCells = [&]() -> bool {
-                    addDispatchRuntimeStat(
-                        interpreterDispatchRuntimeStatsStore()
-                            .mnCriteriaEngineAttemptedCount);
-
-                    const sal_uInt8 nParamCount = pCur->GetByte();
-                    if (nParamCount != 1 || sp < 1)
-                    {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnCriteriaEngineDeclinedCount);
-                        return false;
-                    }
-                    const FormulaToken* pTok = pStack[sp - 1];
-                    if (!pTok || pTok->GetType() != svDoubleRef)
-                    {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnCriteriaEngineDeclinedCount);
-                        return false;
-                    }
-
-                    const ScRange aRange
-                        = pTok->GetDoubleRef()->toAbs(mrDoc, aPos);
-                    if (aRange.aStart.Tab() != aRange.aEnd.Tab())
-                    {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnCriteriaEngineDeclinedCount);
-                        return false;
-                    }
-
-                    sequery::CriteriaAggregateInput aInput;
-                    aInput.mbScalar = false;
-                    aInput.maReference.maRange.maStart = {
-                        static_cast<spreadsheetengine::api::SheetId>(aRange.aStart.Tab()),
-                        static_cast<spreadsheetengine::api::ColumnIndex>(aRange.aStart.Col()),
-                        static_cast<spreadsheetengine::api::RowIndex>(aRange.aStart.Row())
-                    };
-                    aInput.maReference.maRange.maEnd = {
-                        static_cast<spreadsheetengine::api::SheetId>(aRange.aEnd.Tab()),
-                        static_cast<spreadsheetengine::api::ColumnIndex>(aRange.aEnd.Col()),
-                        static_cast<spreadsheetengine::api::RowIndex>(aRange.aEnd.Row())
-                    };
-                    aInput.mnColumns = static_cast<spreadsheetengine::api::MatrixSize>(
-                        aRange.aEnd.Col() - aRange.aStart.Col() + 1);
-                    aInput.mnRows = static_cast<spreadsheetengine::api::MatrixSize>(
-                        aRange.aEnd.Row() - aRange.aStart.Row() + 1);
-
-                    const seitee::detail::CriteriaAggregateMaterializer aMaterializer(
-                        mrDoc, mrContext);
-                    const auto aResult = serpn::planCountEmptyRange(aMaterializer, aInput);
-                    if (!aResult)
-                    {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnCriteriaEngineDeclinedCount);
-                        return false;
-                    }
-
-                    sp -= nParamCount;
-                    nGlobalError = FormulaError::NONE;
-                    addDispatchRuntimeStat(
-                        interpreterDispatchRuntimeStatsStore()
-                            .mnCriteriaEngineSucceededCount);
-                    PushDouble(aResult.maValue);
                     return true;
                 };
 
@@ -7683,492 +7616,6 @@ StackVar ScInterpreter::Interpret()
                         return true;
                     }
                     ScMatrixRef pResult = convertMatrixOperandToMatrixRef(aPlan.maValue);
-                    if (!pResult)
-                    {
-                        PushError(FormulaError::MatrixSize);
-                        return true;
-                    }
-                    PushMatrix(pResult);
-                    return true;
-                };
-
-                // Batch 4 regression/forecast admission: LINEST / LOGEST.
-                // Signature (Y, [X], [bConstant=true], [bStats=false]).
-                // Scope fence: svMatrix for Y / X; svDouble for
-                // bConstant / bStats. Range tokens defer.
-                const auto tryPlanEngineLinestOrLogest = [&](bool bLog) -> bool {
-                    addDispatchRuntimeStat(
-                        interpreterDispatchRuntimeStatsStore()
-                            .mnMatrixEngineAttemptedCount);
-
-                    const sal_uInt8 nParamCount = pCur->GetByte();
-                    if (nParamCount < 1 || nParamCount > 4
-                        || sp < nParamCount)
-                    {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
-                        return false;
-                    }
-
-                    bool bConstant = true;
-                    bool bStats = false;
-                    const FormulaToken* pYTok = pStack[sp - nParamCount];
-                    const FormulaToken* pXTok = nullptr;
-                    if (nParamCount >= 2)
-                        pXTok = pStack[sp - nParamCount + 1];
-                    if (nParamCount >= 3)
-                    {
-                        const FormulaToken* pConstTok
-                            = pStack[sp - nParamCount + 2];
-                        if (!pConstTok || pConstTok->GetType() != svDouble)
-                        {
-                            addDispatchRuntimeStat(
-                                interpreterDispatchRuntimeStatsStore()
-                                    .mnMatrixEngineDeclinedCount);
-                            return false;
-                        }
-                        bConstant = pConstTok->GetDouble() != 0.0;
-                    }
-                    if (nParamCount >= 4)
-                    {
-                        const FormulaToken* pStatsTok
-                            = pStack[sp - nParamCount + 3];
-                        if (!pStatsTok || pStatsTok->GetType() != svDouble)
-                        {
-                            addDispatchRuntimeStat(
-                                interpreterDispatchRuntimeStatsStore()
-                                    .mnMatrixEngineDeclinedCount);
-                            return false;
-                        }
-                        bStats = pStatsTok->GetDouble() != 0.0;
-                    }
-
-                    if (!pYTok || pYTok->GetType() != svMatrix)
-                    {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
-                        return false;
-                    }
-                    ScMatrix* pYMat
-                        = const_cast<FormulaToken*>(pYTok)->GetMatrix();
-                    if (!pYMat)
-                    {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
-                        return false;
-                    }
-                    auto oY = convertMatrixRefToMatrixOperand(*pYMat);
-                    if (!oY)
-                    {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
-                        return false;
-                    }
-
-                    std::optional<serpn::MatrixOperand> oX;
-                    if (pXTok)
-                    {
-                        if (pXTok->GetType() != svMatrix)
-                        {
-                            addDispatchRuntimeStat(
-                                interpreterDispatchRuntimeStatsStore()
-                                    .mnMatrixEngineDeclinedCount);
-                            return false;
-                        }
-                        ScMatrix* pXMat
-                            = const_cast<FormulaToken*>(pXTok)->GetMatrix();
-                        if (!pXMat)
-                        {
-                            addDispatchRuntimeStat(
-                                interpreterDispatchRuntimeStatsStore()
-                                    .mnMatrixEngineDeclinedCount);
-                            return false;
-                        }
-                        oX = convertMatrixRefToMatrixOperand(*pXMat);
-                    }
-
-                    const auto aPlan = bLog
-                        ? serpn::planLogest(oX ? &*oX : nullptr, *oY,
-                                            bConstant, bStats)
-                        : serpn::planLinest(oX ? &*oX : nullptr, *oY,
-                                            bConstant, bStats);
-                    if (aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
-                    {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
-                        return false;
-                    }
-                    sp -= nParamCount;
-                    nGlobalError = FormulaError::NONE;
-                    addDispatchRuntimeStat(
-                        interpreterDispatchRuntimeStatsStore()
-                            .mnMatrixEngineSucceededCount);
-                    if (!aPlan)
-                    {
-                        PushError(selibreoffice::toFormulaError(aPlan.meError));
-                        return true;
-                    }
-                    ScMatrixRef pResult
-                        = convertMatrixOperandToMatrixRef(aPlan.maValue.maMatrix);
-                    if (!pResult)
-                    {
-                        PushError(FormulaError::MatrixSize);
-                        return true;
-                    }
-                    PushMatrix(pResult);
-                    return true;
-                };
-
-                const auto tryPlanEngineLinest = [&]() -> bool {
-                    return tryPlanEngineLinestOrLogest(false);
-                };
-                const auto tryPlanEngineLogest = [&]() -> bool {
-                    return tryPlanEngineLinestOrLogest(true);
-                };
-
-                // Batch 4 regression/forecast admission: TREND / GROWTH.
-                // Signature (knownY, [knownX], [newX], [bConstant=true]).
-                // Scope fence: svMatrix for matrix args; svDouble for
-                // bConstant. Range tokens decline and defer.
-                const auto tryPlanEngineTrendOrGrowth = [&](bool bLog) -> bool {
-                    addDispatchRuntimeStat(
-                        interpreterDispatchRuntimeStatsStore()
-                            .mnMatrixEngineAttemptedCount);
-
-                    const sal_uInt8 nParamCount = pCur->GetByte();
-                    if (nParamCount < 1 || nParamCount > 4
-                        || sp < nParamCount)
-                    {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
-                        return false;
-                    }
-
-                    bool bConstant = true;
-                    const FormulaToken* pYTok = pStack[sp - nParamCount];
-                    const FormulaToken* pXTok = nullptr;
-                    const FormulaToken* pNewXTok = nullptr;
-                    if (nParamCount >= 2)
-                        pXTok = pStack[sp - nParamCount + 1];
-                    if (nParamCount >= 3)
-                        pNewXTok = pStack[sp - nParamCount + 2];
-                    if (nParamCount >= 4)
-                    {
-                        const FormulaToken* pConstTok
-                            = pStack[sp - nParamCount + 3];
-                        if (!pConstTok || pConstTok->GetType() != svDouble)
-                        {
-                            addDispatchRuntimeStat(
-                                interpreterDispatchRuntimeStatsStore()
-                                    .mnMatrixEngineDeclinedCount);
-                            return false;
-                        }
-                        bConstant = pConstTok->GetDouble() != 0.0;
-                    }
-
-                    if (!pYTok || pYTok->GetType() != svMatrix)
-                    {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
-                        return false;
-                    }
-                    ScMatrix* pYMat
-                        = const_cast<FormulaToken*>(pYTok)->GetMatrix();
-                    if (!pYMat)
-                    {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
-                        return false;
-                    }
-                    auto oY = convertMatrixRefToMatrixOperand(*pYMat);
-                    if (!oY)
-                    {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
-                        return false;
-                    }
-                    std::optional<serpn::MatrixOperand> oX;
-                    if (pXTok)
-                    {
-                        if (pXTok->GetType() != svMatrix)
-                        {
-                            addDispatchRuntimeStat(
-                                interpreterDispatchRuntimeStatsStore()
-                                    .mnMatrixEngineDeclinedCount);
-                            return false;
-                        }
-                        ScMatrix* pXMat
-                            = const_cast<FormulaToken*>(pXTok)->GetMatrix();
-                        if (!pXMat)
-                        {
-                            addDispatchRuntimeStat(
-                                interpreterDispatchRuntimeStatsStore()
-                                    .mnMatrixEngineDeclinedCount);
-                            return false;
-                        }
-                        oX = convertMatrixRefToMatrixOperand(*pXMat);
-                    }
-                    std::optional<serpn::MatrixOperand> oNewX;
-                    if (pNewXTok)
-                    {
-                        if (pNewXTok->GetType() != svMatrix)
-                        {
-                            addDispatchRuntimeStat(
-                                interpreterDispatchRuntimeStatsStore()
-                                    .mnMatrixEngineDeclinedCount);
-                            return false;
-                        }
-                        ScMatrix* pNewXMat
-                            = const_cast<FormulaToken*>(pNewXTok)->GetMatrix();
-                        if (!pNewXMat)
-                        {
-                            addDispatchRuntimeStat(
-                                interpreterDispatchRuntimeStatsStore()
-                                    .mnMatrixEngineDeclinedCount);
-                            return false;
-                        }
-                        oNewX = convertMatrixRefToMatrixOperand(*pNewXMat);
-                    }
-
-                    const auto aPlan = bLog
-                        ? serpn::planGrowth(*oY,
-                                            oX ? &*oX : nullptr,
-                                            oNewX ? &*oNewX : nullptr,
-                                            bConstant)
-                        : serpn::planTrend(*oY,
-                                           oX ? &*oX : nullptr,
-                                           oNewX ? &*oNewX : nullptr,
-                                           bConstant);
-                    if (aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
-                    {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
-                        return false;
-                    }
-                    sp -= nParamCount;
-                    nGlobalError = FormulaError::NONE;
-                    addDispatchRuntimeStat(
-                        interpreterDispatchRuntimeStatsStore()
-                            .mnMatrixEngineSucceededCount);
-                    if (!aPlan)
-                    {
-                        PushError(selibreoffice::toFormulaError(aPlan.meError));
-                        return true;
-                    }
-                    ScMatrixRef pResult
-                        = convertMatrixOperandToMatrixRef(aPlan.maValue.maMatrix);
-                    if (!pResult)
-                    {
-                        PushError(FormulaError::MatrixSize);
-                        return true;
-                    }
-                    PushMatrix(pResult);
-                    return true;
-                };
-
-                const auto tryPlanEngineTrend = [&]() -> bool {
-                    return tryPlanEngineTrendOrGrowth(false);
-                };
-                const auto tryPlanEngineGrowth = [&]() -> bool {
-                    return tryPlanEngineTrendOrGrowth(true);
-                };
-
-                // Batch 4 regression/forecast admission: FORECAST.
-                // Signature (x, knownY, knownX). Scope fence: scalar
-                // x must be svDouble; knownY / knownX must be svMatrix.
-                const auto tryPlanEngineForecast = [&]() -> bool {
-                    addDispatchRuntimeStat(
-                        interpreterDispatchRuntimeStatsStore()
-                            .mnMatrixEngineAttemptedCount);
-
-                    const sal_uInt8 nParamCount = pCur->GetByte();
-                    if (nParamCount != 3 || sp < 3)
-                    {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
-                        return false;
-                    }
-                    const FormulaToken* pKnownXTok = pStack[sp - 1];
-                    const FormulaToken* pKnownYTok = pStack[sp - 2];
-                    const FormulaToken* pXTok = pStack[sp - 3];
-                    if (!pKnownXTok || !pKnownYTok || !pXTok
-                        || pKnownXTok->GetType() != svMatrix
-                        || pKnownYTok->GetType() != svMatrix
-                        || pXTok->GetType() != svDouble)
-                    {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
-                        return false;
-                    }
-                    ScMatrix* pKnownYMat
-                        = const_cast<FormulaToken*>(pKnownYTok)->GetMatrix();
-                    ScMatrix* pKnownXMat
-                        = const_cast<FormulaToken*>(pKnownXTok)->GetMatrix();
-                    if (!pKnownYMat || !pKnownXMat)
-                    {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
-                        return false;
-                    }
-                    auto oKnownY
-                        = convertMatrixRefToMatrixOperand(*pKnownYMat);
-                    auto oKnownX
-                        = convertMatrixRefToMatrixOperand(*pKnownXMat);
-                    if (!oKnownY || !oKnownX)
-                    {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
-                        return false;
-                    }
-                    const double fVal = pXTok->GetDouble();
-                    const auto aPlan = serpn::planForecast(
-                        fVal, *oKnownY, *oKnownX);
-                    if (aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
-                    {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
-                        return false;
-                    }
-                    sp -= 3;
-                    nGlobalError = FormulaError::NONE;
-                    addDispatchRuntimeStat(
-                        interpreterDispatchRuntimeStatsStore()
-                            .mnMatrixEngineSucceededCount);
-                    if (!aPlan)
-                    {
-                        PushError(selibreoffice::toFormulaError(aPlan.meError));
-                        return true;
-                    }
-                    PushDouble(aPlan.maValue);
-                    return true;
-                };
-
-                // Batch 4 regression/forecast admission: FOURIER.
-                // Signature (Input, bGroupedByColumn, [bInverse=false],
-                //            [bPolar=false], [fMinMag=0]).
-                const auto tryPlanEngineFourier = [&]() -> bool {
-                    addDispatchRuntimeStat(
-                        interpreterDispatchRuntimeStatsStore()
-                            .mnMatrixEngineAttemptedCount);
-
-                    const sal_uInt8 nParamCount = pCur->GetByte();
-                    if (nParamCount < 2 || nParamCount > 5
-                        || sp < nParamCount)
-                    {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
-                        return false;
-                    }
-
-                    double fMinMag = 0.0;
-                    bool bPolar = false;
-                    bool bInverse = false;
-                    const FormulaToken* pInputTok = pStack[sp - nParamCount];
-                    const FormulaToken* pGroupTok
-                        = pStack[sp - nParamCount + 1];
-                    if (nParamCount >= 3)
-                    {
-                        const FormulaToken* pInvTok
-                            = pStack[sp - nParamCount + 2];
-                        if (!pInvTok || pInvTok->GetType() != svDouble)
-                        {
-                            addDispatchRuntimeStat(
-                                interpreterDispatchRuntimeStatsStore()
-                                    .mnMatrixEngineDeclinedCount);
-                            return false;
-                        }
-                        bInverse = pInvTok->GetDouble() != 0.0;
-                    }
-                    if (nParamCount >= 4)
-                    {
-                        const FormulaToken* pPolarTok
-                            = pStack[sp - nParamCount + 3];
-                        if (!pPolarTok || pPolarTok->GetType() != svDouble)
-                        {
-                            addDispatchRuntimeStat(
-                                interpreterDispatchRuntimeStatsStore()
-                                    .mnMatrixEngineDeclinedCount);
-                            return false;
-                        }
-                        bPolar = pPolarTok->GetDouble() != 0.0;
-                    }
-                    if (nParamCount >= 5)
-                    {
-                        const FormulaToken* pMinMagTok
-                            = pStack[sp - nParamCount + 4];
-                        if (!pMinMagTok || pMinMagTok->GetType() != svDouble)
-                        {
-                            addDispatchRuntimeStat(
-                                interpreterDispatchRuntimeStatsStore()
-                                    .mnMatrixEngineDeclinedCount);
-                            return false;
-                        }
-                        fMinMag = pMinMagTok->GetDouble();
-                    }
-                    if (!pInputTok || pInputTok->GetType() != svMatrix
-                        || !pGroupTok || pGroupTok->GetType() != svDouble)
-                    {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
-                        return false;
-                    }
-                    const bool bGroupedByColumn
-                        = pGroupTok->GetDouble() != 0.0;
-                    ScMatrix* pInputMat
-                        = const_cast<FormulaToken*>(pInputTok)->GetMatrix();
-                    if (!pInputMat)
-                    {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
-                        return false;
-                    }
-                    auto oInput = convertMatrixRefToMatrixOperand(*pInputMat);
-                    if (!oInput)
-                    {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
-                        return false;
-                    }
-                    const auto aPlan = serpn::planFourier(
-                        *oInput, bGroupedByColumn, bInverse, bPolar, fMinMag);
-                    if (aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
-                    {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
-                        return false;
-                    }
-                    sp -= nParamCount;
-                    nGlobalError = FormulaError::NONE;
-                    addDispatchRuntimeStat(
-                        interpreterDispatchRuntimeStatsStore()
-                            .mnMatrixEngineSucceededCount);
-                    if (!aPlan)
-                    {
-                        PushError(selibreoffice::toFormulaError(aPlan.meError));
-                        return true;
-                    }
-                    ScMatrixRef pResult
-                        = convertMatrixOperandToMatrixRef(aPlan.maValue.maMatrix);
                     if (!pResult)
                     {
                         PushError(FormulaError::MatrixSize);
@@ -9566,7 +9013,7 @@ StackVar ScInterpreter::Interpret()
                 // svString (matching a database header); criteria range
                 // must have a header row plus exactly one data row
                 // (multi-row OR criteria defer to legacy).
-                const auto tryPlanEngineDatabaseAggregate
+                [[maybe_unused]] const auto tryPlanEngineDatabaseAggregate
                     = [&](sequery::CriteriaAggregateKind eKind) -> bool {
                     addDispatchRuntimeStat(
                         interpreterDispatchRuntimeStatsStore()
@@ -9890,7 +9337,7 @@ StackVar ScInterpreter::Interpret()
                 // criteria data row, field resolvable by index or
                 // header name. Missing-field / multi-row-criteria / RefList
                 // / external-ref cases defer to legacy.
-                const auto tryPlanEngineDatabaseVariance
+                [[maybe_unused]] const auto tryPlanEngineDatabaseVariance
                     = [&](serpn::VarianceKind eKind) -> bool {
                     addDispatchRuntimeStat(
                         interpreterDispatchRuntimeStatsStore()
@@ -10338,7 +9785,7 @@ StackVar ScInterpreter::Interpret()
                 // single matching target cell. More than one match
                 // produces IllegalArgument, zero matches produce
                 // NoValue — matching legacy ScDBGet semantics.
-                const auto tryPlanEngineDatabaseGet = [&]() -> bool {
+                [[maybe_unused]] const auto tryPlanEngineDatabaseGet = [&]() -> bool {
                     addDispatchRuntimeStat(
                         interpreterDispatchRuntimeStatsStore()
                             .mnCriteriaEngineAttemptedCount);
@@ -10645,7 +10092,7 @@ StackVar ScInterpreter::Interpret()
                 // scalar svDouble or svString criteria. External refs,
                 // matrices, RefList, multi-sheet, and non-scalar
                 // criteria defer to legacy.
-                const auto tryPlanEngineMultiCriterionAggregate
+                [[maybe_unused]] const auto tryPlanEngineMultiCriterionAggregate
                     = [&](sequery::CriteriaAggregateKind eKind,
                           bool bWithTargetRange) -> bool {
                     addDispatchRuntimeStat(
@@ -10821,11 +10268,11 @@ StackVar ScInterpreter::Interpret()
                     }
                     return true;
                 };
-                const auto tryPlanEngineSumIf = [&]() -> bool {
+                [[maybe_unused]] const auto tryPlanEngineSumIf = [&]() -> bool {
                     return tryPlanEngineSingleCriterionAggregate(
                         sequery::CriteriaAggregateKind::Sum, true);
                 };
-                const auto tryPlanEngineAverageIf = [&]() -> bool {
+                [[maybe_unused]] const auto tryPlanEngineAverageIf = [&]() -> bool {
                     return tryPlanEngineSingleCriterionAggregate(
                         sequery::CriteriaAggregateKind::Average, true);
                 };
@@ -10835,7 +10282,7 @@ StackVar ScInterpreter::Interpret()
                 // and absolute mode 1. Any other parameter combination
                 // (3-5 args with abs mode, style flag, sheet token) or
                 // non-scalar arguments defer to legacy ScAddressFunc.
-                const auto tryPlanEngineIndirect = [&]() -> bool {
+                [[maybe_unused]] const auto tryPlanEngineIndirect = [&]() -> bool {
                     addDispatchRuntimeStat(
                         interpreterDispatchRuntimeStatsStore()
                             .mnReferenceEngineAttemptedCount);
@@ -10945,7 +10392,7 @@ StackVar ScInterpreter::Interpret()
                     return true;
                 };
 
-                const auto tryPlanEngineAddress = [&]() -> bool {
+                [[maybe_unused]] const auto tryPlanEngineAddress = [&]() -> bool {
                     addDispatchRuntimeStat(
                         interpreterDispatchRuntimeStatsStore()
                             .mnReferenceEngineAttemptedCount);
@@ -14635,72 +14082,55 @@ StackVar ScInterpreter::Interpret()
                         seinterpcompatdispatch::Dispatcher::aggregateFunction(*this);
                         break;
                     case ocDBSum            :
-                        if (!tryPlanEngineDatabaseAggregate(
-                                sequery::CriteriaAggregateKind::Sum))
-                            DBIterator(ifSUM);
+                        warnIfLegacyCriteriaAggregateReached(u"DSUM");
+                        DBIterator(ifSUM);
                         break;
                     case ocDBCount          :
-                        if (!tryPlanEngineDatabaseAggregate(
-                                sequery::CriteriaAggregateKind::CountNumeric))
-                            evaluateLegacyDBCount();
+                        warnIfLegacyCriteriaAggregateReached(u"DCOUNT");
+                        evaluateLegacyDBCount();
                         break;
                     case ocDBCount2         :
-                        if (!tryPlanEngineDatabaseAggregate(
-                                sequery::CriteriaAggregateKind::Count2))
-                            evaluateLegacyDBCount2();
+                        warnIfLegacyCriteriaAggregateReached(u"DCOUNTA");
+                        evaluateLegacyDBCount2();
                         break;
                     case ocDBAverage        :
-                        if (!tryPlanEngineDatabaseAggregate(
-                                sequery::CriteriaAggregateKind::Average))
-                            DBIterator(ifAVERAGE);
+                        warnIfLegacyCriteriaAggregateReached(u"DAVERAGE");
+                        DBIterator(ifAVERAGE);
                         break;
                     case ocDBGet            :
-                        if (!tryPlanEngineDatabaseGet())
-                            evaluateLegacyDBGet();
+                        warnIfLegacyCriteriaAggregateReached(u"DGET");
+                        evaluateLegacyDBGet();
                         break;
                     case ocDBMax            :
-                        if (!tryPlanEngineDatabaseAggregate(
-                                sequery::CriteriaAggregateKind::Max))
-                            DBIterator(ifMAX);
+                        warnIfLegacyCriteriaAggregateReached(u"DMAX");
+                        DBIterator(ifMAX);
                         break;
                     case ocDBMin            :
-                        if (!tryPlanEngineDatabaseAggregate(
-                                sequery::CriteriaAggregateKind::Min))
-                            DBIterator(ifMIN);
+                        warnIfLegacyCriteriaAggregateReached(u"DMIN");
+                        DBIterator(ifMIN);
                         break;
                     case ocDBProduct        :
-                        if (!tryPlanEngineDatabaseAggregate(
-                                sequery::CriteriaAggregateKind::Product))
-                            DBIterator(ifPRODUCT);
+                        warnIfLegacyCriteriaAggregateReached(u"DPRODUCT");
+                        DBIterator(ifPRODUCT);
                         break;
                     case ocDBStdDev         :
-                        if (!tryPlanEngineDatabaseVariance(
-                                serpn::VarianceKind::SampleStandardDeviation))
-                            evaluateLegacyDBStVar(/*bSample*/true, /*bStdDev*/true);
+                        warnIfLegacyCriteriaAggregateReached(u"DSTDEV");
+                        evaluateLegacyDBStVar(/*bSample*/true, /*bStdDev*/true);
                         break;
                     case ocDBStdDevP        :
-                        if (!tryPlanEngineDatabaseVariance(
-                                serpn::VarianceKind::PopulationStandardDeviation))
-                            evaluateLegacyDBStVar(/*bSample*/false, /*bStdDev*/true);
+                        warnIfLegacyCriteriaAggregateReached(u"DSTDEVP");
+                        evaluateLegacyDBStVar(/*bSample*/false, /*bStdDev*/true);
                         break;
                     case ocDBVar            :
-                        if (!tryPlanEngineDatabaseVariance(
-                                serpn::VarianceKind::SampleVariance))
-                            evaluateLegacyDBStVar(/*bSample*/true, /*bStdDev*/false);
+                        warnIfLegacyCriteriaAggregateReached(u"DVAR");
+                        evaluateLegacyDBStVar(/*bSample*/true, /*bStdDev*/false);
                         break;
                     case ocDBVarP           :
-                        if (!tryPlanEngineDatabaseVariance(
-                                serpn::VarianceKind::PopulationVariance))
-                            evaluateLegacyDBStVar(/*bSample*/false, /*bStdDev*/false);
+                        warnIfLegacyCriteriaAggregateReached(u"DVARP");
+                        evaluateLegacyDBStVar(/*bSample*/false, /*bStdDev*/false);
                         break;
-                    case ocIndirect         :
-                        if (!tryPlanEngineIndirect())
-                            ScIndirect();
-                        break;
-                    case ocAddress          :
-                        if (!tryPlanEngineAddress())
-                            ScAddressFunc();
-                        break;
+                    case ocIndirect         : ScIndirect(); break;
+                    case ocAddress          : ScAddressFunc(); break;
                     case ocMatch:
                     {
                         warnIfLegacyDispatchReached(
@@ -14724,26 +14154,24 @@ StackVar ScInterpreter::Interpret()
                     }
                     break;
                     case ocCountEmptyCells  :
-                        if (!tryPlanEngineCountEmptyCells())
-                            evaluateLegacyCountEmptyCells();
+                        warnIfLegacyCriteriaAggregateReached(u"COUNTBLANK");
+                        evaluateLegacyCountEmptyCells();
                         break;
                     case ocCountIf          :
-                        if (!tryPlanEngineCountIf())
-                            evaluateLegacyCountIf();
+                        warnIfLegacyCriteriaAggregateReached(u"COUNTIF");
+                        evaluateLegacyCountIf();
                         break;
                     case ocSumIf            :
-                        if (!tryPlanEngineSumIf())
-                            IterateParametersIf(ifSUMIF);
+                        warnIfLegacyCriteriaAggregateReached(u"SUMIF");
+                        IterateParametersIf(ifSUMIF);
                         break;
                     case ocAverageIf        :
-                        if (!tryPlanEngineAverageIf())
-                            IterateParametersIf(ifAVERAGEIF);
+                        warnIfLegacyCriteriaAggregateReached(u"AVERAGEIF");
+                        IterateParametersIf(ifAVERAGEIF);
                         break;
                     case ocSumIfs:
                     {
-                        if (tryPlanEngineMultiCriterionAggregate(
-                                sequery::CriteriaAggregateKind::Sum, true))
-                            break;
+                        warnIfLegacyCriteriaAggregateReached(u"SUMIFS");
                         const sal_uInt8 nParamCount = GetByte();
                         if (nParamCount < 3 || (nParamCount % 2 != 1))
                             PushError(FormulaError::ParameterExpected);
@@ -14754,9 +14182,7 @@ StackVar ScInterpreter::Interpret()
                     break;
                     case ocAverageIfs:
                     {
-                        if (tryPlanEngineMultiCriterionAggregate(
-                                sequery::CriteriaAggregateKind::Average, true))
-                            break;
+                        warnIfLegacyCriteriaAggregateReached(u"AVERAGEIFS");
                         const sal_uInt8 nParamCount = GetByte();
                         if (nParamCount < 3 || (nParamCount % 2 != 1))
                             PushError(FormulaError::ParameterExpected);
@@ -14768,9 +14194,7 @@ StackVar ScInterpreter::Interpret()
                     break;
                     case ocCountIfs:
                     {
-                        if (tryPlanEngineMultiCriterionAggregate(
-                                sequery::CriteriaAggregateKind::Count, false))
-                            break;
+                        warnIfLegacyCriteriaAggregateReached(u"COUNTIFS");
                         const sal_uInt8 nParamCount = GetByte();
                         if (nParamCount < 2 || (nParamCount % 2 != 0))
                             PushError(FormulaError::ParameterExpected);
@@ -15049,9 +14473,7 @@ StackVar ScInterpreter::Interpret()
                         break;
                     case ocMinIfs_MS:
                     {
-                        if (tryPlanEngineMultiCriterionAggregate(
-                                sequery::CriteriaAggregateKind::Min, true))
-                            break;
+                        warnIfLegacyCriteriaAggregateReached(u"MINIFS");
                         const sal_uInt8 nParamCount = GetByte();
                         if (nParamCount < 3 || (nParamCount % 2 != 1))
                             PushError(FormulaError::ParameterExpected);
@@ -15065,9 +14487,7 @@ StackVar ScInterpreter::Interpret()
                     break;
                     case ocMaxIfs_MS:
                     {
-                        if (tryPlanEngineMultiCriterionAggregate(
-                                sequery::CriteriaAggregateKind::Max, true))
-                            break;
+                        warnIfLegacyCriteriaAggregateReached(u"MAXIFS");
                         const sal_uInt8 nParamCount = GetByte();
                         if (nParamCount < 3 || (nParamCount % 2 != 1))
                             PushError(FormulaError::ParameterExpected);
@@ -15624,31 +15044,25 @@ StackVar ScInterpreter::Interpret()
                     case ocSlope            : CalculateSlopeIntercept(true); break;
                     case ocIntercept        : CalculateSlopeIntercept(false); break;
                     case ocTrend:
-                        if (!tryPlanEngineTrend())
-                            CalculateTrendGrowth(false);
+                        warnIfLegacyGrowthProjectionReached(u"TREND");
+                        CalculateTrendGrowth(false);
                         break;
                     case ocGrowth:
-                        if (!tryPlanEngineGrowth())
-                        {
-                            warnIfLegacyGrowthProjectionReached(u"GROWTH");
-                            seinterpcompatdispatch::Dispatcher::growth(*this);
-                        }
+                        warnIfLegacyGrowthProjectionReached(u"GROWTH");
+                        seinterpcompatdispatch::Dispatcher::growth(*this);
                         break;
                     case ocLinest:
-                        if (!tryPlanEngineLinest())
-                            CalculateRGPRKP(false);
+                        warnIfLegacyGrowthProjectionReached(u"LINEST");
+                        CalculateRGPRKP(false);
                         break;
                     case ocLogest:
-                        if (!tryPlanEngineLogest())
-                            CalculateRGPRKP(true);
+                        warnIfLegacyGrowthProjectionReached(u"LOGEST");
+                        CalculateRGPRKP(true);
                         break;
                     case ocForecast_LIN:
                     case ocForecast:
-                        if (!tryPlanEngineForecast())
-                        {
-                            warnIfLegacyStatisticalDistributionReached(u"FORECAST");
-                            seinterpcompatdispatch::Dispatcher::forecast(*this);
-                        }
+                        warnIfLegacyStatisticalDistributionReached(u"FORECAST");
+                        seinterpcompatdispatch::Dispatcher::forecast(*this);
                         break;
                     case ocForecast_ETS_ADD : ScForecast_Ets( etsAdd );       break;
                     case ocForecast_ETS_SEA : ScForecast_Ets( etsSeason );    break;
@@ -15843,8 +15257,8 @@ StackVar ScInterpreter::Interpret()
                     }
                     break;
                     case ocFourier:
-                        if (!tryPlanEngineFourier())
-                            ScFourier();
+                        warnIfLegacyMatrixMathReached(u"ORG.LIBREOFFICE.FOURIER");
+                        ScFourier();
                         break;
                     case ocExternal         : ScExternal();                 break;
                     case ocTableOp          : ScTableOp();                  break;

@@ -110,7 +110,8 @@ These are the current retirement and audit counters:
 - `interp4_dispatch_legacy_dispatch_target_count=18`
 - `interp4_dispatch_legacy_call_count=22`
 - `interp4_dispatch_engine_attempt_count=11`
-- `interp4_dispatch_plan_engine_attempt_count=45`
+- `interp4_dispatch_plan_engine_attempt_count=0`
+- `interp4_dispatch_engine_backed_plan_engine_attempt_count=21`
 - `interp4_dispatch_engine_attempted_total=0`
 - `interp4_dispatch_engine_succeeded_total=0`
 - `interp4_dispatch_engine_declined_total=0`
@@ -159,17 +160,14 @@ ambient-runtime success proxy; we only treat it as healthy because it is
 paired with real lambda deletion and covered by the core-forced audit tests.
 `ocBad` (retirement template) and `ocRange` (parity-gap reference) retain
 the older `tryPushEngineBadLiteralError`/range wrapper style.
-`interp4_dispatch_plan_engine_attempt_count`, however, is still 45 on the
-current tree: `Interpret()` continues to carry active `tryPlanEngine*`
-admissions for control-flow, spill, reference, database/criteria, matrix, and
-forecast families. Slice 4 retired the duplicate matrix/reference overlap for
-`COLUMNS`, `ROWS`, `SHEETS`, `COLUMN`, `ROW`, `SHEET`, `AREAS`, `OFFSET`,
-`INDEX`, `MUNIT`, `MDETERM`, `MINVERSE`, `MMULT`, `SEQUENCE`, `TRANSPOSE`,
-and `SORTBY`, so the remaining reference-sensitive sites are the
-host-sensitive `ADDRESS` / `INDIRECT` helpers rather than the broader
-matrix/reference wave covered by Phase 4. So the
-wrapper-cleanup slice landed, but full seam
-reconciliation is still partial rather than complete.
+`interp4_dispatch_plan_engine_attempt_count` is now `0`: duplicate
+lower-seam `tryPlanEngine*` overlap for promoted families is retired.
+The remaining `21` lower-seam `tryPlanEngine*` sites are tracked separately as
+`interp4_dispatch_engine_backed_plan_engine_attempt_count`; they are the
+engine-backed residual classic-entry set for the spill family plus
+`IF` / `IFERROR` / `IFNA` / `CHOOSE` / `IFS` / `SWITCH`, not evidence of two
+owners for the same promoted class. So the wrapper-cleanup slice has now
+closed full seam reconciliation rather than leaving it partial.
 `ocBad` remains the reference retirement template: the legacy `ScBadName()`
 path is deleted, and the classic interpreter no longer coexists with an
 alternate Calc implementation for root error literals. Phase 2 of the authority-transfer pivot is now
@@ -177,9 +175,8 @@ also complete: [HOST_FACADE_CONTRACTS.md](architecture/HOST_FACADE_CONTRACTS.md)
 and
 [COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md](architecture/COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md)
 now give the project one explicit host-contract inventory for the remaining
-legacy surface. Phases 3, 4, and 5 are now complete; Phase 6 is still
-partial because lower-seam `tryPlanEngine*` admissions remain open in
-`Interpret()`. The active dependency-ordered close-out queue now lives in
+legacy surface. Phases 3, 4, 5, and 6 are now complete. The active
+dependency-ordered close-out queue now lives in
 [STACK_MACHINE_RELOCATION_BACKLOG.md](architecture/STACK_MACHINE_RELOCATION_BACKLOG.md).
 Upstream
 `InterpretTail -> RpnEvaluator` counters are wired and observation is
@@ -200,10 +197,12 @@ remaining promoted external-range / external-name plus broadcast /
 jump-matrix matrix-frame shapes authoritatively. Phase 4 is therefore
 complete rather than partial. Phase 5 (Ambient Default-On Pilot) has proven
 the existing default-on state with AutoCalc enabled.
-Phase 6 (Seam Reconciliation) is still partial: the old `tryPushEngine*`
-wrapper family has dropped from 36 sites to 2 (`ocBad` + `ocRange`), but 45
-lower-seam `tryPlanEngine*` admissions remain in `Interpret()`, so the upper
-seam is not yet the single owner for all promoted families. Phase 5 detail:
+Phase 6 (Seam Reconciliation) is now complete: the old `tryPushEngine*`
+wrapper family has dropped from 36 sites to 2 older wrappers plus the 9
+Phase 7 retired-scalar audit sites, duplicate `tryPlanEngine*` overlap is
+down to `0`, and the remaining `21` `tryPlanEngine*` entries are documented as
+the residual spill/control-flow classic surface rather than promoted-family
+ownership conflicts. Phase 5 detail:
 promoted families are authoritative when both
 `authoritativeWhileOffEnabled()` (default true) and family promotion
 (`isFamilyLocalDefaultOnFormula()`) are active — this is the real authority
@@ -564,8 +563,10 @@ Immediate consequence:
   `interp4_dispatch_legacy_lambda_count`
 - `interp4_dispatch_engine_attempt_count` is now 11: 2 older `tryPushEngine*`
   wrappers (ocBad + ocRange) plus 9 Phase 7 retired-scalar sites
-- `interp4_dispatch_plan_engine_attempt_count=45` is the live reminder that
-  full seam reconciliation is still open in `Interpret()`
+- `interp4_dispatch_plan_engine_attempt_count=0` records that duplicate
+  promoted-family lower-seam overlap is gone
+- `interp4_dispatch_engine_backed_plan_engine_attempt_count=21` is the
+  separate inventory of the residual spill/control-flow classic-entry set
 - no new `pushLegacy*` lambdas should be treated as progress unless they are
   temporary compatibility fallbacks for already engine-owned roots
 - the first prerequisite before opcode-by-opcode migration is a fixed

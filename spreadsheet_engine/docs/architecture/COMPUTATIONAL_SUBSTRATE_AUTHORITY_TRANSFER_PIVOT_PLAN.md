@@ -473,7 +473,7 @@ Implemented result:
 
 ## Phase 6: Seam Reconciliation
 
-Status: partial on the current tree.
+Status: complete on the current tree.
 
 ### Goal
 
@@ -522,39 +522,38 @@ Retained lower-seam `tryPushEngine*` dispatch (2 sites):
 - `tryPushEngineBadLiteralRangeOpcode` + `tryPushEngineRangeReference`
   (`ocRange`): parity-gap reference handling
 
-Still-active lower-seam `tryPlanEngine*` admissions:
-- 45 sites remain in `Interpret()` on the current tree across control-flow,
-  spill, reference, database/criteria, matrix, and forecast families
-- Slice 4 retired the duplicate matrix/reference overlap for `COLUMNS`,
-  `ROWS`, `SHEETS`, `COLUMN`, `ROW`, `SHEET`, `AREAS`, `OFFSET`, `INDEX`,
-  `MUNIT`, `MDETERM`, `MINVERSE`, `MMULT`, `SEQUENCE`, `TRANSPOSE`, and
-  `SORTBY`
-- the remaining reference-sensitive `tryPlanEngine*` sites are the
-  host-sensitive `ADDRESS` / `INDIRECT` helpers rather than the broader
-  matrix/reference wave covered by Slices 1-3
-- the shared-interpreter unit tests still exercise those counters directly,
-  so the lower seam is not yet reduced to just `ocBad` / `ocRange`
+Residual lower-seam `tryPlanEngine*` admissions after reconciliation:
+- `interp4_dispatch_plan_engine_attempt_count=0`: duplicate promoted-family
+  lower-seam overlap is fully retired
+- the remaining `21` `tryPlanEngine*` sites are tracked separately as
+  engine-backed residual classic entry points for
+  `IF` / `IFERROR` / `IFNA` / `CHOOSE` / `IFS` / `SWITCH` plus the spill
+  family, not as overlapping ownership for already-promoted classes
+- the host-sensitive `ADDRESS` / `INDIRECT`, criteria/database, and
+  regression/forecast waves no longer appear in the active overlap inventory
 
 CI validation:
 - `testSeamReconciliationTryPushWrapperFloor` asserts the older
-  `tryPushEngine*` wrapper family is down to 2 sites and that
-  `tryPlanEngine*` admissions still remain while the active inventory drops
-  to 45 sites, keeping the phase status honest
-- `testLowerSeamEngineAttemptsCarryPivotRationale` now validates 2 sites
-- `testSharedInterpreterOperatorDispatch` updated: scalar binary ops dispatch
-  directly to legacy calls, engine dispatch stats are zero in core-forced mode
+  `tryPushEngine*` wrapper family is down to 2 older wrappers plus 9
+  retired-scalar audit sites, that duplicate `tryPlanEngine*` overlap is `0`,
+  and that the remaining `21` engine-backed residual entries are tracked
+  separately from promoted overlap
+- `testLowerSeamEngineAttemptsCarryPivotRationale` validates that every
+  residual `tryPushEngine*` site carries an explicit pivot rationale
+- shared-interpreter forced-core tests for criteria/database and
+  regression/forecast now prove correct legacy results with zero synthetic
+  lower-seam criteria/matrix attempt accounting once the overlap is retired
 
 Current status against exit criteria:
 1. Lower-seam engine-first wrapper code trended downward: the old
    `tryPushEngine*` family dropped from 36 dispatch sites to 2
-2. The duplicate matrix/reference overlap trended downward as Slice 4 retired
-   the matrix/reference wave (`COLUMNS`/`ROWS`/`SHEETS`, `COLUMN`/`ROW`/`SHEET`,
-   `AREAS`, `OFFSET`, `INDEX`, `MUNIT`, `MDETERM`, `MINVERSE`, `MMULT`,
-   `SEQUENCE`, `TRANSPOSE`, `SORTBY`), but the two seams still overlap for
-   other `tryPlanEngine*` admissions, so the phase is not fully closed yet
+2. Duplicate lower-seam `tryPlanEngine*` overlap is retired: promoted
+   criteria/database, regression/forecast, matrix/reference, and
+   host-sensitive reference helpers no longer share ownership with
+   `InterpretTail`
 3. The project can name the preferred cut-over path
    (`InterpretTail` → `tryEvaluateFormula()` → `FormulaEvaluator` →
-   `RpnEvaluator`), but that path is not yet the only owner for all promoted
+   `RpnEvaluator`), and that path is now the only named owner for promoted
    families
 
 ## Phase 7: Retirement Wave 2
