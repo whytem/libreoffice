@@ -6052,6 +6052,91 @@ materializeCriteriaAggregateInput(const core::formula::Node& rArgument, const Sc
         return materializeSpillMatrixFunctionCall(rNode, rDoc, rContext, rFormulaPos);
     if (aFunctionName == u"ISNUMBER")
         return materializeIsNumberMatrixFunctionCall(rNode, rDoc, rContext, rFormulaPos);
+    if (aFunctionName == u"EXACT")
+    {
+        if (rNode.maChildren.size() != 2)
+        {
+            return makeMaterializedValue(
+                makeSingleValueMatrix(api::CellValue::error(api::Error::IllegalArgument)));
+        }
+
+        const auto aLeft = materializeMatrixNode(*rNode.maChildren[0], rDoc, rContext, rFormulaPos);
+        if (!aLeft.mbSupported)
+            return makeUnsupportedMaterialization<ScMatrixRef>(aLeft.meFallbackReason);
+        if (!aLeft.moValue)
+            return makeMaterializedError<ScMatrixRef>(aLeft.meError);
+
+        const auto aRight = materializeMatrixNode(*rNode.maChildren[1], rDoc, rContext, rFormulaPos);
+        if (!aRight.mbSupported)
+            return makeUnsupportedMaterialization<ScMatrixRef>(aRight.meFallbackReason);
+        if (!aRight.moValue)
+            return makeMaterializedError<ScMatrixRef>(aRight.meError);
+
+        SCSIZE nLeftColumns = 0;
+        SCSIZE nLeftRows = 0;
+        SCSIZE nRightColumns = 0;
+        SCSIZE nRightRows = 0;
+        (*aLeft.moValue)->GetDimensions(nLeftColumns, nLeftRows);
+        (*aRight.moValue)->GetDimensions(nRightColumns, nRightRows);
+
+        const SCSIZE nResultColumns = std::max(nLeftColumns, nRightColumns);
+        const SCSIZE nResultRows = std::max(nLeftRows, nRightRows);
+        ScMatrixRef xMatrix(new ScMatrix(nResultColumns, nResultRows));
+        for (SCSIZE nRow = 0; nRow < nResultRows; ++nRow)
+        {
+            for (SCSIZE nColumn = 0; nColumn < nResultColumns; ++nColumn)
+            {
+                SCSIZE nLeftColumn = nColumn;
+                SCSIZE nLeftRow = nRow;
+                SCSIZE nRightColumn = nColumn;
+                SCSIZE nRightRow = nRow;
+                if (!(*aLeft.moValue)->ValidColRowOrReplicated(nLeftColumn, nLeftRow)
+                    || !(*aRight.moValue)->ValidColRowOrReplicated(nRightColumn, nRightRow))
+                {
+                    return makeUnsupportedMaterialization<ScMatrixRef>(
+                        FallbackReason::UnsupportedFormulaShape);
+                }
+
+                const auto aLeftValue = lookupexecution::detail::toApiCellValue(
+                    (*aLeft.moValue)->Get(nLeftColumn, nLeftRow));
+                if (aLeftValue.isError())
+                {
+                    putScalarIntoMatrix(aLeftValue, xMatrix, nColumn, nRow);
+                    continue;
+                }
+
+                const auto aRightValue = lookupexecution::detail::toApiCellValue(
+                    (*aRight.moValue)->Get(nRightColumn, nRightRow));
+                if (aRightValue.isError())
+                {
+                    putScalarIntoMatrix(aRightValue, xMatrix, nColumn, nRow);
+                    continue;
+                }
+
+                const auto aLeftText = coerceScalarToText(rDoc, rContext, aLeftValue);
+                if (!aLeftText)
+                {
+                    putScalarIntoMatrix(api::CellValue::error(aLeftText.meError), xMatrix,
+                        nColumn, nRow);
+                    continue;
+                }
+
+                const auto aRightText = coerceScalarToText(rDoc, rContext, aRightValue);
+                if (!aRightText)
+                {
+                    putScalarIntoMatrix(api::CellValue::error(aRightText.meError), xMatrix,
+                        nColumn, nRow);
+                    continue;
+                }
+
+                putScalarIntoMatrix(
+                    api::CellValue::boolean(aLeftText.maValue == aRightText.maValue), xMatrix,
+                    nColumn, nRow);
+            }
+        }
+
+        return makeMaterializedValue(xMatrix);
+    }
     if (aFunctionName == u"IF")
     {
         if (rNode.maChildren.empty() || rNode.maChildren.size() > 3)

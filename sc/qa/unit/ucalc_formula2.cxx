@@ -3752,6 +3752,82 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorSingleCellMat
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2,
+    testInterpretTailEngineEvaluatorSingleCellMatrixExactDefaultOn)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+        m_pDoc->InsertTab(0, u"EngineSingleCellMatrixExactDefaultOn"_ustr));
+
+    m_pDoc->SetString(0, 5, 0, u"a"_ustr); // A6
+    std::vector<std::vector<const char*>> aData
+        = { { "a", "1" }, { "b", "2" }, { "a", "4" } }; // A7:B9
+    insertRangeData(m_pDoc, ScAddress(0, 6, 0), aData);
+
+    ScMarkData aMark(m_pDoc->GetSheetLimits());
+    aMark.SelectOneTable(0);
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+        setaileval::resetStats();
+
+        m_pDoc->InsertMatrixFormula(4, 3, 4, 3, aMark,
+            u"=SUM(IF(EXACT(A7:A9;A$6);B7:B9;0))"_ustr);
+
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(5.0, m_pDoc->GetValue(4, 3, 0), 1e-12);
+
+        ScFormulaCell* pCell = m_pDoc->GetFormulaCell(ScAddress(4, 3, 0));
+        CPPUNIT_ASSERT(pCell);
+        CPPUNIT_ASSERT_EQUAL(ScMatrixMode::Formula, pCell->GetMatrixFlag());
+        SCCOL nCols = 0;
+        SCROW nRows = 0;
+        pCell->GetMatColsRows(nCols, nRows);
+        CPPUNIT_ASSERT_EQUAL(static_cast<SCCOL>(1), nCols);
+        CPPUNIT_ASSERT_EQUAL(static_cast<SCROW>(1), nRows);
+
+        const OUString aFormulaSource = pCell->GetFormula(FormulaGrammar::GRAM_ODFF);
+        CPPUNIT_ASSERT_MESSAGE(
+            "single-cell matrix EXACT formula should remain family-local default-on",
+            setaileval::isFamilyLocalDefaultOnFormula(std::u16string_view(
+                aFormulaSource.getStr(), aFormulaSource.getLength())));
+        const OUString aCanonicalFormulaSource = pCell->GetHybridFormula();
+        const auto aAttempt = setaileval::tryEvaluateFormula(
+            *m_pDoc, m_pDoc->GetNonThreadedContext(), ScAddress(4, 3, 0),
+            std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
+            m_pDoc->GetCalcConfig().mbEmptyStringAsZero, pCell->GetCode(),
+            std::u16string_view(aCanonicalFormulaSource.getStr(),
+                aCanonicalFormulaSource.getLength()));
+        const std::string aAttemptLabel
+            = "single-cell matrix EXACT formula should be supported by tryEvaluateFormula"
+              " fallback_reason="
+              + std::to_string(static_cast<int>(aAttempt.meFallbackReason));
+        CPPUNIT_ASSERT_MESSAGE(aAttemptLabel, aAttempt.mbSupported);
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT_MESSAGE(
+            "single-cell matrix EXACT formulas should stay authoritative in default-on mode",
+            aStats.mnAuthoritativeCount >= 1);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(
+            "single-cell matrix EXACT formulas should not need legacy fallback",
+            static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT_MESSAGE(
+            "numeric aggregate roots should own single-cell matrix EXACT formulas upstream",
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::NumericAggregate)]
+                >= 1);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(
+            "numeric aggregate roots should not fall back for single-cell matrix EXACT formulas",
+            static_cast<sal_uInt64>(0),
+            aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::NumericAggregate)]);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorArrayContextIfDefaultOn)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;

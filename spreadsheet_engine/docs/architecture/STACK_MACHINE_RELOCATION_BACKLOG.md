@@ -92,6 +92,9 @@ Current landing on the tree:
 - `InterpretTail` now admits 1x1 matrix-origin formulas at the upper seam,
   which gives promoted scalar-result array formulas an authoritative path
   without overstating multi-cell matrix ownership
+- matrix `EXACT(...)` now materializes elementwise upstream, which clears the
+  1x1 matrix-origin `SUM(IF(EXACT(range);range;0))` blocker and lets that
+  classic jump-matrix-style scalar-result shape stay authoritative
 - forced-core audit coverage now proves that lower-seam engine admissions own
   classic jump-matrix `IF(...)` reference-branch shapes, including the
   `SUM(IF(EXACT(OFFSET(...):OFFSET(...));OFFSET(...):OFFSET(...);0))` form
