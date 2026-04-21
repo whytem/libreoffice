@@ -1,22 +1,24 @@
 # Computational Substrate Authority Transfer Pivot Plan
 
-Status: active execution plan for the next migration phase
+Status: closed on the current tree; retained as the authority-transfer
+completion record and relocation handoff
 
 ## Purpose
 
-This plan turns the current strategic conclusion into an execution sequence.
+This document now records the completed authority-transfer pivot and hands the
+remaining work to the relocation backlog.
 
 The project now has two different kinds of success:
 
 - shared-engine extraction: materially achieved
-- live authority transfer inside Calc: still incomplete
+- live authority transfer inside Calc: complete on the current tree
 
-The active dependency-ordered close-out queue for the remaining work is
+The active dependency-ordered relocation queue for the remaining work is
 [STACK_MACHINE_RELOCATION_BACKLOG.md](STACK_MACHINE_RELOCATION_BACKLOG.md).
 
-The pivot is to stop treating more below-seam leaf admissions as the main
-product and instead build toward one engine-native execution path that can
-carry real Calc traffic under `ScFormulaCell::InterpretTail()`.
+The pivot result is that one engine-native execution path can now carry real
+Calc traffic under `ScFormulaCell::InterpretTail()`, and remaining work is
+ordinary relocation rather than authority-transfer bookkeeping.
 
 ## Architectural Decision
 
@@ -629,42 +631,42 @@ Retirement-wave slice exit criteria satisfied:
 2. `interp4_dispatch_legacy_lambda_count` dropped from 21 to 18 ✓
 3. Retirement template proven repeatable beyond ocBad prototype ✓
 
-## Immediate Execution Sequence
+## Residual Legacy Surface
 
-These are the recommended next concrete steps:
+Authority transfer is complete, but Calc still owns a bounded residual legacy
+surface:
 
-1. Governance reset and doc-role cleanup.
-2. Complete host-boundary audit and normalize
-   [HOST_FACADE_CONTRACTS.md](HOST_FACADE_CONTRACTS.md).
-3. Add upstream `InterpretTail` RPN counters and ambient observe lane.
-4. Route scalar operators through upstream `RpnEvaluator` in observe/shadow.
-5. Run one bounded ambient default-on pilot.
-6. Delete the corresponding lower-seam duplicate attempt sites.
-7. Only then reopen the host-sensitive text tail as the next retirement wave.
+- the two older `tryPushEngine*` wrappers: `ocBad` and `ocRange`
+- the 9 retired-scalar audit sites counted by
+  `interp4_dispatch_engine_attempt_count`
+- the `21` engine-backed spill/control-flow classic-entry sites counted by
+  `interp4_dispatch_engine_backed_plan_engine_attempt_count`
+- remaining interpreter-resident legacy lambdas, dispatch targets, and
+  subroutines measured on the canonical dashboard
+- document/application host policy and any host-state utilities that do not
+  belong in `spreadsheet_engine`
 
-## Metrics That Matter During The Pivot
+## Post-Pivot Relocation Queue
 
-Primary:
+Active migration work is now plain relocation:
 
-- `interpret_tail_rpn_attempted_total`
-- `interpret_tail_rpn_succeeded_total`
-- `legacy_interpreter_subroutine_count`
-- `interp4_dispatch_legacy_lambda_count`
-
-Supporting:
-
-- `interpret_tail_live_authoritative_match_rate`
-- `known_regressions_baseline`
-- core-forced full-legacy acceptance counters for retirement candidates
-
-Anti-metrics:
-
-- static lower-seam attempt-count growth without corresponding ambient runtime
-- wrapper-count drops that are not matched by lambda-count drops
+1. Reduce `interp4_dispatch_legacy_lambda_count` and
+   `legacy_interpreter_subroutine_count` by moving reusable interpreter logic
+   into `spreadsheet_engine` or deleting it once parity is proven elsewhere.
+2. Decide the long-term home of the residual spill/control-flow
+   classic-entry sites and shrink
+   `interp4_dispatch_engine_backed_plan_engine_attempt_count` accordingly.
+3. Retire the remaining `ocBad` / `ocRange` parity-gap wrappers when their
+   reference/error handling is covered elsewhere.
+4. Continue narrowing the host/application surface documented in
+   [HOST_FACADE_CONTRACTS.md](HOST_FACADE_CONTRACTS.md) while keeping Calc as
+   the document and application host.
 
 ## Relationship To Existing Docs
 
 - [../PROJECT_STATUS.md](../PROJECT_STATUS.md): canonical dashboard
+- [STACK_MACHINE_RELOCATION_BACKLOG.md](STACK_MACHINE_RELOCATION_BACKLOG.md):
+  active relocation queue
 - [COMPUTATIONAL_SUBSTRATE_RPN_EVALUATOR_INITIATIVE.md](COMPUTATIONAL_SUBSTRATE_RPN_EVALUATOR_INITIATIVE.md):
   architectural rationale and working rules
 - [CLOSE_OUT_PLAN.md](CLOSE_OUT_PLAN.md): closeout framing for the current
@@ -673,4 +675,5 @@ Anti-metrics:
   per-batch substrate/admission sequencing
 - [HOST_FACADE_CONTRACTS.md](HOST_FACADE_CONTRACTS.md): definitive host contract
 
-This pivot plan is the execution bridge between those documents.
+This pivot plan is now the completion record for the authority-transfer phase
+and the handoff into that relocation queue.

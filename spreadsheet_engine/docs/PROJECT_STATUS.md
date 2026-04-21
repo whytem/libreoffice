@@ -12,6 +12,7 @@ Start here for the active migration story:
 - [architecture/COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md](architecture/COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md)
 - [architecture/COMPUTATIONAL_SUBSTRATE_RPN_BATCH_EXECUTION_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_RPN_BATCH_EXECUTION_PLAN.md)
 - [architecture/COMPUTATIONAL_SUBSTRATE_TEXT_INFO_RETIREMENT_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_TEXT_INFO_RETIREMENT_PLAN.md)
+- [architecture/STACK_MACHINE_RELOCATION_BACKLOG.md](architecture/STACK_MACHINE_RELOCATION_BACKLOG.md)
 - [architecture/CALC_TEST_KNOWN_REGRESSIONS.md](architecture/CALC_TEST_KNOWN_REGRESSIONS.md)
 
 ## Objective
@@ -23,7 +24,22 @@ application host.
 That splits into two tracks:
 
 - shared-engine extraction: materially achieved
-- live evaluation authority transfer inside Calc: in progress
+- live evaluation authority transfer inside Calc: complete on the current tree
+
+## Active Queue
+
+Authority-transfer closeout is complete on the current tree. Active migration
+work is now the post-pivot relocation queue in
+[architecture/STACK_MACHINE_RELOCATION_BACKLOG.md](architecture/STACK_MACHINE_RELOCATION_BACKLOG.md).
+
+Residual Calc-owned legacy surface:
+
+- `ocBad` / `ocRange` plus the 9 retired-scalar audit sites still measured by
+  `interp4_dispatch_engine_attempt_count`
+- the `21` engine-backed spill/control-flow classic-entry sites measured by
+  `interp4_dispatch_engine_backed_plan_engine_attempt_count`
+- remaining interpreter-resident legacy lambdas, legacy dispatch targets, and
+  subroutines measured by the existing dashboard counters
 
 ## Live Evaluator Dashboard
 

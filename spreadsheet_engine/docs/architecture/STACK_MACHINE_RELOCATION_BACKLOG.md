@@ -1,11 +1,11 @@
 # Stack Machine Relocation Backlog
 
-Status: active close-out backlog
+Status: active relocation backlog
 
 ## Purpose
 
-Convert the remaining open parts of the authority-transfer pivot into one
-dependency-ordered execution backlog that can be worked commit-by-commit.
+Carry the now-closed authority-transfer pivot forward as one
+dependency-ordered relocation backlog that can be worked commit-by-commit.
 
 This backlog starts from the current tree state:
 
@@ -105,7 +105,10 @@ families that are explicitly not yet relocated.
    `testSeamReconciliationTryPushWrapperFloor`,
    `testLowerSeamEngineAttemptsCarryPivotRationale`, and
    `testProjectStatusOwnsCanonicalDashboardMetrics`.
-8. Slice 8: pending
+8. Slice 8: complete
+   Verified with `CppunitTest_sc_interpret_tail_corpus` covering
+   `testProjectStatusOwnsCanonicalDashboardMetrics` and
+   `testSeamReconciliationTryPushWrapperFloor`.
 
 ## Backlog
 
@@ -333,6 +336,24 @@ Definition of done:
 
 ### Slice 8: Plan closure and relocation handoff
 
+Status: complete
+
+Current landing on the tree:
+
+- the pivot plan now records authority transfer as complete on the current
+  tree and hands active work to the relocation backlog
+- `PROJECT_STATUS.md` now treats live evaluation authority transfer as
+  complete and documents the remaining Calc-owned legacy surface in plain
+  relocation terms
+- the residual classic surface is now named explicitly as:
+  - the `ocBad` / `ocRange` parity-gap wrappers plus the 9 retired-scalar
+    audit sites
+  - the `21` engine-backed spill/control-flow classic-entry sites
+  - the remaining interpreter-resident legacy lambdas, legacy dispatch
+    targets, and host/application-state utilities measured on the dashboard
+- active work is therefore no longer framed as authority transfer; it is the
+  ordinary relocation queue below
+
 Goal: close the pivot plan honestly and turn the remaining work into plain
 module relocation rather than authority-transfer bookkeeping.
 
@@ -362,3 +383,19 @@ Definition of done:
 This order is intentional: it finishes the missing substrate first, then uses
 that substrate to delete overlap, then closes docs only after the code path is
 real.
+
+## Post-Pivot Relocation Queue
+
+1. Reduce `interp4_dispatch_legacy_lambda_count` by moving reusable
+   interpreter-resident helpers into `spreadsheet_engine` or deleting them
+   outright once parity is proven elsewhere.
+2. Reduce `legacy_interpreter_subroutine_count` by relocating the remaining
+   engine-worthy interpreter subroutines behind explicit host/module
+   contracts.
+3. Shrink `interp4_dispatch_engine_backed_plan_engine_attempt_count` by
+   deciding which spill/control-flow classic-entry sites should move upstream
+   and which should remain Calc-owned legacy surface.
+4. Retire the two older `tryPushEngine*` wrappers (`ocBad` and `ocRange`) once
+   their parity-gap reference/error handling is covered elsewhere.
+5. Extract interpreter-state utilities that are still generally useful to the
+   engine module, while leaving document/application host policy in Calc.
