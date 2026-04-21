@@ -455,6 +455,16 @@ regression/forecast family produces matrix or scalar numeric
 results on the same semantic surface as MDETERM / TRANSPOSE / MMULT
 / MINVERSE. No new counter triple is introduced.
 
+Slice 6 of the relocation backlog has now closed the remaining
+regression/forecast math-kernel ownership gap. Scalar regression statistics
+(`SLOPE`, `CORREL`, `PEARSON`, `RSQ`, `STEYX`, `COVAR`,
+`COVARIANCE.P`/`.S`) stay authoritative through the upper seam's shared
+regression-stats path, while `LINEST`, `LOGEST`, `TREND`, and `GROWTH`
+materialize matrix results upstream through the shared
+`LinestEngine`/`ForecastEngine` substrate. The remaining Phase 6 work for
+that family is now only Slice 7's lower-seam admission deletion, not
+interpreter-resident numerical kernels.
+
 `ocLet` remains the last unstarted Batch 1 member; the nested-
 interpreter spawn contract for binding resolution is the gating
 substrate work.

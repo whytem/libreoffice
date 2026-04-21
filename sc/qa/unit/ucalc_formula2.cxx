@@ -4929,6 +4929,50 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorGrowthDefault
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorRegressionStatsDefaultOn)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+        m_pDoc->InsertTab(0, u"EngineRegressionStatsDefaultOn"_ustr));
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(0, 0, 0, u"=SLOPE({3;5;7};{1;2;3})"_ustr);
+        m_pDoc->SetString(1, 0, 0, u"=CORREL({1;2;3};{1;2;3})"_ustr);
+        m_pDoc->SetString(2, 0, 0, u"=PEARSON({1;2;3};{1;2;3})"_ustr);
+        m_pDoc->SetString(3, 0, 0, u"=COVAR({1;2;3};{1;2;3})"_ustr);
+        m_pDoc->SetString(4, 0, 0, u"=COM.MICROSOFT.COVARIANCE.S({1;2;3};{1;2;3})"_ustr);
+        m_pDoc->SetString(5, 0, 0, u"=RSQ({1;2;3};{1;2;3})"_ustr);
+        m_pDoc->SetString(6, 0, 0, u"=STEYX({3;5;7};{1;2;3})"_ustr);
+
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(0, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(1, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(2, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0 / 3.0, m_pDoc->GetValue(3, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(4, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(5, 0, 0), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, m_pDoc->GetValue(6, 0, 0), 1e-12);
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 7);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::StatisticalDistribution)]
+            >= 7);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
+            aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::StatisticalDistribution)]);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorCriteriaAggregateAuthoritative)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
@@ -5447,6 +5491,95 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorMatrixMathDef
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::MatrixMath)]
             >= 2);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
+            aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::MatrixMath)]);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorRegressionMatrixDefaultOn)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+        m_pDoc->InsertTab(0, u"EngineRegressionMatrixDefaultOn"_ustr));
+
+    ScMarkData aMark(m_pDoc->GetSheetLimits());
+    aMark.SelectOneTable(0);
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+        setaileval::resetStats();
+
+        m_pDoc->InsertMatrixFormula(0, 0, 1, 0, aMark,
+            u"=LINEST({3;5;7;9};{1;2;3;4})"_ustr);
+        m_pDoc->InsertMatrixFormula(0, 2, 1, 2, aMark,
+            u"=LOGEST({6;18;54};{1;2;3})"_ustr);
+        m_pDoc->InsertMatrixFormula(0, 4, 1, 4, aMark,
+            u"=TREND({3;5;7;9};{1;2;3;4};{5;6})"_ustr);
+        m_pDoc->InsertMatrixFormula(0, 6, 1, 6, aMark,
+            u"=GROWTH({6;18;54};{1;2;3};{4;5})"_ustr);
+        m_pDoc->InsertMatrixFormula(0, 8, 1, 8, aMark,
+            u"=ORG.LIBREOFFICE.FOURIER({5};TRUE();FALSE();FALSE();0)"_ustr);
+
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(0, 0, 0)), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(1, 0, 0)), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(ScAddress(0, 2, 0)), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(1, 2, 0)), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(11.0, m_pDoc->GetValue(ScAddress(0, 4, 0)), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(13.0, m_pDoc->GetValue(ScAddress(1, 4, 0)), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(162.0, m_pDoc->GetValue(ScAddress(0, 6, 0)), 1e-9);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(486.0, m_pDoc->GetValue(ScAddress(1, 6, 0)), 1e-9);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(5.0, m_pDoc->GetValue(ScAddress(0, 8, 0)), 1e-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, m_pDoc->GetValue(ScAddress(1, 8, 0)), 1e-12);
+
+        ScFormulaCell* pCell = m_pDoc->GetFormulaCell(ScAddress(0, 0, 0));
+        CPPUNIT_ASSERT(pCell);
+        CPPUNIT_ASSERT_EQUAL(ScMatrixMode::Formula, pCell->GetMatrixFlag());
+        SCCOL nCols = 0;
+        SCROW nRows = 0;
+        pCell->GetMatColsRows(nCols, nRows);
+        CPPUNIT_ASSERT_EQUAL(static_cast<SCCOL>(2), nCols);
+        CPPUNIT_ASSERT_EQUAL(static_cast<SCROW>(1), nRows);
+
+        const OUString aFormulaSource = pCell->GetFormula(FormulaGrammar::GRAM_ODFF);
+        CPPUNIT_ASSERT_MESSAGE(
+            "LINEST matrix formula should remain family-local default-on",
+            setaileval::isFamilyLocalDefaultOnFormula(std::u16string_view(
+                aFormulaSource.getStr(), aFormulaSource.getLength())));
+        const OUString aCanonicalFormulaSource = pCell->GetHybridFormula();
+        const auto aAttempt = setaileval::tryEvaluateFormula(
+            *m_pDoc, m_pDoc->GetNonThreadedContext(), ScAddress(0, 0, 0),
+            std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
+            m_pDoc->GetCalcConfig().mbEmptyStringAsZero, pCell->GetCode(),
+            std::u16string_view(aCanonicalFormulaSource.getStr(),
+                aCanonicalFormulaSource.getLength()),
+            true);
+        CPPUNIT_ASSERT(aAttempt.mbSupported);
+        CPPUNIT_ASSERT(aAttempt.hasMatrixResult());
+        CPPUNIT_ASSERT_EQUAL(static_cast<SCSIZE>(2), aAttempt.mnMatrixColumns);
+        CPPUNIT_ASSERT_EQUAL(static_cast<SCSIZE>(1), aAttempt.mnMatrixRows);
+        ASSERT_DOUBLES_EQUAL(2.0, aAttempt.mpMatrixResult->GetDouble(0, 0));
+        ASSERT_DOUBLES_EQUAL(1.0, aAttempt.mpMatrixResult->GetDouble(1, 0));
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 5);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::GrowthProjection)]
+            >= 4);
+        CPPUNIT_ASSERT(
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::MatrixMath)]
+            >= 1);
+        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
+            aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::GrowthProjection)]);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
             aStats.maFunctionFallbackCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::MatrixMath)]);

@@ -66,7 +66,9 @@
 #include <spreadsheetengine/runtime/FinancialRuntime.hxx>
 #include <spreadsheetengine/runtime/KahanSum.hxx>
 #include <spreadsheetengine/runtime/ConversionRuntime.hxx>
+#include <spreadsheetengine/runtime/ForecastEngine.hxx>
 #include <spreadsheetengine/runtime/NumeralConversion.hxx>
+#include <spreadsheetengine/runtime/LinestEngine.hxx>
 #include <spreadsheetengine/runtime/MathAggregate.hxx>
 #include <spreadsheetengine/runtime/MathBitwise.hxx>
 #include <spreadsheetengine/runtime/MathFunctionRuntime.hxx>
@@ -1054,9 +1056,10 @@ classifyImportedStoredHostTruthFunction(api::StringView rFunctionName)
     {
         return FunctionKind::StatisticalDistribution;
     }
-    if (rFunctionName == u"SLOPE" || rFunctionName == u"ORG.LIBREOFFICE.FORECAST.ETS.MULT"
+    if (rFunctionName == u"ORG.LIBREOFFICE.FORECAST.ETS.MULT"
         || rFunctionName == u"COM.MICROSOFT.FORECAST.ETS"
-        || rFunctionName == u"RSQ" || rFunctionName == u"STEYX")
+        || rFunctionName == u"GROWTH" || rFunctionName == u"TREND"
+        || rFunctionName == u"LINEST" || rFunctionName == u"LOGEST")
         return FunctionKind::GrowthProjection;
     if (rFunctionName == u"YEARFRAC" || rFunctionName == u"DAYS360")
         return FunctionKind::DateDifference;
@@ -1290,13 +1293,25 @@ classifyImportedStoredHostTruthFunction(api::StringView rFunctionName)
         || rFunctionName == u"BINOMDIST" || rFunctionName == u"BINOM.DIST"
         || rFunctionName == u"BINOM.DIST.RANGE" || rFunctionName == u"B"
         || rFunctionName == u"INTERCEPT" || rFunctionName == u"FORECAST"
+        || rFunctionName == u"SLOPE" || rFunctionName == u"RSQ"
+        || rFunctionName == u"STEYX" || rFunctionName == u"CORREL"
+        || rFunctionName == u"PEARSON" || rFunctionName == u"COVAR"
+        || rFunctionName == u"COVARIANCE.P"
+        || rFunctionName == u"COM.MICROSOFT.COVARIANCE.P"
+        || rFunctionName == u"COVARIANCE.S"
+        || rFunctionName == u"COM.MICROSOFT.COVARIANCE.S"
         || rFunctionName == u"BETADIST" || rFunctionName == u"BETA.DIST"
         || rFunctionName == u"PROB")
     {
         return FunctionKind::StatisticalDistribution;
     }
-    if (rFunctionName == u"GROWTH")
+    if (rFunctionName == u"GROWTH" || rFunctionName == u"LINEST"
+        || rFunctionName == u"LOGEST" || rFunctionName == u"TREND")
         return FunctionKind::GrowthProjection;
+    if (rFunctionName == u"ORG.LIBREOFFICE.FOURIER")
+    {
+        return FunctionKind::MatrixMath;
+    }
     if (rFunctionName == u"COUNTIF" || rFunctionName == u"COUNTIFS"
         || rFunctionName == u"SUMIF" || rFunctionName == u"SUMIFS"
         || rFunctionName == u"AVERAGEIF" || rFunctionName == u"AVERAGEIFS"
@@ -5135,6 +5150,238 @@ materializeCriteriaAggregateInput(const core::formula::Node& rArgument, const Sc
     return xMatrix;
 }
 
+[[nodiscard]] inline std::optional<spreadsheetengine::core::rpn::MatrixOperand>
+matrixRefToMatrixOperand(
+    const ScConstMatrixRef& pMatrix,
+    spreadsheetengine::core::rpn::MatrixProvenance eProvenance
+        = spreadsheetengine::core::rpn::MatrixProvenance::ComputedResult)
+{
+    if (!pMatrix)
+        return std::nullopt;
+
+    SCSIZE nColumns = 0;
+    SCSIZE nRows = 0;
+    pMatrix->GetDimensions(nColumns, nRows);
+    if (nColumns < 1 || nRows < 1)
+        return std::nullopt;
+
+    spreadsheetengine::core::rpn::MatrixOperand aOperand;
+    aOperand.maDimensions = { static_cast<api::MatrixSize>(nColumns),
+                              static_cast<api::MatrixSize>(nRows) };
+    aOperand.meProvenance = eProvenance;
+    aOperand.maValues.reserve(static_cast<std::size_t>(nColumns) * nRows);
+    for (SCSIZE nRow = 0; nRow < nRows; ++nRow)
+    {
+        for (SCSIZE nColumn = 0; nColumn < nColumns; ++nColumn)
+            aOperand.maValues.push_back(
+                lookupexecution::detail::toApiCellValue(pMatrix->Get(nColumn, nRow)));
+    }
+
+    return aOperand;
+}
+
+[[nodiscard]] inline Materialization<ScMatrixRef> matrixOperandToMatrixRef(
+    const spreadsheetengine::core::rpn::MatrixOperand& rOperand)
+{
+    if (rOperand.isEmpty() || rOperand.maValues.size() != rOperand.cellCount())
+        return makeMaterializedError<ScMatrixRef>(api::Error::IllegalArgument);
+
+    ScMatrixRef xMatrix(new ScMatrix(static_cast<SCSIZE>(rOperand.maDimensions.mnColumns),
+        static_cast<SCSIZE>(rOperand.maDimensions.mnRows)));
+    for (api::MatrixSize nRow = 0; nRow < rOperand.maDimensions.mnRows; ++nRow)
+    {
+        for (api::MatrixSize nColumn = 0; nColumn < rOperand.maDimensions.mnColumns; ++nColumn)
+        {
+            const auto* pValue = rOperand.at({ nColumn, nRow });
+            if (!pValue)
+                return makeMaterializedError<ScMatrixRef>(api::Error::IllegalArgument);
+            putScalarIntoMatrix(*pValue, xMatrix, static_cast<SCSIZE>(nColumn),
+                static_cast<SCSIZE>(nRow));
+        }
+    }
+
+    return makeMaterializedValue(xMatrix);
+}
+
+[[nodiscard]] inline Materialization<spreadsheetengine::core::rpn::MatrixOperand>
+materializeMatrixOperandNode(
+    const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
+    const ScAddress& rFormulaPos)
+{
+    const auto aMatrix = materializeMatrixNode(rNode, rDoc, rContext, rFormulaPos);
+    if (!aMatrix.mbSupported)
+    {
+        return makeUnsupportedMaterialization<spreadsheetengine::core::rpn::MatrixOperand>(
+            aMatrix.meFallbackReason);
+    }
+    if (!aMatrix.moValue)
+    {
+        return makeMaterializedError<spreadsheetengine::core::rpn::MatrixOperand>(aMatrix.meError);
+    }
+
+    const auto oOperand = matrixRefToMatrixOperand(*aMatrix.moValue);
+    if (!oOperand)
+    {
+        return makeMaterializedError<spreadsheetengine::core::rpn::MatrixOperand>(
+            api::Error::IllegalArgument);
+    }
+    return makeMaterializedValue(*oOperand);
+}
+
+[[nodiscard]] inline Materialization<bool> materializeOptionalBooleanFlagNode(
+    const core::formula::Node* pArgument, const ScDocument& rDoc, ScInterpreterContext& rContext,
+    const ScAddress& rFormulaPos, bool bDefaultValue)
+{
+    if (!pArgument || pArgument->meKind == core::formula::NodeKind::EmptyArgument)
+        return makeMaterializedValue(bDefaultValue);
+
+    const auto aScalar
+        = materializeScalarizedReferenceValueNode(*pArgument, rDoc, rContext, rFormulaPos);
+    if (!aScalar.mbSupported)
+        return makeUnsupportedMaterialization<bool>(aScalar.meFallbackReason);
+    if (!aScalar.moValue)
+        return makeMaterializedError<bool>(aScalar.meError);
+
+    if (aScalar.moValue->isBoolean())
+        return makeMaterializedValue(aScalar.moValue->mfNumber != 0.0);
+    if (aScalar.moValue->isNumber())
+        return makeMaterializedValue(aScalar.moValue->mfNumber != 0.0);
+    return makeMaterializedError<bool>(api::Error::IllegalArgument);
+}
+
+[[nodiscard]] inline Materialization<spreadsheetengine::core::rpn::MatrixOperand>
+materializeGrowthProjectionMatrixFunctionCall(
+    const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
+    const ScAddress& rFormulaPos)
+{
+    namespace serpn = spreadsheetengine::core::rpn;
+
+    const api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
+    if (aFunctionName != u"GROWTH" && aFunctionName != u"TREND" && aFunctionName != u"LINEST"
+        && aFunctionName != u"LOGEST")
+    {
+        return makeUnsupportedMaterialization<serpn::MatrixOperand>(
+            FallbackReason::UnsupportedFunction);
+    }
+
+    const auto materializeOptionalOperand = [&](const core::formula::Node* pArgument)
+        -> Materialization<std::optional<serpn::MatrixOperand>> {
+        if (!pArgument || pArgument->meKind == core::formula::NodeKind::EmptyArgument)
+            return makeMaterializedValue(std::optional<serpn::MatrixOperand> {});
+
+        const auto aOperand = materializeMatrixOperandNode(*pArgument, rDoc, rContext, rFormulaPos);
+        if (!aOperand.mbSupported)
+            return makeUnsupportedMaterialization<std::optional<serpn::MatrixOperand>>(
+                aOperand.meFallbackReason);
+        if (!aOperand.moValue)
+            return makeMaterializedError<std::optional<serpn::MatrixOperand>>(aOperand.meError);
+        return makeMaterializedValue(std::optional<serpn::MatrixOperand> { *aOperand.moValue });
+    };
+
+    if (rNode.maChildren.empty() || rNode.maChildren.size() > 4)
+    {
+        return makeMaterializedValue(
+            *matrixRefToMatrixOperand(makeSingleValueMatrix(api::CellValue::error(
+                api::Error::IllegalArgument))));
+    }
+
+    const auto aKnownY = materializeMatrixOperandNode(*rNode.maChildren[0], rDoc, rContext, rFormulaPos);
+    if (!aKnownY.mbSupported)
+        return makeUnsupportedMaterialization<serpn::MatrixOperand>(aKnownY.meFallbackReason);
+    if (!aKnownY.moValue)
+        return makeMaterializedError<serpn::MatrixOperand>(aKnownY.meError);
+
+    if (aFunctionName == u"LINEST" || aFunctionName == u"LOGEST")
+    {
+        const auto aKnownX = materializeOptionalOperand(
+            rNode.maChildren.size() >= 2 ? &*rNode.maChildren[1] : nullptr);
+        if (!aKnownX.mbSupported)
+            return makeUnsupportedMaterialization<serpn::MatrixOperand>(aKnownX.meFallbackReason);
+        if (!aKnownX.moValue)
+            return makeMaterializedError<serpn::MatrixOperand>(aKnownX.meError);
+
+        const auto aConstant = materializeOptionalBooleanFlagNode(
+            rNode.maChildren.size() >= 3 ? &*rNode.maChildren[2] : nullptr, rDoc, rContext,
+            rFormulaPos, true);
+        if (!aConstant.mbSupported)
+            return makeUnsupportedMaterialization<serpn::MatrixOperand>(aConstant.meFallbackReason);
+        if (!aConstant.moValue)
+            return makeMaterializedError<serpn::MatrixOperand>(aConstant.meError);
+
+        const auto aStats = materializeOptionalBooleanFlagNode(
+            rNode.maChildren.size() >= 4 ? &*rNode.maChildren[3] : nullptr, rDoc, rContext,
+            rFormulaPos, false);
+        if (!aStats.mbSupported)
+            return makeUnsupportedMaterialization<serpn::MatrixOperand>(aStats.meFallbackReason);
+        if (!aStats.moValue)
+            return makeMaterializedError<serpn::MatrixOperand>(aStats.meError);
+
+        const auto aPlan = aFunctionName == u"LOGEST"
+                               ? serpn::planLogest(
+                                     aKnownX.moValue->has_value() ? &**aKnownX.moValue : nullptr,
+                                     *aKnownY.moValue, *aConstant.moValue, *aStats.moValue)
+                               : serpn::planLinest(
+                                     aKnownX.moValue->has_value() ? &**aKnownX.moValue : nullptr,
+                                     *aKnownY.moValue, *aConstant.moValue, *aStats.moValue);
+        if (aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
+        {
+            return makeUnsupportedMaterialization<serpn::MatrixOperand>(
+                FallbackReason::UnsupportedFormulaShape);
+        }
+        if (!aPlan)
+        {
+            return makeMaterializedValue(*matrixRefToMatrixOperand(makeSingleValueMatrix(
+                api::CellValue::error(aPlan.meError))));
+        }
+        return makeMaterializedValue(aPlan.maValue.maMatrix);
+    }
+
+    const auto aKnownX = materializeOptionalOperand(
+        rNode.maChildren.size() >= 2 ? &*rNode.maChildren[1] : nullptr);
+    if (!aKnownX.mbSupported)
+        return makeUnsupportedMaterialization<serpn::MatrixOperand>(aKnownX.meFallbackReason);
+    if (!aKnownX.moValue)
+        return makeMaterializedError<serpn::MatrixOperand>(aKnownX.meError);
+
+    const auto aNewX = materializeOptionalOperand(
+        rNode.maChildren.size() >= 3 ? &*rNode.maChildren[2] : nullptr);
+    if (!aNewX.mbSupported)
+        return makeUnsupportedMaterialization<serpn::MatrixOperand>(aNewX.meFallbackReason);
+    if (!aNewX.moValue)
+        return makeMaterializedError<serpn::MatrixOperand>(aNewX.meError);
+
+    const auto aConstant = materializeOptionalBooleanFlagNode(
+        rNode.maChildren.size() >= 4 ? &*rNode.maChildren[3] : nullptr, rDoc, rContext,
+        rFormulaPos, true);
+    if (!aConstant.mbSupported)
+        return makeUnsupportedMaterialization<serpn::MatrixOperand>(aConstant.meFallbackReason);
+    if (!aConstant.moValue)
+        return makeMaterializedError<serpn::MatrixOperand>(aConstant.meError);
+
+    const auto aPlan = aFunctionName == u"GROWTH"
+                           ? serpn::planGrowth(
+                                 *aKnownY.moValue,
+                                 aKnownX.moValue->has_value() ? &**aKnownX.moValue : nullptr,
+                                 aNewX.moValue->has_value() ? &**aNewX.moValue : nullptr,
+                                 *aConstant.moValue)
+                           : serpn::planTrend(
+                                 *aKnownY.moValue,
+                                 aKnownX.moValue->has_value() ? &**aKnownX.moValue : nullptr,
+                                 aNewX.moValue->has_value() ? &**aNewX.moValue : nullptr,
+                                 *aConstant.moValue);
+    if (aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
+    {
+        return makeUnsupportedMaterialization<serpn::MatrixOperand>(
+            FallbackReason::UnsupportedFormulaShape);
+    }
+    if (!aPlan)
+    {
+        return makeMaterializedValue(*matrixRefToMatrixOperand(makeSingleValueMatrix(
+            api::CellValue::error(aPlan.meError))));
+    }
+    return makeMaterializedValue(aPlan.maValue.maMatrix);
+}
+
 [[nodiscard]] inline Materialization<ScMatrixRef> materializeLookupExecutionResultMatrix(
     const lookupexecution::LookupExecutionResult& rResult, const ScDocument& rDoc,
     ScInterpreterContext& rContext, const ScAddress& rFormulaPos)
@@ -6629,12 +6876,94 @@ materializeCriteriaAggregateInput(const core::formula::Node& rArgument, const Sc
         return materializeXLookupMatrixFunctionCall(rNode, rDoc, rContext, rFormulaPos);
     if (eFunction == FunctionKind::Index)
         return materializeIndexMatrixFunctionCall(rNode, rDoc, rContext, rFormulaPos);
+    if (eFunction == FunctionKind::GrowthProjection)
+    {
+        const auto aProjection
+            = materializeGrowthProjectionMatrixFunctionCall(rNode, rDoc, rContext, rFormulaPos);
+        if (!aProjection.mbSupported)
+            return makeUnsupportedMaterialization<ScMatrixRef>(aProjection.meFallbackReason);
+        if (!aProjection.moValue)
+            return makeMaterializedError<ScMatrixRef>(aProjection.meError);
+        return matrixOperandToMatrixRef(*aProjection.moValue);
+    }
     if (eFunction == FunctionKind::Selector)
         return materializeSelectorMatrixFunctionCall(rNode, rDoc, rContext, rFormulaPos);
     if (eFunction == FunctionKind::SpillArray)
         return materializeSpillMatrixFunctionCall(rNode, rDoc, rContext, rFormulaPos);
     if (aFunctionName == u"ISNUMBER")
         return materializeIsNumberMatrixFunctionCall(rNode, rDoc, rContext, rFormulaPos);
+    if (aFunctionName == u"ORG.LIBREOFFICE.FOURIER")
+    {
+        if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 5)
+        {
+            return makeMaterializedValue(
+                makeSingleValueMatrix(api::CellValue::error(api::Error::IllegalArgument)));
+        }
+
+        const auto aInput = materializeMatrixOperandNode(
+            *rNode.maChildren[0], rDoc, rContext, rFormulaPos);
+        if (!aInput.mbSupported)
+            return makeUnsupportedMaterialization<ScMatrixRef>(aInput.meFallbackReason);
+        if (!aInput.moValue)
+            return makeMaterializedError<ScMatrixRef>(aInput.meError);
+
+        const auto aGroupedByColumn = materializeOptionalBooleanFlagNode(
+            rNode.maChildren.size() >= 2 ? &*rNode.maChildren[1] : nullptr, rDoc, rContext,
+            rFormulaPos, true);
+        if (!aGroupedByColumn.mbSupported)
+            return makeUnsupportedMaterialization<ScMatrixRef>(aGroupedByColumn.meFallbackReason);
+        if (!aGroupedByColumn.moValue)
+            return makeMaterializedError<ScMatrixRef>(aGroupedByColumn.meError);
+
+        const auto aInverse = materializeOptionalBooleanFlagNode(
+            rNode.maChildren.size() >= 3 ? &*rNode.maChildren[2] : nullptr, rDoc, rContext,
+            rFormulaPos, false);
+        if (!aInverse.mbSupported)
+            return makeUnsupportedMaterialization<ScMatrixRef>(aInverse.meFallbackReason);
+        if (!aInverse.moValue)
+            return makeMaterializedError<ScMatrixRef>(aInverse.meError);
+
+        const auto aPolar = materializeOptionalBooleanFlagNode(
+            rNode.maChildren.size() >= 4 ? &*rNode.maChildren[3] : nullptr, rDoc, rContext,
+            rFormulaPos, false);
+        if (!aPolar.mbSupported)
+            return makeUnsupportedMaterialization<ScMatrixRef>(aPolar.meFallbackReason);
+        if (!aPolar.moValue)
+            return makeMaterializedError<ScMatrixRef>(aPolar.meError);
+
+        double fMinMagnitude = 0.0;
+        if (rNode.maChildren.size() >= 5
+            && rNode.maChildren[4]->meKind != core::formula::NodeKind::EmptyArgument)
+        {
+            const auto aScalar = materializeScalarNode(
+                *rNode.maChildren[4], rDoc, rContext, rFormulaPos);
+            if (!aScalar.mbSupported)
+                return makeUnsupportedMaterialization<ScMatrixRef>(aScalar.meFallbackReason);
+            if (!aScalar.moValue)
+                return makeMaterializedError<ScMatrixRef>(aScalar.meError);
+
+            const auto aNumber = coerceScalarToNumber(rDoc, rContext, *aScalar.moValue);
+            if (!aNumber)
+                return makeMaterializedError<ScMatrixRef>(aNumber.meError);
+            fMinMagnitude = aNumber.maValue;
+        }
+        const auto aPlan = spreadsheetengine::core::rpn::planFourier(
+            *aInput.moValue, *aGroupedByColumn.moValue, *aInverse.moValue, *aPolar.moValue,
+            fMinMagnitude);
+        if (aPlan.meReadiness != spreadsheetengine::core::rpn::RpnCoercionReadiness::Ready)
+            return makeUnsupportedMaterialization<ScMatrixRef>(FallbackReason::UnsupportedFormulaShape);
+        if (!aPlan)
+        {
+            return makeMaterializedValue(
+                makeSingleValueMatrix(api::CellValue::error(aPlan.meError)));
+        }
+        const auto aResultMatrix = matrixOperandToMatrixRef(aPlan.maValue.maMatrix);
+        if (!aResultMatrix.mbSupported)
+            return makeUnsupportedMaterialization<ScMatrixRef>(aResultMatrix.meFallbackReason);
+        if (!aResultMatrix.moValue)
+            return makeMaterializedError<ScMatrixRef>(aResultMatrix.meError);
+        return makeMaterializedValue(*aResultMatrix.moValue);
+    }
     if (aFunctionName == u"EXACT")
     {
         if (rNode.maChildren.size() != 2)
@@ -11996,6 +12325,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         double fMeanY = 0.0;
         double fSumDeltaXDeltaY = 0.0;
         double fSumSqrDeltaX = 0.0;
+        double fSumSqrDeltaY = 0.0;
     };
 
     const auto collectRegressionStats =
@@ -12066,6 +12396,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
             const double fDeltaY = aY.maValue - aStats.fMeanY;
             aStats.fSumDeltaXDeltaY += fDeltaX * fDeltaY;
             aStats.fSumSqrDeltaX += fDeltaX * fDeltaX;
+            aStats.fSumSqrDeltaY += fDeltaY * fDeltaY;
         }
 
         return makeMaterializedValue(aStats);
@@ -12703,6 +13034,81 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         return makeNumericAttempt(aDistribution.maValue);
     }
 
+    if (aFunctionName == u"SLOPE")
+    {
+        if (rNode.maChildren.size() != 2)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+
+        const auto aStats = collectRegressionStats(*rNode.maChildren[0], *rNode.maChildren[1]);
+        if (!aStats.mbSupported)
+            return makeUnsupportedAttempt(aStats.meFallbackReason);
+        if (!aStats.moValue)
+            return makeErrorAttempt(aStats.meError);
+        if (rtl::math::approxEqual(aStats.moValue->fSumSqrDeltaX, 0.0))
+            return makeErrorAttempt(api::Error::DivisionByZero);
+
+        return makeNumericAttempt(
+            aStats.moValue->fSumDeltaXDeltaY / aStats.moValue->fSumSqrDeltaX);
+    }
+
+    if (aFunctionName == u"CORREL" || aFunctionName == u"PEARSON" || aFunctionName == u"RSQ"
+        || aFunctionName == u"STEYX" || aFunctionName == u"COVAR"
+        || aFunctionName == u"COVARIANCE.P" || aFunctionName == u"COM.MICROSOFT.COVARIANCE.P"
+        || aFunctionName == u"COVARIANCE.S" || aFunctionName == u"COM.MICROSOFT.COVARIANCE.S")
+    {
+        if (rNode.maChildren.size() != 2)
+            return makeErrorAttempt(api::Error::IllegalArgument);
+
+        const auto aStats = collectRegressionStats(*rNode.maChildren[0], *rNode.maChildren[1]);
+        if (!aStats.mbSupported)
+            return makeUnsupportedAttempt(aStats.meFallbackReason);
+        if (!aStats.moValue)
+            return makeErrorAttempt(aStats.meError);
+
+        if (aFunctionName == u"STEYX" && aStats.moValue->fCount < 3.0)
+            return makeErrorAttempt(api::Error::NoValue);
+
+        if (aFunctionName == u"COVAR" || aFunctionName == u"COVARIANCE.P"
+            || aFunctionName == u"COM.MICROSOFT.COVARIANCE.P")
+        {
+            return makeNumericAttempt(
+                aStats.moValue->fSumDeltaXDeltaY / aStats.moValue->fCount);
+        }
+
+        if (aFunctionName == u"COVARIANCE.S"
+            || aFunctionName == u"COM.MICROSOFT.COVARIANCE.S")
+        {
+            if (aStats.moValue->fCount < 2.0)
+                return makeErrorAttempt(api::Error::NoValue);
+            return makeNumericAttempt(
+                aStats.moValue->fSumDeltaXDeltaY / (aStats.moValue->fCount - 1.0));
+        }
+
+        if (aStats.moValue->fSumSqrDeltaX < std::numeric_limits<double>::min()
+            || ((aFunctionName == u"CORREL" || aFunctionName == u"PEARSON"
+                 || aFunctionName == u"RSQ")
+                && aStats.moValue->fSumSqrDeltaY < std::numeric_limits<double>::min()))
+        {
+            return makeErrorAttempt(api::Error::DivisionByZero);
+        }
+
+        if (aFunctionName == u"STEYX")
+        {
+            const double fResidual
+                = aStats.moValue->fSumSqrDeltaY
+                  - (aStats.moValue->fSumDeltaXDeltaY * aStats.moValue->fSumDeltaXDeltaY
+                     / aStats.moValue->fSumSqrDeltaX);
+            return makeNumericAttempt(std::sqrt(fResidual / (aStats.moValue->fCount - 2.0)));
+        }
+
+        const double fPearson
+            = aStats.moValue->fSumDeltaXDeltaY
+              / std::sqrt(aStats.moValue->fSumSqrDeltaX * aStats.moValue->fSumSqrDeltaY);
+        if (aFunctionName == u"RSQ")
+            return makeNumericAttempt(fPearson * fPearson);
+        return makeNumericAttempt(fPearson);
+    }
+
     if (aFunctionName == u"INTERCEPT" || aFunctionName == u"FORECAST")
     {
         if (rNode.maChildren.size() != 2 + (aFunctionName == u"FORECAST" ? 1 : 0))
@@ -12813,200 +13219,17 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     const core::formula::Node& rNode, FunctionKind eFunction, const ScDocument& rDoc,
     ScInterpreterContext& rContext, const ScAddress& rFormulaPos)
 {
-    // This handler only implements GROWTH semantics (log-linear fit).
-    // Sister GrowthProjection members (SLOPE / RSQ / STEYX /
-    // FORECAST.ETS variants) would be mis-computed here, so decline
-    // back to legacy for anything other than GROWTH itself.
-    const api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
-    if (aFunctionName != u"GROWTH")
-        return makeUnsupported(eFunction, FallbackReason::UnsupportedFunction);
+    const auto aProjection
+        = materializeGrowthProjectionMatrixFunctionCall(rNode, rDoc, rContext, rFormulaPos);
+    if (!aProjection.mbSupported)
+        return makeUnsupported(eFunction, aProjection.meFallbackReason);
+    if (!aProjection.moValue)
+        return makeErrorResult(eFunction, aProjection.meError);
 
-    const auto makeNumericAttempt = [&](double fValue) {
-        return makeNumericResult(eFunction, fValue, SvNumFormatType::NUMBER);
-    };
-    const auto makeErrorAttempt = [&](api::Error eError) {
-        return makeErrorResult(eFunction, eError);
-    };
-    const auto materializeOneDimensionalSequence =
-        [&](const core::formula::Node* pArgument, bool bRequirePositive,
-            bool* pWasOmitted = nullptr) -> Materialization<std::vector<double>> {
-        if (pWasOmitted)
-            *pWasOmitted = false;
-
-        if (!pArgument)
-            return makeMaterializedError<std::vector<double>>(api::Error::IllegalArgument);
-        if (pArgument->meKind == core::formula::NodeKind::EmptyArgument)
-        {
-            if (pWasOmitted)
-                *pWasOmitted = true;
-            return makeMaterializedValue(std::vector<double> {});
-        }
-
-        const auto aMatrix = materializeMatrixNode(*pArgument, rDoc, rContext, rFormulaPos);
-        if (!aMatrix.mbSupported)
-            return makeUnsupportedMaterialization<std::vector<double>>(aMatrix.meFallbackReason);
-        if (!aMatrix.moValue)
-            return makeMaterializedError<std::vector<double>>(aMatrix.meError);
-
-        SCSIZE nColumns = 0;
-        SCSIZE nRows = 0;
-        (*aMatrix.moValue)->GetDimensions(nColumns, nRows);
-        if (nColumns == 0 || nRows == 0)
-            return makeMaterializedError<std::vector<double>>(api::Error::IllegalArgument);
-        if (nColumns != 1 && nRows != 1)
-        {
-            return makeUnsupportedMaterialization<std::vector<double>>(
-                FallbackReason::UnsupportedFormulaShape);
-        }
-
-        std::vector<double> aValues;
-        aValues.reserve(nColumns * nRows);
-        for (SCSIZE nRow = 0; nRow < nRows; ++nRow)
-        {
-            for (SCSIZE nColumn = 0; nColumn < nColumns; ++nColumn)
-            {
-                const auto aValue = lookupexecution::detail::toApiCellValue(
-                    (*aMatrix.moValue)->Get(nColumn, nRow));
-                if (!aValue.isNumber())
-                {
-                    if (aValue.isError())
-                        return makeMaterializedError<std::vector<double>>(aValue.meError);
-                    return makeMaterializedError<std::vector<double>>(api::Error::IllegalArgument);
-                }
-
-                if (bRequirePositive && !(aValue.mfNumber > 0.0))
-                    return makeMaterializedError<std::vector<double>>(api::Error::IllegalArgument);
-                aValues.push_back(aValue.mfNumber);
-            }
-        }
-
-        return makeMaterializedValue(std::move(aValues));
-    };
-
-    const auto materializeConstantFlag = [&](const core::formula::Node* pArgument)
-        -> Materialization<bool> {
-        if (!pArgument || pArgument->meKind == core::formula::NodeKind::EmptyArgument)
-            return makeMaterializedValue(true);
-
-        const auto aScalar
-            = materializeScalarizedReferenceValueNode(*pArgument, rDoc, rContext, rFormulaPos);
-        if (!aScalar.mbSupported)
-            return makeUnsupportedMaterialization<bool>(aScalar.meFallbackReason);
-        if (!aScalar.moValue)
-            return makeMaterializedError<bool>(aScalar.meError);
-
-        if (aScalar.moValue->isBoolean())
-            return makeMaterializedValue(aScalar.moValue->mfNumber != 0.0);
-        if (aScalar.moValue->isNumber())
-            return makeMaterializedValue(aScalar.moValue->mfNumber != 0.0);
-        return makeMaterializedError<bool>(api::Error::IllegalArgument);
-    };
-
-    if (rNode.maChildren.empty() || rNode.maChildren.size() > 4)
-        return makeErrorAttempt(api::Error::IllegalArgument);
-
-    const auto aKnownY = materializeOneDimensionalSequence(&*rNode.maChildren[0], true);
-    if (!aKnownY.mbSupported)
-        return makeUnsupported(eFunction, aKnownY.meFallbackReason);
-    if (!aKnownY.moValue)
-        return makeErrorAttempt(aKnownY.meError);
-    if (aKnownY.moValue->empty())
-        return makeErrorAttempt(api::Error::IllegalArgument);
-
-    std::vector<double> aKnownX;
-    if (rNode.maChildren.size() >= 2)
-    {
-        const auto aKnownXValues = materializeOneDimensionalSequence(
-            &*rNode.maChildren[1], false);
-        if (!aKnownXValues.mbSupported)
-            return makeUnsupported(eFunction, aKnownXValues.meFallbackReason);
-        if (!aKnownXValues.moValue)
-            return makeErrorAttempt(aKnownXValues.meError);
-        aKnownX = *aKnownXValues.moValue;
-    }
-
-    if (aKnownX.empty())
-    {
-        aKnownX.reserve(aKnownY.moValue->size());
-        for (std::size_t nIndex = 0; nIndex < aKnownY.moValue->size(); ++nIndex)
-            aKnownX.push_back(static_cast<double>(nIndex + 1));
-    }
-
-    if (aKnownX.size() != aKnownY.moValue->size())
-        return makeErrorAttempt(api::Error::IllegalArgument);
-
-    std::vector<double> aNewX;
-    if (rNode.maChildren.size() >= 3)
-    {
-        const auto aNewXValues = materializeOneDimensionalSequence(
-            &*rNode.maChildren[2], false);
-        if (!aNewXValues.mbSupported)
-            return makeUnsupported(eFunction, aNewXValues.meFallbackReason);
-        if (!aNewXValues.moValue)
-            return makeErrorAttempt(aNewXValues.meError);
-        aNewX = *aNewXValues.moValue;
-    }
-
-    if (aNewX.empty())
-        aNewX = aKnownX;
-    if (aNewX.empty())
-        return makeErrorAttempt(api::Error::IllegalArgument);
-
-    const auto aConstant = materializeConstantFlag(
-        rNode.maChildren.size() >= 4 ? &*rNode.maChildren[3] : nullptr);
-    if (!aConstant.mbSupported)
-        return makeUnsupported(eFunction, aConstant.meFallbackReason);
-    if (!aConstant.moValue)
-        return makeErrorAttempt(aConstant.meError);
-
-    std::vector<double> aLoggedY;
-    aLoggedY.reserve(aKnownY.moValue->size());
-    for (double fValue : *aKnownY.moValue)
-        aLoggedY.push_back(std::log(fValue));
-
-    double fSlope = 0.0;
-    double fIntercept = 0.0;
-    if (*aConstant.moValue)
-    {
-        const double fCount = static_cast<double>(aKnownX.size());
-        const double fMeanX
-            = std::accumulate(aKnownX.begin(), aKnownX.end(), 0.0) / fCount;
-        const double fMeanY
-            = std::accumulate(aLoggedY.begin(), aLoggedY.end(), 0.0) / fCount;
-
-        double fSumDeltaXDeltaY = 0.0;
-        double fSumSqrDeltaX = 0.0;
-        for (std::size_t nIndex = 0; nIndex < aKnownX.size(); ++nIndex)
-        {
-            const double fDeltaX = aKnownX[nIndex] - fMeanX;
-            const double fDeltaY = aLoggedY[nIndex] - fMeanY;
-            fSumDeltaXDeltaY += fDeltaX * fDeltaY;
-            fSumSqrDeltaX += fDeltaX * fDeltaX;
-        }
-
-        if (rtl::math::approxEqual(fSumSqrDeltaX, 0.0))
-            return makeErrorAttempt(api::Error::NoValue);
-
-        fSlope = fSumDeltaXDeltaY / fSumSqrDeltaX;
-        fIntercept = fMeanY - fSlope * fMeanX;
-    }
-    else
-    {
-        double fSumXY = 0.0;
-        double fSumX2 = 0.0;
-        for (std::size_t nIndex = 0; nIndex < aKnownX.size(); ++nIndex)
-        {
-            fSumXY += aKnownX[nIndex] * aLoggedY[nIndex];
-            fSumX2 += aKnownX[nIndex] * aKnownX[nIndex];
-        }
-
-        if (rtl::math::approxEqual(fSumX2, 0.0))
-            return makeErrorAttempt(api::Error::NoValue);
-
-        fSlope = fSumXY / fSumX2;
-    }
-
-    return makeNumericAttempt(std::exp(fIntercept + fSlope * aNewX.front()));
+    const api::CellValue* pTopLeft = aProjection.moValue->at({ 0, 0 });
+    if (!pTopLeft)
+        return makeErrorResult(eFunction, api::Error::IllegalArgument);
+    return makeScalarAttempt(eFunction, *pTopLeft);
 }
 
 [[nodiscard]] inline EvaluationAttempt evaluateTextUtilityFunction(
@@ -15948,8 +16171,11 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     }
     if (eFunction == FunctionKind::Round)
         return true;
-    if (aUpperFunctionName == u"GROWTH")
-        return true;
+    if (eFunction == FunctionKind::GrowthProjection)
+    {
+        return aUpperFunctionName == u"GROWTH" || aUpperFunctionName == u"TREND"
+               || aUpperFunctionName == u"LINEST" || aUpperFunctionName == u"LOGEST";
+    }
     if (aUpperFunctionName == u"PROB")
         return true;
     if (aUpperFunctionName == u"IFERROR" || aUpperFunctionName == u"IFNA")

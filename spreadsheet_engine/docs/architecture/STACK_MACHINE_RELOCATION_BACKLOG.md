@@ -77,7 +77,18 @@ families that are explicitly not yet relocated.
    `testSharedInterpreterDatabaseVarianceDispatch`, and
    `testSharedInterpreterDatabaseCountDispatch`, plus
    `spreadsheetengine_execution_tests`.
-6. Slice 6: pending
+6. Slice 6: complete
+   Verified with `CppunitTest_sc_ucalc_formula2` covering
+   `testInterpretTailEngineEvaluatorGrowthDefaultOn`,
+   `testInterpretTailEngineEvaluatorRegressionStatsDefaultOn`,
+   `testInterpretTailEngineEvaluatorRegressionMatrixDefaultOn`,
+   `testInterpretTailEngineEvaluatorForecastAuthoritative`, and
+   `testInterpretTailEngineEvaluatorStatisticalDistributionDefaultOn`, plus
+   `CppunitTest_sc_ucalc_shared_cases` covering
+   `testInterpretTailEngineEvaluatorGrowthHelper`,
+   `testInterpretTailEngineEvaluatorRegressionMatrixHelper`, and
+   `testInterpretTailEngineEvaluatorForecastHelper`, plus
+   `spreadsheetengine_execution_tests`.
 7. Slice 7: pending
 8. Slice 8: pending
 
@@ -239,6 +250,25 @@ Definition of done:
   bespoke Calc-local loops
 
 ### Slice 6: Regression / forecast substrate
+
+Status: complete
+
+Current landing on the tree:
+
+- the upper seam now classifies scalar regression statistics
+  (`SLOPE`, `CORREL`, `PEARSON`, `RSQ`, `STEYX`, `COVAR`,
+  `COVARIANCE.P`, `COVARIANCE.S`) as `StatisticalDistribution`, so the
+  existing engine-native regression stats path stays authoritative under
+  `InterpretTail`
+- `LINEST`, `LOGEST`, `TREND`, and `GROWTH` now materialize matrix results
+  upstream through the shared `LinestEngine` substrate instead of relying on
+  interpreter-resident kernels
+- scalar helper paths now read the top-left value from that same shared
+  matrix result, and nested consumers like `INDEX(LOGEST(...))` can consume
+  those matrices authoritatively
+- the remaining regression/forecast work is therefore no longer math-kernel
+  ownership; it is the Slice 7 deletion pass over the overlapping
+  lower-seam admissions
 
 Goal: move the remaining numerical cores that still block end-to-end stack
 machine relocation.

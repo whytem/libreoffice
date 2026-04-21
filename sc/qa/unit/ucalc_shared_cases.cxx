@@ -3478,6 +3478,61 @@ CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorGrowthHelp
         spreadsheetengine::api::formulavalue::ValueType::Error, aInvalid.maResult.meType);
 }
 
+CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorRegressionMatrixHelper)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aAutoCalc(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"InterpretTailRegressionMatrixHelper"_ustr);
+    ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
+    const ScAddress aFormulaPos(7, 0, 0);
+
+    const auto aSlope = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=SLOPE({3;5;7;9};{1;2;3;4})", false);
+    CPPUNIT_ASSERT(aSlope.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::StatisticalDistribution, aSlope.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value, aSlope.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aSlope.maResult.mfValue, 1e-12);
+
+    const auto aLinestScalar = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=LINEST({3;5;7;9};{1;2;3;4})", false);
+    CPPUNIT_ASSERT(aLinestScalar.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::GrowthProjection, aLinestScalar.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value,
+        aLinestScalar.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aLinestScalar.maResult.mfValue, 1e-12);
+
+    const auto aLinestMatrix = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=LINEST({3;5;7;9};{1;2;3;4})", false, nullptr, {}, true);
+    CPPUNIT_ASSERT(aLinestMatrix.mbSupported);
+    CPPUNIT_ASSERT(aLinestMatrix.hasMatrixResult());
+    CPPUNIT_ASSERT_EQUAL(static_cast<SCSIZE>(2), aLinestMatrix.mnMatrixColumns);
+    CPPUNIT_ASSERT_EQUAL(static_cast<SCSIZE>(1), aLinestMatrix.mnMatrixRows);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aLinestMatrix.mpMatrixResult->Get(0, 0).fVal, 1e-12);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, aLinestMatrix.mpMatrixResult->Get(1, 0).fVal, 1e-12);
+
+    const auto aTrendMatrix = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=TREND({3;5;7;9};{1;2;3;4};{5;6})", false, nullptr, {},
+        true);
+    CPPUNIT_ASSERT(aTrendMatrix.mbSupported);
+    CPPUNIT_ASSERT(aTrendMatrix.hasMatrixResult());
+    CPPUNIT_ASSERT_EQUAL(static_cast<SCSIZE>(2), aTrendMatrix.mnMatrixColumns);
+    CPPUNIT_ASSERT_EQUAL(static_cast<SCSIZE>(1), aTrendMatrix.mnMatrixRows);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(11.0, aTrendMatrix.mpMatrixResult->Get(0, 0).fVal, 1e-12);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(13.0, aTrendMatrix.mpMatrixResult->Get(1, 0).fVal, 1e-12);
+
+    const auto aNestedLogest = setaileval::tryEvaluateFormula(
+        *m_pDoc, rContext, aFormulaPos, u"=INDEX(LOGEST({6;18;54};{1;2;3});1;2)", false);
+    CPPUNIT_ASSERT(aNestedLogest.mbSupported);
+    CPPUNIT_ASSERT_EQUAL(setaileval::FunctionKind::Index, aNestedLogest.meFunction);
+    CPPUNIT_ASSERT_EQUAL(
+        spreadsheetengine::api::formulavalue::ValueType::Value,
+        aNestedLogest.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, aNestedLogest.maResult.mfValue, 1e-9);
+}
+
 CPPUNIT_TEST_FIXTURE(TestSharedCases, testInterpretTailEngineEvaluatorForecastHelper)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
