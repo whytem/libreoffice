@@ -4671,42 +4671,28 @@ StackVar ScInterpreter::Interpret()
                     }
                     PushDouble(rResult.maValue);
                 };
-                const auto tryPushEngineBadLiteralError = [&]() {
-                    addDispatchRuntimeStat(
-                        interpreterDispatchRuntimeStatsStore().mnEngineAttemptedCount);
-                    if (!pMyFormulaCell || !pArr)
-                    {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore().mnEngineDeclinedCount);
+                const auto pushRootErrorLiteralTerminal = [&]() -> bool {
+                    if (!pMyFormulaCell)
                         return false;
-                    }
 
                     const OUString aFormulaSource
                         = pMyFormulaCell->GetFormula(FormulaGrammar::GRAM_ODFF, &mrContext);
                     if (aFormulaSource.isEmpty())
-                    {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore().mnEngineDeclinedCount);
                         return false;
-                    }
 
-                    const auto aAttempt = setaileval::tryEvaluateFormula(
-                        mrDoc, mrContext, aPos,
-                        std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
-                        mrDoc.GetCalcConfig().mbEmptyStringAsZero, pArr);
-                    if (!aAttempt.mbSupported
-                        || aAttempt.maResult.meType
-                               != spreadsheetengine::api::formulavalue::ValueType::Error)
+                    const auto aNormalized = setaileval::detail::normalizeFormulaSource(
+                        std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()));
+                    const auto aParse = spreadsheetengine::core::formula::parseFormula(aNormalized);
+                    if (!aParse || !aParse.mpRoot
+                        || aParse.mpRoot->meKind
+                               != spreadsheetengine::core::formula::NodeKind::ErrorLiteral)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore().mnEngineDeclinedCount);
                         return false;
                     }
 
                     nGlobalError = FormulaError::NONE;
-                    addDispatchRuntimeStat(
-                        interpreterDispatchRuntimeStatsStore().mnEngineSucceededCount);
-                    PushError(selibreoffice::toFormulaError(aAttempt.maResult.meError));
+                    PushError(selibreoffice::toFormulaError(
+                        setaileval::detail::mapErrorLiteral(aParse.mpRoot->maPrimaryText)));
                     return true;
                 };
                 const auto pushRetiredScalarResult = [&]() -> bool {
@@ -4758,70 +4744,6 @@ StackVar ScInterpreter::Interpret()
                         default:
                             return false;
                     }
-                };
-                const auto tryPushEngineBadLiteralRangeOpcode = [&]() {
-                    if (!pMyFormulaCell || !pArr)
-                        return false;
-
-                    const OUString aFormulaSource
-                        = pMyFormulaCell->GetFormula(FormulaGrammar::GRAM_ODFF, &mrContext);
-                    if (aFormulaSource.isEmpty())
-                        return false;
-
-                    if (!setaileval::isRootErrorLiteralFormula(
-                            std::u16string_view(aFormulaSource.getStr(),
-                                aFormulaSource.getLength())))
-                    {
-                        return false;
-                    }
-
-                    return tryPushEngineBadLiteralError();
-                };
-                const auto tryPushEngineRangeReference = [&]() {
-                    auto& rDispatchStats = interpreterDispatchRuntimeStatsStore();
-                    addDispatchRuntimeStat(rDispatchStats.mnEngineAttemptedCount);
-                    addDispatchRuntimeStat(rDispatchStats.mnRangeEngineAttemptedCount);
-                    if (nGlobalError != FormulaError::NONE || sp < 2)
-                    {
-                        addDispatchRuntimeStat(rDispatchStats.mnEngineDeclinedCount);
-                        addDispatchRuntimeStat(rDispatchStats.mnRangeEngineDeclinedCount);
-                        addDispatchRuntimeStat(
-                            rDispatchStats.mnRangeEngineDeclinedGlobalErrorOrStackCount);
-                        maybeRecordRangeDispatchDeclineFormulaSample();
-                        return false;
-                    }
-
-                    const FormulaToken* pRight = pStack[sp - 1];
-                    const FormulaToken* pLeft = pStack[sp - 2];
-                    if (!pLeft || !pRight)
-                    {
-                        addDispatchRuntimeStat(rDispatchStats.mnEngineDeclinedCount);
-                        addDispatchRuntimeStat(rDispatchStats.mnRangeEngineDeclinedCount);
-                        addDispatchRuntimeStat(
-                            rDispatchStats.mnRangeEngineDeclinedNullTokenCount);
-                        maybeRecordRangeDispatchDeclineFormulaSample();
-                        return false;
-                    }
-
-                    FormulaTokenRef xRangeResult
-                        = seinterpcompatdispatch::Dispatcher::rangeReferenceToken(
-                            *this, *pLeft, *pRight);
-                    if (!xRangeResult)
-                    {
-                        addDispatchRuntimeStat(rDispatchStats.mnEngineDeclinedCount);
-                        addDispatchRuntimeStat(rDispatchStats.mnRangeEngineDeclinedCount);
-                        addDispatchRuntimeStat(
-                            rDispatchStats.mnRangeEngineDeclinedBuildFailureCount);
-                        maybeRecordRangeDispatchDeclineFormulaSample();
-                        return false;
-                    }
-
-                    sp -= 2;
-                    nGlobalError = FormulaError::NONE;
-                    addDispatchRuntimeStat(rDispatchStats.mnEngineSucceededCount);
-                    addDispatchRuntimeStat(rDispatchStats.mnRangeEngineSucceededCount);
-                    PushTokenRef(xRangeResult);
-                    return true;
                 };
                 const auto warnIfLegacyDateFamilyReached = [&](std::u16string_view rFunctionName) {
                     warnIfLegacyDispatchReached(
@@ -12044,16 +11966,16 @@ StackVar ScInterpreter::Interpret()
                         break;
                     case ocIntersect        : ScIntersect();                break;
                     case ocRange            :
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: parity-gap
-                        if (!tryPushEngineBadLiteralRangeOpcode()
-                            && !tryPushEngineRangeReference())
+                        if (!pushRootErrorLiteralTerminal())
                         {
+                            // Bare/root range references remain an explicit host-owned
+                            // terminal until the unified reference substrate lands.
                             warnIfLegacyDispatchReached(
-                                "engine-first root range reference", u"RANGE_REFERENCE",
+                                "host-owned root range reference", u"RANGE_REFERENCE",
                                 [](std::u16string_view rFormula) {
                                     return setaileval::isRootRangeReferenceFormula(rFormula);
                                 },
-                                "engine-backed root range reference reached ScInterpreter");
+                                "host-owned root range reference reached ScInterpreter");
                             ScRangeFunc();
                         }
                         break;
@@ -14893,10 +14815,9 @@ StackVar ScInterpreter::Interpret()
                     break;
                     case ocNoName           : PushError(FormulaError::NoName); break;
                     case ocBad              :
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
-                        if (!tryPushEngineBadLiteralError())
+                        if (!pushRootErrorLiteralTerminal())
                         {
-                            OSL_FAIL("engine-backed root error literal declined ocBad");
+                            OSL_FAIL("host-owned root error literal could not be materialized");
                             PushError(FormulaError::NoName);
                         }
                         break;

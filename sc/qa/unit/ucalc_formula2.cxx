@@ -1916,7 +1916,7 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterLinestEngineDispatch)
     m_pDoc->DeleteTab(0);
 }
 
-CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterBadLiteralDispatch)
+CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterBadLiteralTerminal)
 {
     sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
     ScopedEnvironmentOverride aMode(
@@ -1949,20 +1949,26 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterBadLiteralDispatch)
         = "attempted=" + std::to_string(aDispatchStats.mnEngineAttemptedCount)
           + " succeeded=" + std::to_string(aDispatchStats.mnEngineSucceededCount)
           + " declined=" + std::to_string(aDispatchStats.mnEngineDeclinedCount);
-    CPPUNIT_ASSERT_MESSAGE("bad literal dispatch should attempt engine evaluation: "
-                               + aDispatchStatsLabel,
-                           aDispatchStats.mnEngineAttemptedCount >= 4);
-    CPPUNIT_ASSERT_MESSAGE("bad literal dispatch should succeed through the engine path: "
-                               + aDispatchStatsLabel,
-                           aDispatchStats.mnEngineSucceededCount >= 4);
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("bad literal dispatch should not need legacy fallback here: "
-                                     + aDispatchStatsLabel,
-                                 sal_uInt64(0),
-                                 aDispatchStats.mnEngineDeclinedCount);
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("bracketed ODF error literals should not fall into range dispatch decline accounting: "
-                                     + aDispatchStatsLabel,
-                                 sal_uInt64(0),
-                                 aDispatchStats.mnRangeEngineDeclinedCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "root error literals should no longer count as lower-seam engine debt: "
+            + aDispatchStatsLabel,
+        sal_uInt64(0), aDispatchStats.mnEngineAttemptedCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "root error literals should not report synthetic lower-seam successes: "
+            + aDispatchStatsLabel,
+        sal_uInt64(0), aDispatchStats.mnEngineSucceededCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "root error literals should not report synthetic lower-seam declines: "
+            + aDispatchStatsLabel,
+        sal_uInt64(0), aDispatchStats.mnEngineDeclinedCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "root error literals should not report dedicated range dispatch attempts: "
+            + aDispatchStatsLabel,
+        sal_uInt64(0), aDispatchStats.mnRangeEngineAttemptedCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "bracketed ODF error literals should not fall into range dispatch decline accounting: "
+            + aDispatchStatsLabel,
+        sal_uInt64(0), aDispatchStats.mnRangeEngineDeclinedCount);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("dispatch accounting should stay balanced: "
                                      + aDispatchStatsLabel,
                                  aDispatchStats.mnEngineAttemptedCount,
@@ -2226,7 +2232,7 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterSpillEngineDispatch)
     m_pDoc->DeleteTab(0);
 }
 
-CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterRangeDispatch)
+CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterRangeTerminal)
 {
     sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
     ScopedEnvironmentOverride aMode(
@@ -2249,31 +2255,43 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterRangeDispatch)
         ScAddress(3, 0, 0), u"=SUM(OFFSET(A1;0;0):OFFSET(B2;0;0))"_ustr);
     ASSERT_DOUBLES_EQUAL(10.0, m_pDoc->GetValue(ScAddress(3, 0, 0)));
 
+    ScMarkData aMark(m_pDoc->GetSheetLimits());
+    aMark.SelectOneTable(0);
+    m_pDoc->InsertMatrixFormula(5, 0, 6, 1, aMark, u"=A1:B2"_ustr);
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(5, 0, 0)));
+    ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(6, 0, 0)));
+    ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(ScAddress(5, 1, 0)));
+    ASSERT_DOUBLES_EQUAL(4.0, m_pDoc->GetValue(ScAddress(6, 1, 0)));
+
     const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
     const std::string aDispatchStatsLabel
         = "attempted=" + std::to_string(aDispatchStats.mnEngineAttemptedCount)
           + " succeeded=" + std::to_string(aDispatchStats.mnEngineSucceededCount)
           + " declined=" + std::to_string(aDispatchStats.mnEngineDeclinedCount);
-    CPPUNIT_ASSERT_MESSAGE("range dispatch should attempt engine evaluation: "
-                               + aDispatchStatsLabel,
-                           aDispatchStats.mnEngineAttemptedCount >= 1);
-    CPPUNIT_ASSERT_MESSAGE("range dispatch should register a dedicated range attempt: "
-                               + aDispatchStatsLabel,
-                           aDispatchStats.mnRangeEngineAttemptedCount >= 1);
-    CPPUNIT_ASSERT_MESSAGE("range dispatch should succeed through the engine path: "
-                               + aDispatchStatsLabel,
-                           aDispatchStats.mnEngineSucceededCount >= 1);
-    CPPUNIT_ASSERT_MESSAGE("range dispatch should succeed through the dedicated range path: "
-                               + aDispatchStatsLabel,
-                           aDispatchStats.mnRangeEngineSucceededCount >= 1);
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("range dispatch should not need legacy fallback here: "
-                                     + aDispatchStatsLabel,
-                                 sal_uInt64(0),
-                                 aDispatchStats.mnEngineDeclinedCount);
-    CPPUNIT_ASSERT_EQUAL_MESSAGE("range dispatch should not decline through the dedicated range path here: "
-                                     + aDispatchStatsLabel,
-                                 sal_uInt64(0),
-                                 aDispatchStats.mnRangeEngineDeclinedCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "range terminals should no longer count as lower-seam engine debt: "
+            + aDispatchStatsLabel,
+        sal_uInt64(0), aDispatchStats.mnEngineAttemptedCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "range terminals should not report synthetic lower-seam successes: "
+            + aDispatchStatsLabel,
+        sal_uInt64(0), aDispatchStats.mnEngineSucceededCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "range terminals should not report synthetic lower-seam declines: "
+            + aDispatchStatsLabel,
+        sal_uInt64(0), aDispatchStats.mnEngineDeclinedCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "range terminals should not report dedicated range attempts: "
+            + aDispatchStatsLabel,
+        sal_uInt64(0), aDispatchStats.mnRangeEngineAttemptedCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "range terminals should not report dedicated range successes: "
+            + aDispatchStatsLabel,
+        sal_uInt64(0), aDispatchStats.mnRangeEngineSucceededCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "range terminals should not report dedicated range declines: "
+            + aDispatchStatsLabel,
+        sal_uInt64(0), aDispatchStats.mnRangeEngineDeclinedCount);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("dispatch accounting should stay balanced: "
                                      + aDispatchStatsLabel,
                                  aDispatchStats.mnEngineAttemptedCount,
