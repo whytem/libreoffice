@@ -87,6 +87,17 @@ Definition of done:
 Goal: finish the remaining Phase 4 matrix-frame work that still forces Calc to
 own broadcast, jump-matrix, or array-context behavior.
 
+Current landing on the tree:
+
+- forced-core audit coverage now proves that lower-seam engine admissions own
+  classic jump-matrix `IF(...)` reference-branch shapes, including the
+  `SUM(IF(EXACT(OFFSET(...):OFFSET(...));OFFSET(...):OFFSET(...);0))` form
+- forced-core audit coverage also now proves array-context `OFFSET(...)`
+  reference execution in matrix formulas
+- the remaining blocker is therefore not those specific lower-seam shapes, but
+  ambient authoritative ownership plus the still-open broadcast / generic
+  jump-matrix close-out
+
 Scope:
 
 - broadcast-compatible matrix shapes

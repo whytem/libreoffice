@@ -733,6 +733,21 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterControlFlowIfDispatch)
     ASSERT_DOUBLES_EQUAL(10.0, m_pDoc->GetValue(ScAddress(3, 0, 0)));
     ASSERT_DOUBLES_EQUAL(20.0, m_pDoc->GetValue(ScAddress(3, 1, 0)));
 
+    // Jump-matrix IF shapes should keep routing through the same engine-side
+    // JumpMatrix initialization even when the chosen branch is reference-like.
+    m_pDoc->SetString(ScAddress(0, 8, 0), u"a"_ustr); // A9
+    std::vector<std::vector<const char*>> aJumpData
+        = { { "a", "1" }, { "b", "2" }, { "a", "4" } }; // A10:B12
+    insertRangeData(m_pDoc, ScAddress(0, 9, 0), aJumpData);
+
+    m_pDoc->InsertMatrixFormula(
+        4, 0, 4, 0, aMark, u"=SUM(IF(EXACT(A10:A12;A9);B10:B12;0))"_ustr);
+    ASSERT_DOUBLES_EQUAL(5.0, m_pDoc->GetValue(ScAddress(4, 0, 0)));
+
+    m_pDoc->InsertMatrixFormula(4, 1, 4, 1, aMark,
+        u"=SUM(IF(EXACT(OFFSET(A10;0;0):OFFSET(A10;2;0);A9);OFFSET(A10;0;1):OFFSET(A10;2;1);0))"_ustr);
+    ASSERT_DOUBLES_EQUAL(5.0, m_pDoc->GetValue(ScAddress(4, 1, 0)));
+
     const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
     const std::string aLabel
         = "controlflow_attempted="
@@ -1454,6 +1469,17 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterReferenceOffsetDispatch)
     // handles it directly rather than declining to legacy.
     m_pDoc->SetString(ScAddress(5, 2, 0), u"=OFFSET(A1;1;1;2;2)"_ustr);
     CPPUNIT_ASSERT(m_pDoc->GetString(ScAddress(5, 2, 0)) != u"Err:502"_ustr);
+
+    // Array-context OFFSET should stay on the reference engine path too.
+    std::vector<std::vector<const char*>> aData = { { "abc" }, { "bcd" }, { "cde" } };
+    insertRangeData(m_pDoc, ScAddress(0, 7, 0), aData); // A8:A10
+    ScMarkData aMark(m_pDoc->GetSheetLimits());
+    aMark.SelectOneTable(0);
+    m_pDoc->InsertMatrixFormula(
+        5, 4, 5, 6, aMark, u"=FIND(\"c\";OFFSET(A8:A10;0;COLUMN()-6))"_ustr);
+    ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(ScAddress(5, 4, 0)));
+    ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(5, 5, 0)));
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(5, 6, 0)));
 
     const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
     const std::string aLabel
