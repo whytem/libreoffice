@@ -51,7 +51,10 @@ This is the deletion-gating replay surface for the standing corpus:
 
 These are the upstream `InterpretTail -> RpnEvaluator` counters introduced by
 Phase 3 of the authority-transfer pivot plan. Observation is now default-on in
-all builds (release and debug).
+all builds (release and debug). Promoted families (ScalarRoot, MathScalar,
+Conditional, NumericAggregate, TextUtility, and others covered by
+`isFamilyLocalDefaultOnFormula()`) are authoritative under ordinary AutoCalc
+conditions via the `authoritativeWhileOffEnabled()` mechanism.
 
 - `interpret_tail_rpn_attempted_total=0`
 - `interpret_tail_rpn_succeeded_total=0`
@@ -64,6 +67,36 @@ all builds (release and debug).
 - `interpret_tail_rpn_reference_succeeded=0`
 - `interpret_tail_rpn_matrix_attempted=0`
 - `interpret_tail_rpn_matrix_succeeded=0`
+- `interpret_tail_authoritative_count=0`
+- `interpret_tail_authoritative_fallback_count=0`
+- `interpret_tail_shadow_match_count=0`
+- `interpret_tail_shadow_mismatch_error=0`
+- `interpret_tail_shadow_mismatch_numeric_value=0`
+- `interpret_tail_shadow_mismatch_format_type=0`
+- `interpret_tail_shadow_mismatch_result_type=0`
+- `interpret_tail_shadow_mismatch_string_value=0`
+
+#### Rollback Controls
+
+The ambient default-on pilot can be rolled back at two levels using
+environment variables that are read on every formula evaluation:
+
+- `SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR`: controls the rollout
+  mode. Accepted values: `observe` (default when unset), `shadow` /
+  `shadowcompare`, `authority` / `authoritative` / `authoritative_with_fallback`,
+  and any disabled value (`off`, `0`, `false`).
+- `SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF`: controls
+  whether promoted families get authoritative treatment regardless of rollout
+  mode. Accepted values: `true` (default when unset), `false` / `0` / `off`.
+
+Partial rollback (engine observes, legacy is authority): set
+`SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF=false`. The engine
+still evaluates formulas for telemetry but does not apply results.
+
+Full rollback (engine completely off): set both
+`SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR=off` and
+`SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF=false`. No engine
+evaluation occurs; legacy `ScInterpreter::Interpret()` handles all traffic.
 
 ### Forced-Legacy Audit And Retirement
 
@@ -73,7 +106,7 @@ These are the current retirement and audit counters:
 - `interp4_dispatch_legacy_lambda_count=21`
 - `interp4_dispatch_legacy_dispatch_target_count=21`
 - `interp4_dispatch_legacy_call_count=31`
-- `interp4_dispatch_engine_attempt_count=14`
+- `interp4_dispatch_engine_attempt_count=2`
 - `interp4_dispatch_engine_attempted_total=0`
 - `interp4_dispatch_engine_succeeded_total=0`
 - `interp4_dispatch_engine_declined_total=0`
@@ -107,26 +140,22 @@ companion metric: it counts `pushLegacy*` lambdas still living inside
 [interpr4.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr4.cxx).
 If the wrapper count falls while the lambda count stays flat or rises, we are
 relocating Calc logic rather than moving authority into the standalone engine.
-`interp4_dispatch_engine_attempt_count` is now an audit metric: it counts
-lower-seam `Interpret()` dispatch cases that try the standalone engine first
-before falling back to Calc. The paired runtime totals show whether that path
-is actually carrying audit load. On the standing replay corpus those totals are
-still `0 / 0 / 0`, which is the honest sign that the upstream seam prevents
-this path from seeing ordinary replay traffic. The core-forced full-legacy
-audit lane reports `606 / 602 / 4`, so the lower seam is still useful for
-retirement validation, but it is not ambient authority transfer on its own.
+Phase 6 (Seam Reconciliation) removed 34 lower-seam `tryPushEngine*` dispatch
+wrappers, their 5 backing lambda definitions, 8 operand-builder helpers, and
+the `mnTextInfoEngine*` stats triad. `interp4_dispatch_engine_attempt_count`
+dropped from 36 to 2: only `ocBad` (retirement template) and `ocRange`
+(parity-gap reference) retain lower-seam engine dispatch. The upper seam
+(`InterpretTail`) is now the single owner for all promoted families; the lower
+seam no longer claims overlapping work.
 `ocBad` remains the reference retirement template: the legacy `ScBadName()`
 path is deleted, and the classic interpreter no longer coexists with an
-alternate Calc implementation for root error literals. The focused pure
-text/info and parsing/inspection retirement wave is now complete, so the next
-interpreter-resident cleanup target is the host-sensitive text tail rather than
-another pure-scalar text sweep. Phase 2 of the authority-transfer pivot is now
+alternate Calc implementation for root error literals. Phase 2 of the authority-transfer pivot is now
 also complete: [HOST_FACADE_CONTRACTS.md](architecture/HOST_FACADE_CONTRACTS.md)
 and
 [COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md](architecture/COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md)
 now give the project one explicit host-contract inventory for the remaining
-legacy surface. Phase 3 is now complete, and Phase 4 has landed its first
-upper-seam delegation slice plus exit criteria: upstream
+legacy surface. Phase 3 and Phase 5 are now complete; Phase 4 is partially complete
+(external-reference and broadcast/jump-matrix edges remain open). Upstream
 `InterpretTail -> RpnEvaluator` counters are wired and observation is
 default-on in all builds. The FormulaEvaluator (AST walker used by the upper
 seam) now delegates binary/unary operators to
@@ -143,7 +172,18 @@ names authoritatively, and spreadsheet/statistical matrix consumers share
 one range-to-matrix materialization helper. Remaining Phase 4 work is now
 concentrated in the still-deferred external-reference and
 broadcast-compatible / jump-matrix matrix-frame paths rather than the
-earlier broad control-flow/ref/matrix split.
+earlier broad control-flow/ref/matrix split. Phase 5 (Ambient Default-On
+Pilot) has proven the existing default-on state with AutoCalc enabled.
+Phase 6 (Seam Reconciliation) is complete: the upper seam is the single
+owner for all promoted families, and `interp4_dispatch_engine_attempt_count`
+has dropped from 36 to 2 (ocBad + ocRange only). Phase 5 detail:
+promoted families are authoritative when both
+`authoritativeWhileOffEnabled()` (default true) and family promotion
+(`isFamilyLocalDefaultOnFormula()`) are active — this is the real authority
+gate, independent of `resolveRolloutMode()`. Shadow comparison (requiring
+`ENGINE_EVALUATOR=shadow` AND `AUTHORITATIVE_WHILE_OFF=false` to bypass the
+authoritative short-circuit) produces zero mismatches. Both partial and full
+rollback controls are documented and validated by CI.
 
 Batch 1 of the five-batch RPN evaluator plan has now landed its substrate
 (`runtime/RpnControlFlow.hxx`) and six explicit admissions:
@@ -467,9 +507,8 @@ Immediate consequence:
 
 - the next honest migration metric is reduction in
   `interp4_dispatch_legacy_lambda_count`
-- `interp4_dispatch_engine_attempt_count` is now a companion, not a success
-  metric by itself; it must be read alongside the live and full-legacy
-  runtime totals
+- `interp4_dispatch_engine_attempt_count` is now 2 (ocBad + ocRange only);
+  the upper seam owns all promoted families after Phase 6 seam reconciliation
 - no new `pushLegacy*` lambdas should be treated as progress unless they are
   temporary compatibility fallbacks for already engine-owned roots
 - the first prerequisite before opcode-by-opcode migration is a fixed
@@ -529,8 +568,8 @@ Next routing policy:
 - keep `unsupported_function=0` as an explicit regression guard
 - steer the next phase off unseen live surface and genuine reduction in
   `interp4_dispatch_legacy_lambda_count`
-- treat growth in `interp4_dispatch_engine_attempt_count` without corresponding
-  movement in the runtime totals as a new gaming risk to guard against
+- `interp4_dispatch_engine_attempt_count` is at floor (2) after Phase 6;
+  any growth signals new lower-seam dispatch sites that should route upstream
 - treat wrapper deletion as secondary unless the relocated legacy dispatch
   surface also falls
 - use the host-boundary audit as the design gate for the next subsystem work

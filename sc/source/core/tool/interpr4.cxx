@@ -358,9 +358,7 @@ struct InterpreterDispatchRuntimeStatsStore
     std::atomic<sal_uInt64> mnCriteriaEngineAttemptedCount { 0 };
     std::atomic<sal_uInt64> mnCriteriaEngineSucceededCount { 0 };
     std::atomic<sal_uInt64> mnCriteriaEngineDeclinedCount { 0 };
-    std::atomic<sal_uInt64> mnTextInfoEngineAttemptedCount { 0 };
-    std::atomic<sal_uInt64> mnTextInfoEngineSucceededCount { 0 };
-    std::atomic<sal_uInt64> mnTextInfoEngineDeclinedCount { 0 };
+
     std::atomic<sal_uInt64> mnMatrixEngineAttemptedCount { 0 };
     std::atomic<sal_uInt64> mnMatrixEngineSucceededCount { 0 };
     std::atomic<sal_uInt64> mnMatrixEngineDeclinedCount { 0 };
@@ -518,9 +516,7 @@ void resetScInterpreterDispatchRuntimeStats()
     rStore.mnCriteriaEngineAttemptedCount.store(0, std::memory_order_relaxed);
     rStore.mnCriteriaEngineSucceededCount.store(0, std::memory_order_relaxed);
     rStore.mnCriteriaEngineDeclinedCount.store(0, std::memory_order_relaxed);
-    rStore.mnTextInfoEngineAttemptedCount.store(0, std::memory_order_relaxed);
-    rStore.mnTextInfoEngineSucceededCount.store(0, std::memory_order_relaxed);
-    rStore.mnTextInfoEngineDeclinedCount.store(0, std::memory_order_relaxed);
+
     rStore.mnMatrixEngineAttemptedCount.store(0, std::memory_order_relaxed);
     rStore.mnMatrixEngineSucceededCount.store(0, std::memory_order_relaxed);
     rStore.mnMatrixEngineDeclinedCount.store(0, std::memory_order_relaxed);
@@ -574,12 +570,7 @@ ScInterpreterDispatchRuntimeStatsSnapshot getScInterpreterDispatchRuntimeStatsSn
         = rStore.mnCriteriaEngineSucceededCount.load(std::memory_order_relaxed);
     aSnapshot.mnCriteriaEngineDeclinedCount
         = rStore.mnCriteriaEngineDeclinedCount.load(std::memory_order_relaxed);
-    aSnapshot.mnTextInfoEngineAttemptedCount
-        = rStore.mnTextInfoEngineAttemptedCount.load(std::memory_order_relaxed);
-    aSnapshot.mnTextInfoEngineSucceededCount
-        = rStore.mnTextInfoEngineSucceededCount.load(std::memory_order_relaxed);
-    aSnapshot.mnTextInfoEngineDeclinedCount
-        = rStore.mnTextInfoEngineDeclinedCount.load(std::memory_order_relaxed);
+
     aSnapshot.mnMatrixEngineAttemptedCount
         = rStore.mnMatrixEngineAttemptedCount.load(std::memory_order_relaxed);
     aSnapshot.mnMatrixEngineSucceededCount
@@ -4650,1138 +4641,6 @@ StackVar ScInterpreter::Interpret()
                         return;
                     }
                     PushDouble(rResult.maValue);
-                };
-                // The first operator pilot only accepts plain scalar tokens.
-                // Reference and matrix operands still fall back to the legacy
-                // interpreter so we do not guess at broadcast or reference
-                // resolution semantics.
-                const auto tryBuildEngineScalarBinaryOperand
-                    = [&](const FormulaToken& rToken,
-                          serpn::BinaryScalarOperator eOperator)
-                    -> std::optional<serpn::RpnValue> {
-                    switch (rToken.GetType())
-                    {
-                        case svDouble:
-                        {
-                            const auto eType
-                                = static_cast<SvNumFormatType>(rToken.GetDoubleType());
-                            // Arithmetic must preserve Calc's format-sensitive
-                            // semantics, so the engine path only accepts plain
-                            // numeric/logical doubles here. Comparisons do not
-                            // depend on number-format propagation, so they may
-                            // accept wider scalar shapes later without changing
-                            // this arithmetic contract.
-                            if (!serpn::isComparisonOperator(eOperator))
-                            {
-                                switch (eType)
-                                {
-                                    case SvNumFormatType::ALL:
-                                    case SvNumFormatType::UNDEFINED:
-                                    case SvNumFormatType::NUMBER:
-                                    case SvNumFormatType::LOGICAL:
-                                        break;
-                                    default:
-                                        return std::nullopt;
-                                }
-                            }
-
-                            if (serpn::isConcatenationOperator(eOperator))
-                                return std::nullopt;
-
-                            return serpn::RpnValue::number(rToken.GetDouble());
-                        }
-                        case svString:
-                        case svStringName:
-                            return serpn::RpnValue::text(rToken.GetString().getString());
-                        case svMissing:
-                        case svEmptyCell:
-                            return serpn::RpnValue::empty();
-                        case svError:
-                            return serpn::RpnValue::error(
-                                selibreoffice::toApiError(rToken.GetError()));
-                        default:
-                            return std::nullopt;
-                    }
-                };
-                const auto tryBuildEngineScalarReferenceOperand
-                    = [&](const FormulaToken& rToken,
-                          serpn::BinaryScalarOperator eOperator)
-                    -> std::optional<serpn::RpnValue> {
-                    if (mrDoc.m_TableOpList.empty() == false || pJumpMatrix)
-                        return std::nullopt;
-
-                    const FormulaError nSavedError = nGlobalError;
-                    const SvNumFormatType eSavedCurFmtType = nCurFmtType;
-                    const sal_uInt32 nSavedCurFmtIndex = nCurFmtIndex;
-                    const auto restoreInterpreterState = [&]() {
-                        nGlobalError = nSavedError;
-                        nCurFmtType = eSavedCurFmtType;
-                        nCurFmtIndex = nSavedCurFmtIndex;
-                    };
-                    const auto makeErrorResult = [&](FormulaError eError) {
-                        restoreInterpreterState();
-                        return std::optional<serpn::RpnValue>(
-                            serpn::RpnValue::error(selibreoffice::toApiError(eError)));
-                    };
-                    const auto buildFromCellAddress = [&](const ScAddress& rAddress)
-                        -> std::optional<serpn::RpnValue> {
-                        ScRefCellValue aCell(mrDoc, rAddress);
-                        const FormulaError eCellError = GetCellErrCode(aCell);
-                        if (eCellError != FormulaError::NONE)
-                            return makeErrorResult(eCellError);
-
-                        switch (aCell.getType())
-                        {
-                            case CELLTYPE_NONE:
-                                restoreInterpreterState();
-                                return serpn::RpnValue::empty();
-                            case CELLTYPE_VALUE:
-                                if (serpn::isConcatenationOperator(eOperator))
-                                {
-                                    restoreInterpreterState();
-                                    return std::nullopt;
-                                }
-                                {
-                                    const double fValue = GetCellValue(rAddress, aCell);
-                                    if (nGlobalError != FormulaError::NONE)
-                                        return makeErrorResult(nGlobalError);
-                                    restoreInterpreterState();
-                                    return serpn::RpnValue::number(fValue);
-                                }
-                            case CELLTYPE_STRING:
-                            case CELLTYPE_EDIT:
-                                if (!serpn::isConcatenationOperator(eOperator))
-                                {
-                                    restoreInterpreterState();
-                                    return std::nullopt;
-                                }
-                                {
-                                    svl::SharedString aString;
-                                    GetCellString(aString, aCell);
-                                    if (nGlobalError != FormulaError::NONE)
-                                        return makeErrorResult(nGlobalError);
-                                    restoreInterpreterState();
-                                    return serpn::RpnValue::text(aString.getString());
-                                }
-                            case CELLTYPE_FORMULA:
-                                if (aCell.getFormula()->IsValue())
-                                {
-                                    if (serpn::isConcatenationOperator(eOperator))
-                                    {
-                                        restoreInterpreterState();
-                                        return std::nullopt;
-                                    }
-                                    const double fValue = GetCellValue(rAddress, aCell);
-                                    if (nGlobalError != FormulaError::NONE)
-                                        return makeErrorResult(nGlobalError);
-                                    restoreInterpreterState();
-                                    return serpn::RpnValue::number(fValue);
-                                }
-
-                                if (!serpn::isConcatenationOperator(eOperator))
-                                {
-                                    restoreInterpreterState();
-                                    return std::nullopt;
-                                }
-                                {
-                                    svl::SharedString aString;
-                                    GetCellString(aString, aCell);
-                                    if (nGlobalError != FormulaError::NONE)
-                                        return makeErrorResult(nGlobalError);
-                                    restoreInterpreterState();
-                                    return serpn::RpnValue::text(aString.getString());
-                                }
-                        }
-
-                        restoreInterpreterState();
-                        return std::nullopt;
-                    };
-
-                    nGlobalError = FormulaError::NONE;
-                    switch (rToken.GetType())
-                    {
-                        case svSingleRef:
-                        {
-                            const ScSingleRefData* pRefData = rToken.GetSingleRef();
-                            if (pRefData->IsDeleted())
-                                return makeErrorResult(FormulaError::NoRef);
-
-                            SCCOL nCol = 0;
-                            SCROW nRow = 0;
-                            SCTAB nTab = 0;
-                            SingleRefToVars(*pRefData, nCol, nRow, nTab);
-                            if (nGlobalError != FormulaError::NONE)
-                                return makeErrorResult(nGlobalError);
-
-                            return buildFromCellAddress(ScAddress(nCol, nRow, nTab));
-                        }
-                        case svDoubleRef:
-                        {
-                            ScRange aRange;
-                            DoubleRefToRange(*rToken.GetDoubleRef(), aRange);
-                            if (nGlobalError != FormulaError::NONE)
-                                return makeErrorResult(nGlobalError);
-
-                            ScAddress aAddress;
-                            if (!DoubleRefToPosSingleRef(aRange, aAddress))
-                            {
-                                if (nGlobalError != FormulaError::NONE)
-                                    return makeErrorResult(nGlobalError);
-                                restoreInterpreterState();
-                                return std::nullopt;
-                            }
-
-                            return buildFromCellAddress(aAddress);
-                        }
-                        default:
-                            restoreInterpreterState();
-                            return std::nullopt;
-                    }
-                };
-                const auto tryBuildEngineTextInfoDirectOperand =
-                    [&](const FormulaToken& rToken)
-                    -> std::optional<spreadsheetengine::api::CellValue> {
-                    switch (rToken.GetType())
-                    {
-                        case svDouble:
-                        {
-                            const auto eType
-                                = static_cast<SvNumFormatType>(rToken.GetDoubleType());
-                            if (eType == SvNumFormatType::LOGICAL)
-                            {
-                                return spreadsheetengine::api::CellValue::boolean(
-                                    rToken.GetDouble() != 0.0);
-                            }
-                            return spreadsheetengine::api::CellValue::number(rToken.GetDouble());
-                        }
-                        case svString:
-                        case svStringName:
-                            return spreadsheetengine::api::CellValue::text(
-                                selibreoffice::toApiString(rToken.GetString().getString()));
-                        case svMissing:
-                        case svEmptyCell:
-                            return spreadsheetengine::api::CellValue::empty();
-                        case svError:
-                            return spreadsheetengine::api::CellValue::error(
-                                selibreoffice::toApiError(rToken.GetError()));
-                        default:
-                            return std::nullopt;
-                    }
-                };
-                const auto tryBuildEngineTextInfoReferenceOperand =
-                    [&](const FormulaToken& rToken)
-                    -> std::optional<spreadsheetengine::api::CellValue> {
-                    if (mrDoc.m_TableOpList.empty() == false)
-                        return std::nullopt;
-
-                    const FormulaError nSavedError = nGlobalError;
-                    const SvNumFormatType eSavedCurFmtType = nCurFmtType;
-                    const sal_uInt32 nSavedCurFmtIndex = nCurFmtIndex;
-                    const auto restoreInterpreterState = [&]() {
-                        nGlobalError = nSavedError;
-                        nCurFmtType = eSavedCurFmtType;
-                        nCurFmtIndex = nSavedCurFmtIndex;
-                    };
-                    const auto makeErrorResult = [&](FormulaError eError) {
-                        restoreInterpreterState();
-                        return std::optional<spreadsheetengine::api::CellValue>(
-                            spreadsheetengine::api::CellValue::error(
-                                selibreoffice::toApiError(eError)));
-                    };
-                    const auto buildFromCellAddress = [&](const ScAddress& rAddress)
-                        -> std::optional<spreadsheetengine::api::CellValue> {
-                        const auto aValue = setaileval::detail::readMaterializedHostCellValue(
-                            mrDoc, mrContext, rAddress);
-                        restoreInterpreterState();
-                        return aValue;
-                    };
-
-                    nGlobalError = FormulaError::NONE;
-                    switch (rToken.GetType())
-                    {
-                        case svSingleRef:
-                        {
-                            const ScSingleRefData* pRefData = rToken.GetSingleRef();
-                            if (pRefData->IsDeleted())
-                                return makeErrorResult(FormulaError::NoRef);
-
-                            SCCOL nCol = 0;
-                            SCROW nRow = 0;
-                            SCTAB nTab = 0;
-                            SingleRefToVars(*pRefData, nCol, nRow, nTab);
-                            if (nGlobalError != FormulaError::NONE)
-                                return makeErrorResult(nGlobalError);
-
-                            return buildFromCellAddress(ScAddress(nCol, nRow, nTab));
-                        }
-                        case svDoubleRef:
-                        {
-                            ScRange aRange;
-                            DoubleRefToRange(*rToken.GetDoubleRef(), aRange);
-                            if (nGlobalError != FormulaError::NONE)
-                                return makeErrorResult(nGlobalError);
-
-                            ScAddress aAddress;
-                            if (pJumpMatrix)
-                            {
-                                const SCCOL nCols
-                                    = aRange.aEnd.Col() - aRange.aStart.Col() + 1;
-                                const SCROW nRows
-                                    = aRange.aEnd.Row() - aRange.aStart.Row() + 1;
-                                SCSIZE nC = 0;
-                                SCSIZE nR = 0;
-                                pJumpMatrix->GetPos(nC, nR);
-                                if ((nC >= static_cast<SCSIZE>(nCols) && nCols != 1)
-                                    || (nR >= static_cast<SCSIZE>(nRows) && nRows != 1))
-                                {
-                                    return makeErrorResult(FormulaError::NoValue);
-                                }
-
-                                aAddress = ScAddress(aRange.aStart.Col() + (nCols == 1 ? 0 : nC),
-                                    aRange.aStart.Row() + (nRows == 1 ? 0 : nR),
-                                    aRange.aStart.Tab());
-                            }
-                            else if (!DoubleRefToPosSingleRef(aRange, aAddress))
-                            {
-                                restoreInterpreterState();
-                                return std::nullopt;
-                            }
-
-                            return buildFromCellAddress(aAddress);
-                        }
-                        case svExternalSingleRef:
-                        case svExternalDoubleRef:
-                        case svMatrix:
-                        {
-                            if (pJumpMatrix)
-                            {
-                                restoreInterpreterState();
-                                return std::nullopt;
-                            }
-
-                            double fValue = 0.0;
-                            svl::SharedString aString;
-                            const ScMatValType nType = GetDoubleOrStringFromMatrix(fValue, aString);
-                            const FormulaError eMatrixError = nGlobalError;
-                            restoreInterpreterState();
-                            if (eMatrixError != FormulaError::NONE)
-                            {
-                                return std::optional<spreadsheetengine::api::CellValue>(
-                                    spreadsheetengine::api::CellValue::error(
-                                        selibreoffice::toApiError(eMatrixError)));
-                            }
-                            if (nType == ScMatValType::Empty)
-                                return spreadsheetengine::api::CellValue::empty();
-                            if (ScMatrix::IsBooleanType(nType))
-                            {
-                                return spreadsheetengine::api::CellValue::boolean(fValue != 0.0);
-                            }
-                            if (ScMatrix::IsValueType(nType))
-                                return spreadsheetengine::api::CellValue::number(fValue);
-                            return spreadsheetengine::api::CellValue::text(
-                                selibreoffice::toApiString(aString.getString()));
-                        }
-                        default:
-                            restoreInterpreterState();
-                            return std::nullopt;
-                    }
-                };
-                const auto tryBuildEngineTextInfoOperand =
-                    [&](const FormulaToken& rToken)
-                    -> std::optional<spreadsheetengine::api::CellValue> {
-                    if (auto oDirect = tryBuildEngineTextInfoDirectOperand(rToken))
-                        return oDirect;
-                    return tryBuildEngineTextInfoReferenceOperand(rToken);
-                };
-                const auto tryBuildEngineTextParsingReferenceOperand =
-                    [&](const FormulaToken& rToken)
-                    -> std::optional<spreadsheetengine::api::CellValue> {
-                    if (mrDoc.m_TableOpList.empty() == false)
-                        return std::nullopt;
-
-                    const FormulaError nSavedError = nGlobalError;
-                    const SvNumFormatType eSavedCurFmtType = nCurFmtType;
-                    const sal_uInt32 nSavedCurFmtIndex = nCurFmtIndex;
-                    const auto restoreInterpreterState = [&]() {
-                        nGlobalError = nSavedError;
-                        nCurFmtType = eSavedCurFmtType;
-                        nCurFmtIndex = nSavedCurFmtIndex;
-                    };
-                    const auto makeErrorResult = [&](FormulaError eError) {
-                        restoreInterpreterState();
-                        return std::optional<spreadsheetengine::api::CellValue>(
-                            spreadsheetengine::api::CellValue::error(
-                                selibreoffice::toApiError(eError)));
-                    };
-                    const auto buildFromCellAddress = [&](const ScAddress& rAddress)
-                        -> std::optional<spreadsheetengine::api::CellValue> {
-                        const auto aValue = setaileval::detail::readTextParsingHostCellValue(
-                            mrDoc, mrContext, rAddress);
-                        restoreInterpreterState();
-                        return aValue;
-                    };
-
-                    nGlobalError = FormulaError::NONE;
-                    switch (rToken.GetType())
-                    {
-                        case svSingleRef:
-                        {
-                            const ScSingleRefData* pRefData = rToken.GetSingleRef();
-                            if (pRefData->IsDeleted())
-                                return makeErrorResult(FormulaError::NoRef);
-
-                            SCCOL nCol = 0;
-                            SCROW nRow = 0;
-                            SCTAB nTab = 0;
-                            SingleRefToVars(*pRefData, nCol, nRow, nTab);
-                            if (nGlobalError != FormulaError::NONE)
-                                return makeErrorResult(nGlobalError);
-
-                            return buildFromCellAddress(ScAddress(nCol, nRow, nTab));
-                        }
-                        case svDoubleRef:
-                        {
-                            if (pJumpMatrix)
-                            {
-                                restoreInterpreterState();
-                                return std::nullopt;
-                            }
-
-                            ScRange aRange;
-                            DoubleRefToRange(*rToken.GetDoubleRef(), aRange);
-                            if (nGlobalError != FormulaError::NONE)
-                                return makeErrorResult(nGlobalError);
-
-                            ScAddress aAddress;
-                            if (!DoubleRefToPosSingleRef(aRange, aAddress))
-                            {
-                                restoreInterpreterState();
-                                return std::nullopt;
-                            }
-
-                            return buildFromCellAddress(aAddress);
-                        }
-                        case svExternalSingleRef:
-                        case svExternalDoubleRef:
-                        case svMatrix:
-                        {
-                            if (pJumpMatrix)
-                            {
-                                restoreInterpreterState();
-                                return std::nullopt;
-                            }
-
-                            double fValue = 0.0;
-                            svl::SharedString aString;
-                            const ScMatValType nType = GetDoubleOrStringFromMatrix(fValue, aString);
-                            const FormulaError eMatrixError = nGlobalError;
-                            restoreInterpreterState();
-                            if (eMatrixError != FormulaError::NONE)
-                            {
-                                return std::optional<spreadsheetengine::api::CellValue>(
-                                    spreadsheetengine::api::CellValue::error(
-                                        selibreoffice::toApiError(eMatrixError)));
-                            }
-                            if (nType == ScMatValType::Empty)
-                                return spreadsheetengine::api::CellValue::empty();
-                            if (ScMatrix::IsBooleanType(nType))
-                                return spreadsheetengine::api::CellValue::boolean(fValue != 0.0);
-                            if (ScMatrix::IsValueType(nType))
-                                return spreadsheetengine::api::CellValue::number(fValue);
-                            return spreadsheetengine::api::CellValue::text(
-                                selibreoffice::toApiString(aString.getString()));
-                        }
-                        default:
-                            restoreInterpreterState();
-                            return std::nullopt;
-                    }
-                };
-                const auto tryBuildEngineTextParsingOperand =
-                    [&](const FormulaToken& rToken)
-                    -> std::optional<spreadsheetengine::api::CellValue> {
-                    if (auto oDirect = tryBuildEngineTextInfoDirectOperand(rToken))
-                        return oDirect;
-                    return tryBuildEngineTextParsingReferenceOperand(rToken);
-                };
-                const auto pushEngineTextInfoValue =
-                    [&](const spreadsheetengine::api::CellValue& rValue) {
-                    switch (rValue.meKind)
-                    {
-                        case spreadsheetengine::api::CellValueKind::Error:
-                            PushError(selibreoffice::toFormulaError(rValue.meError));
-                            return;
-                        case spreadsheetengine::api::CellValueKind::Text:
-                            PushString(selibreoffice::toLibreOfficeString(rValue.maString));
-                            return;
-                        case spreadsheetengine::api::CellValueKind::Boolean:
-                            nFuncFmtType = SvNumFormatType::LOGICAL;
-                            PushInt(rValue.mfNumber != 0.0);
-                            return;
-                        case spreadsheetengine::api::CellValueKind::Number:
-                            nFuncFmtType = SvNumFormatType::NUMBER;
-                            PushDouble(rValue.mfNumber);
-                            return;
-                        case spreadsheetengine::api::CellValueKind::Empty:
-                            PushString(OUString());
-                            return;
-                    }
-                };
-                const auto tryPushEngineTextUtility =
-                    [&](std::u16string_view rFunctionName) {
-                    auto& rDispatchStats = interpreterDispatchRuntimeStatsStore();
-                    addDispatchRuntimeStat(rDispatchStats.mnTextInfoEngineAttemptedCount);
-                    if (sp < 1)
-                    {
-                        addDispatchRuntimeStat(rDispatchStats.mnTextInfoEngineDeclinedCount);
-                        return false;
-                    }
-
-                    const FormulaToken* pArgument = pStack[sp - 1];
-                    if (!pArgument)
-                    {
-                        addDispatchRuntimeStat(rDispatchStats.mnTextInfoEngineDeclinedCount);
-                        return false;
-                    }
-
-                    const auto oValue = tryBuildEngineTextInfoOperand(*pArgument);
-                    if (!oValue)
-                    {
-                        addDispatchRuntimeStat(rDispatchStats.mnTextInfoEngineDeclinedCount);
-                        return false;
-                    }
-
-                    spreadsheetengine::api::CellValue aResult
-                        = spreadsheetengine::api::CellValue::error(
-                            spreadsheetengine::api::Error::IllegalArgument);
-                    if (rFunctionName == u"CODE")
-                    {
-                        const auto aText
-                            = setaileval::detail::coerceScalarToText(mrDoc, mrContext, *oValue);
-                        if (!aText)
-                            aResult = spreadsheetengine::api::CellValue::error(aText.meError);
-                        else if (aText.maValue.isEmpty())
-                            aResult = spreadsheetengine::api::CellValue::error(
-                                spreadsheetengine::api::Error::IllegalArgument);
-                        else
-                            aResult = spreadsheetengine::api::CellValue::number(static_cast<double>(
-                                selibreoffice::codeFromText(aText.maValue)));
-                    }
-                    else if (rFunctionName == u"TRIM")
-                    {
-                        const auto aText
-                            = setaileval::detail::coerceScalarToText(mrDoc, mrContext, *oValue);
-                        aResult = !aText
-                                      ? spreadsheetengine::api::CellValue::error(aText.meError)
-                                      : spreadsheetengine::api::CellValue::text(
-                                            selibreoffice::toApiString(
-                                                selibreoffice::trimRepeatedSpaces(
-                                                    aText.maValue)));
-                    }
-                    else if (rFunctionName == u"CLEAN")
-                    {
-                        const auto aText
-                            = setaileval::detail::coerceScalarToText(mrDoc, mrContext, *oValue);
-                        aResult = !aText
-                                      ? spreadsheetengine::api::CellValue::error(aText.meError)
-                                      : spreadsheetengine::api::CellValue::text(
-                                            selibreoffice::toApiString(
-                                                selibreoffice::cleanPrintable(aText.maValue)));
-                    }
-                    else if (rFunctionName == u"LEN")
-                    {
-                        const auto aText
-                            = setaileval::detail::coerceScalarToText(mrDoc, mrContext, *oValue);
-                        aResult = !aText
-                                      ? spreadsheetengine::api::CellValue::error(aText.meError)
-                                      : spreadsheetengine::api::CellValue::number(
-                                            static_cast<double>(
-                                                selibreoffice::countCodePoints(aText.maValue)));
-                    }
-                    else if (rFunctionName == u"CHAR")
-                    {
-                        const auto aNumber
-                            = setaileval::detail::coerceScalarToNumber(mrDoc, mrContext, *oValue);
-                        if (!aNumber)
-                            aResult = spreadsheetengine::api::CellValue::error(aNumber.meError);
-                        else if (const auto oWhole = setaileval::detail::coerceWholeNumber(aNumber.maValue);
-                                 oWhole && *oWhole >= 1 && *oWhole <= 255)
-                        {
-                            if (const auto oChar = selibreoffice::charFromValue(
-                                    static_cast<double>(*oWhole)))
-                            {
-                                aResult = spreadsheetengine::api::CellValue::text(
-                                    selibreoffice::toApiString(*oChar));
-                            }
-                            else
-                            {
-                                aResult = spreadsheetengine::api::CellValue::error(
-                                    spreadsheetengine::api::Error::IllegalArgument);
-                            }
-                        }
-                        else
-                        {
-                            aResult = spreadsheetengine::api::CellValue::error(
-                                spreadsheetengine::api::Error::IllegalArgument);
-                        }
-                    }
-                    else if (rFunctionName == u"UNICODE")
-                    {
-                        const auto aText
-                            = setaileval::detail::coerceScalarToText(mrDoc, mrContext, *oValue);
-                        if (!aText)
-                            aResult = spreadsheetengine::api::CellValue::error(aText.meError);
-                        else if (const auto oCode = selibreoffice::unicodeFromText(aText.maValue))
-                            aResult = spreadsheetengine::api::CellValue::number(*oCode);
-                        else
-                            aResult = spreadsheetengine::api::CellValue::error(
-                                spreadsheetengine::api::Error::IllegalArgument);
-                    }
-                    else if (rFunctionName == u"UNICHAR")
-                    {
-                        const auto aNumber
-                            = setaileval::detail::coerceScalarToNumber(mrDoc, mrContext, *oValue);
-                        if (!aNumber)
-                            aResult = spreadsheetengine::api::CellValue::error(aNumber.meError);
-                        else if (const auto oWhole = setaileval::detail::coerceWholeNumber(aNumber.maValue);
-                                 oWhole && *oWhole >= 0)
-                        {
-                            if (const auto oChar = selibreoffice::unicharFromCodePoint(
-                                    static_cast<sal_uInt32>(*oWhole)))
-                            {
-                                aResult = spreadsheetengine::api::CellValue::text(
-                                    selibreoffice::toApiString(*oChar));
-                            }
-                            else
-                            {
-                                aResult = spreadsheetengine::api::CellValue::error(
-                                    spreadsheetengine::api::Error::IllegalArgument);
-                            }
-                        }
-                        else
-                        {
-                            aResult = spreadsheetengine::api::CellValue::error(
-                                spreadsheetengine::api::Error::IllegalArgument);
-                        }
-                    }
-                    else if (rFunctionName == u"ASC" || rFunctionName == u"JIS")
-                    {
-                        const auto aText
-                            = setaileval::detail::coerceScalarToText(mrDoc, mrContext, *oValue);
-                        aResult = !aText
-                                      ? spreadsheetengine::api::CellValue::error(aText.meError)
-                                      : spreadsheetengine::api::CellValue::text(
-                                            selibreoffice::toApiString(
-                                                rFunctionName == u"ASC"
-                                                    ? selibreoffice::convertIntoHalfWidth(
-                                                          aText.maValue)
-                                                    : selibreoffice::convertIntoFullWidth(
-                                                          aText.maValue)));
-                    }
-                    else
-                    {
-                        addDispatchRuntimeStat(rDispatchStats.mnTextInfoEngineDeclinedCount);
-                        return false;
-                    }
-
-                    sp -= 1;
-                    nGlobalError = FormulaError::NONE;
-                    addDispatchRuntimeStat(rDispatchStats.mnTextInfoEngineSucceededCount);
-                    pushEngineTextInfoValue(aResult);
-                    return true;
-                };
-                const auto tryPushEngineInformationPredicate =
-                    [&](std::u16string_view rFunctionName) {
-                    auto& rDispatchStats = interpreterDispatchRuntimeStatsStore();
-                    addDispatchRuntimeStat(rDispatchStats.mnTextInfoEngineAttemptedCount);
-                    if (sp < 1)
-                    {
-                        addDispatchRuntimeStat(rDispatchStats.mnTextInfoEngineDeclinedCount);
-                        return false;
-                    }
-
-                    const FormulaToken* pArgument = pStack[sp - 1];
-                    if (!pArgument)
-                    {
-                        addDispatchRuntimeStat(rDispatchStats.mnTextInfoEngineDeclinedCount);
-                        return false;
-                    }
-
-                    if (rFunctionName == u"ISBLANK" && pArgument->GetType() == svEmptyCell)
-                    {
-                        const bool bResult
-                            = !static_cast<const ScEmptyCellToken*>(pArgument)->IsInherited();
-                        sp -= 1;
-                        nGlobalError = FormulaError::NONE;
-                        addDispatchRuntimeStat(rDispatchStats.mnTextInfoEngineSucceededCount);
-                        nFuncFmtType = SvNumFormatType::LOGICAL;
-                        PushInt(int(bResult));
-                        return true;
-                    }
-
-                    const auto oValue = tryBuildEngineTextInfoOperand(*pArgument);
-                    if (!oValue)
-                    {
-                        addDispatchRuntimeStat(rDispatchStats.mnTextInfoEngineDeclinedCount);
-                        return false;
-                    }
-
-                    bool bResult = false;
-                    if (rFunctionName == u"ISBLANK")
-                        bResult = oValue->isEmpty();
-                    else if (rFunctionName == u"ISTEXT")
-                        bResult = oValue->isText();
-                    else if (rFunctionName == u"ISNONTEXT")
-                        bResult = !oValue->isText();
-                    else if (rFunctionName == u"ISNUMBER")
-                        bResult = oValue->isNumber() || oValue->isBoolean();
-                    else if (rFunctionName == u"ISNA")
-                    {
-                        bResult = oValue->isError()
-                                  && oValue->meError == spreadsheetengine::api::Error::NotAvailable;
-                    }
-                    else if (rFunctionName == u"ISERR")
-                    {
-                        bResult = oValue->isError()
-                                  && oValue->meError != spreadsheetengine::api::Error::NotAvailable;
-                    }
-                    else if (rFunctionName == u"ISERROR")
-                        bResult = oValue->isError();
-                    else
-                    {
-                        addDispatchRuntimeStat(rDispatchStats.mnTextInfoEngineDeclinedCount);
-                        return false;
-                    }
-
-                    sp -= 1;
-                    nGlobalError = FormulaError::NONE;
-                    addDispatchRuntimeStat(rDispatchStats.mnTextInfoEngineSucceededCount);
-                    nFuncFmtType = SvNumFormatType::LOGICAL;
-                    PushInt(int(bResult));
-                    return true;
-                };
-                const auto tryPushEngineTextParsingFunction =
-                    [&](std::u16string_view rFunctionName, sal_uInt8 nParamCount) {
-                    auto& rDispatchStats = interpreterDispatchRuntimeStatsStore();
-                    addDispatchRuntimeStat(rDispatchStats.mnTextInfoEngineAttemptedCount);
-
-                    if ((rFunctionName == u"NUMBERVALUE" && (nParamCount < 1 || nParamCount > 3))
-                        || sp < nParamCount || nParamCount == 0)
-                    {
-                        addDispatchRuntimeStat(rDispatchStats.mnTextInfoEngineDeclinedCount);
-                        return false;
-                    }
-
-                    const FormulaToken* pPrimary = pStack[sp - nParamCount];
-                    if (!pPrimary)
-                    {
-                        addDispatchRuntimeStat(rDispatchStats.mnTextInfoEngineDeclinedCount);
-                        return false;
-                    }
-
-                    const auto oPrimaryValue = tryBuildEngineTextParsingOperand(*pPrimary);
-                    if (!oPrimaryValue)
-                    {
-                        addDispatchRuntimeStat(rDispatchStats.mnTextInfoEngineDeclinedCount);
-                        return false;
-                    }
-
-                    auto pushErrorResult = [&](spreadsheetengine::api::Error eError,
-                                               SvNumFormatType eFormatType = SvNumFormatType::NUMBER) {
-                        sp -= nParamCount;
-                        nGlobalError = FormulaError::NONE;
-                        addDispatchRuntimeStat(rDispatchStats.mnTextInfoEngineSucceededCount);
-                        nFuncFmtType = eFormatType;
-                        PushError(selibreoffice::toFormulaError(eError));
-                        return true;
-                    };
-                    auto pushNumericResult = [&](double fValue, SvNumFormatType eFormatType) {
-                        sp -= nParamCount;
-                        nGlobalError = FormulaError::NONE;
-                        addDispatchRuntimeStat(rDispatchStats.mnTextInfoEngineSucceededCount);
-                        nFuncFmtType = eFormatType;
-                        PushDouble(fValue);
-                        return true;
-                    };
-
-                    if (rFunctionName == u"VALUE")
-                    {
-                        if (oPrimaryValue->isError())
-                            return pushErrorResult(oPrimaryValue->meError);
-                        if (oPrimaryValue->isNumber() || oPrimaryValue->isBoolean())
-                            return pushNumericResult(oPrimaryValue->mfNumber,
-                                SvNumFormatType::NUMBER);
-                        if (oPrimaryValue->isEmpty())
-                            return pushNumericResult(0.0, SvNumFormatType::NUMBER);
-
-                        const auto aText = setaileval::detail::coerceScalarToText(
-                            mrDoc, mrContext, *oPrimaryValue);
-                        if (!aText)
-                            return pushErrorResult(aText.meError);
-
-                        const auto aResult = setextparseexec::evaluateValue(
-                            mrDoc, mrContext, aText.maValue);
-                        if (!aResult)
-                        {
-                            if (const auto oStandalone
-                                = setaileval::detail::tryStandaloneParsedScalarValue(
-                                    aText.maValue))
-                            {
-                                return pushNumericResult(*oStandalone,
-                                    SvNumFormatType::NUMBER);
-                            }
-                            return pushErrorResult(aResult.meError);
-                        }
-                        return pushNumericResult(aResult.maValue, SvNumFormatType::NUMBER);
-                    }
-
-                    if (rFunctionName == u"DATEVALUE" || rFunctionName == u"TIMEVALUE")
-                    {
-                        if (oPrimaryValue->isError())
-                            return pushErrorResult(oPrimaryValue->meError,
-                                rFunctionName == u"DATEVALUE" ? SvNumFormatType::DATE
-                                                              : SvNumFormatType::TIME);
-
-                        if (rFunctionName == u"DATEVALUE"
-                            && (pPrimary->GetType() == svSingleRef
-                                || pPrimary->GetType() == svDoubleRef)
-                            && (oPrimaryValue->isNumber() || oPrimaryValue->isBoolean()))
-                        {
-                            return pushNumericResult(std::trunc(oPrimaryValue->mfNumber),
-                                SvNumFormatType::DATE);
-                        }
-
-                        const auto aText = setaileval::detail::coerceScalarToText(
-                            mrDoc, mrContext, *oPrimaryValue);
-                        if (!aText)
-                            return pushErrorResult(aText.meError,
-                                rFunctionName == u"DATEVALUE" ? SvNumFormatType::DATE
-                                                              : SvNumFormatType::TIME);
-
-                        if (rFunctionName == u"DATEVALUE")
-                        {
-                            const auto aResult = setextparseexec::evaluateDateValue(
-                                mrDoc, mrContext, aText.maValue);
-                            if (!aResult)
-                            {
-                                if (const auto oStandalone
-                                    = setaileval::detail::tryStandaloneParsedDateValue(
-                                        aText.maValue))
-                                {
-                                    return pushNumericResult(*oStandalone,
-                                        SvNumFormatType::DATE);
-                                }
-                                if (const auto oIsoFallback
-                                    = setaileval::detail::tryIsoDateValueFallback(
-                                        mrDoc, aText.maValue))
-                                {
-                                    return pushNumericResult(*oIsoFallback,
-                                        SvNumFormatType::DATE);
-                                }
-                                return pushErrorResult(aResult.meError,
-                                    SvNumFormatType::DATE);
-                            }
-                            return pushNumericResult(aResult.maValue, SvNumFormatType::DATE);
-                        }
-
-                        const auto aResult = setextparseexec::evaluateTimeValue(
-                            mrDoc, mrContext, aText.maValue);
-                        if (!aResult)
-                        {
-                            if (const auto oStandalone
-                                = setaileval::detail::tryStandaloneParsedTimeValue(
-                                    aText.maValue))
-                            {
-                                return pushNumericResult(*oStandalone,
-                                    SvNumFormatType::TIME);
-                            }
-                            return pushErrorResult(aResult.meError, SvNumFormatType::TIME);
-                        }
-                        return pushNumericResult(aResult.maValue, SvNumFormatType::TIME);
-                    }
-
-                    if (rFunctionName == u"NUMBERVALUE")
-                    {
-                        std::optional<OUString> oDecimalSeparator;
-                        std::optional<OUString> oGroupSeparator;
-
-                        if (nParamCount >= 2)
-                        {
-                            const FormulaToken* pDecimal = pStack[sp - 2];
-                            if (!pDecimal)
-                            {
-                                addDispatchRuntimeStat(rDispatchStats.mnTextInfoEngineDeclinedCount);
-                                return false;
-                            }
-                            const auto oDecimalValue = tryBuildEngineTextParsingOperand(*pDecimal);
-                            if (!oDecimalValue)
-                            {
-                                addDispatchRuntimeStat(rDispatchStats.mnTextInfoEngineDeclinedCount);
-                                return false;
-                            }
-                            const auto aDecimal = setaileval::detail::coerceScalarToText(
-                                mrDoc, mrContext, *oDecimalValue);
-                            if (!aDecimal)
-                                return pushErrorResult(aDecimal.meError);
-                            oDecimalSeparator = aDecimal.maValue;
-                        }
-                        if (nParamCount == 3)
-                        {
-                            const FormulaToken* pGroup = pStack[sp - 1];
-                            if (!pGroup)
-                            {
-                                addDispatchRuntimeStat(rDispatchStats.mnTextInfoEngineDeclinedCount);
-                                return false;
-                            }
-                            const auto oGroupValue = tryBuildEngineTextParsingOperand(*pGroup);
-                            if (!oGroupValue)
-                            {
-                                addDispatchRuntimeStat(rDispatchStats.mnTextInfoEngineDeclinedCount);
-                                return false;
-                            }
-                            const auto aGroup = setaileval::detail::coerceScalarToText(
-                                mrDoc, mrContext, *oGroupValue);
-                            if (!aGroup)
-                                return pushErrorResult(aGroup.meError);
-                            oGroupSeparator = aGroup.maValue;
-                        }
-
-                        if (oPrimaryValue->isError())
-                            return pushErrorResult(oPrimaryValue->meError);
-
-                        const auto aText = setaileval::detail::coerceScalarToText(
-                            mrDoc, mrContext, *oPrimaryValue);
-                        if (!aText)
-                            return pushErrorResult(aText.meError);
-
-                        const auto aResult = setextparseexec::evaluateNumberValue(
-                            mrDoc, mrContext, aText.maValue, oDecimalSeparator,
-                            oGroupSeparator, maCalcConfig.mbEmptyStringAsZero);
-                        if (!aResult)
-                            return pushErrorResult(aResult.meError);
-                        return pushNumericResult(aResult.maValue, SvNumFormatType::NUMBER);
-                    }
-
-                    addDispatchRuntimeStat(rDispatchStats.mnTextInfoEngineDeclinedCount);
-                    return false;
-                };
-                const auto tryResolveEngineScalarReferenceAddress =
-                    [&](const FormulaToken& rToken) -> std::optional<ScAddress> {
-                    const FormulaError nSavedError = nGlobalError;
-                    const auto restoreInterpreterState = [&]() { nGlobalError = nSavedError; };
-
-                    nGlobalError = FormulaError::NONE;
-                    switch (rToken.GetType())
-                    {
-                        case svSingleRef:
-                        {
-                            const ScSingleRefData* pRefData = rToken.GetSingleRef();
-                            if (pRefData->IsDeleted())
-                            {
-                                restoreInterpreterState();
-                                return std::nullopt;
-                            }
-
-                            SCCOL nCol = 0;
-                            SCROW nRow = 0;
-                            SCTAB nTab = 0;
-                            SingleRefToVars(*pRefData, nCol, nRow, nTab);
-                            if (nGlobalError != FormulaError::NONE)
-                            {
-                                restoreInterpreterState();
-                                return std::nullopt;
-                            }
-                            restoreInterpreterState();
-                            return ScAddress(nCol, nRow, nTab);
-                        }
-                        case svDoubleRef:
-                        {
-                            if (IsInArrayContext())
-                            {
-                                restoreInterpreterState();
-                                return std::nullopt;
-                            }
-
-                            ScRange aRange;
-                            DoubleRefToRange(*rToken.GetDoubleRef(), aRange);
-                            if (nGlobalError != FormulaError::NONE)
-                            {
-                                restoreInterpreterState();
-                                return std::nullopt;
-                            }
-                            ScAddress aAddress;
-                            if (!DoubleRefToPosSingleRef(aRange, aAddress))
-                            {
-                                restoreInterpreterState();
-                                return std::nullopt;
-                            }
-                            restoreInterpreterState();
-                            return aAddress;
-                        }
-                        default:
-                            restoreInterpreterState();
-                            return std::nullopt;
-                    }
-                };
-                const auto tryPushEngineFormulaInspectionFunction =
-                    [&](std::u16string_view rFunctionName) {
-                    auto& rDispatchStats = interpreterDispatchRuntimeStatsStore();
-                    addDispatchRuntimeStat(rDispatchStats.mnTextInfoEngineAttemptedCount);
-                    if (sp < 1)
-                    {
-                        addDispatchRuntimeStat(rDispatchStats.mnTextInfoEngineDeclinedCount);
-                        return false;
-                    }
-
-                    const FormulaToken* pArgument = pStack[sp - 1];
-                    if (!pArgument)
-                    {
-                        addDispatchRuntimeStat(rDispatchStats.mnTextInfoEngineDeclinedCount);
-                        return false;
-                    }
-
-                    if (rFunctionName == u"ISFORMULA")
-                    {
-                        if (const auto oAddress
-                            = tryResolveEngineScalarReferenceAddress(*pArgument))
-                        {
-                            sp -= 1;
-                            nGlobalError = FormulaError::NONE;
-                            addDispatchRuntimeStat(rDispatchStats.mnTextInfoEngineSucceededCount);
-                            nFuncFmtType = SvNumFormatType::LOGICAL;
-                            PushInt(int(seformulainspect::isFormulaCell(
-                                mrDoc, mrContext, *oAddress)));
-                            return true;
-                        }
-
-                        if (pArgument->GetType() != svDoubleRef)
-                        {
-                            sp -= 1;
-                            nGlobalError = FormulaError::NONE;
-                            addDispatchRuntimeStat(rDispatchStats.mnTextInfoEngineSucceededCount);
-                            nFuncFmtType = SvNumFormatType::LOGICAL;
-                            PushInt(0);
-                            return true;
-                        }
-
-                        addDispatchRuntimeStat(rDispatchStats.mnTextInfoEngineDeclinedCount);
-                        return false;
-                    }
-
-                    if (rFunctionName == u"FORMULA")
-                    {
-                        const auto oAddress = tryResolveEngineScalarReferenceAddress(*pArgument);
-                        if (!oAddress)
-                        {
-                            addDispatchRuntimeStat(rDispatchStats.mnTextInfoEngineDeclinedCount);
-                            return false;
-                        }
-
-                        const auto aFormulaText
-                            = seformulainspect::formulaTextForCell(mrDoc, mrContext, *oAddress);
-                        sp -= 1;
-                        nGlobalError = FormulaError::NONE;
-                        addDispatchRuntimeStat(rDispatchStats.mnTextInfoEngineSucceededCount);
-                        if (!aFormulaText)
-                        {
-                            PushError(selibreoffice::toFormulaError(aFormulaText.meError));
-                            return true;
-                        }
-                        PushString(aFormulaText.maValue);
-                        return true;
-                    }
-
-                    addDispatchRuntimeStat(rDispatchStats.mnTextInfoEngineDeclinedCount);
-                    return false;
-                };
-                const auto tryPushEngineScalarBinaryOp
-                    = [&](serpn::BinaryScalarOperator eOperator) {
-                    addDispatchRuntimeStat(
-                        interpreterDispatchRuntimeStatsStore().mnEngineAttemptedCount);
-                    if (sp < 2)
-                    {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore().mnEngineDeclinedCount);
-                        return false;
-                    }
-
-                    const FormulaToken* pRight = pStack[sp - 1];
-                    const FormulaToken* pLeft = pStack[sp - 2];
-                    if (!pLeft || !pRight)
-                    {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore().mnEngineDeclinedCount);
-                        return false;
-                    }
-
-                    if (serpn::isComparisonOperator(eOperator)
-                        && ((pLeft->GetType() == svString || pLeft->GetType() == svStringName)
-                            && (pRight->GetType() == svString || pRight->GetType() == svStringName)))
-                    {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore().mnEngineDeclinedCount);
-                        return false;
-                    }
-
-                    auto oLeft = tryBuildEngineScalarBinaryOperand(*pLeft, eOperator);
-                    if (!oLeft)
-                        oLeft = tryBuildEngineScalarReferenceOperand(*pLeft, eOperator);
-                    auto oRight = tryBuildEngineScalarBinaryOperand(*pRight, eOperator);
-                    if (!oRight)
-                        oRight = tryBuildEngineScalarReferenceOperand(*pRight, eOperator);
-                    if (!oLeft || !oRight)
-                    {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore().mnEngineDeclinedCount);
-                        return false;
-                    }
-
-                    const auto aResult
-                        = serpn::evaluateBinaryScalarOperator(eOperator, *oLeft, *oRight);
-                    if (aResult.meReadiness != serpn::RpnCoercionReadiness::Ready)
-                    {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore().mnEngineDeclinedCount);
-                        return false;
-                    }
-
-                    sp -= 2;
-                    nGlobalError = FormulaError::NONE;
-                    addDispatchRuntimeStat(
-                        interpreterDispatchRuntimeStatsStore().mnEngineSucceededCount);
-
-                    if (!aResult)
-                    {
-                        PushError(selibreoffice::toFormulaError(aResult.meError));
-                        return true;
-                    }
-
-                    switch (aResult.maValue.meKind)
-                    {
-                        case serpn::RpnValueKind::Number:
-                            nFuncFmtType = SvNumFormatType::NUMBER;
-                            PushDouble(aResult.maValue.maScalar.mfNumber);
-                            return true;
-                        case serpn::RpnValueKind::Boolean:
-                            nFuncFmtType = SvNumFormatType::LOGICAL;
-                            PushInt(aResult.maValue.maScalar.mfNumber != 0.0);
-                            return true;
-                        case serpn::RpnValueKind::String:
-                            PushString(selibreoffice::toLibreOfficeString(
-                                aResult.maValue.maScalar.maString));
-                            return true;
-                        case serpn::RpnValueKind::Empty:
-                            PushString(OUString());
-                            return true;
-                        case serpn::RpnValueKind::Error:
-                            PushError(selibreoffice::toFormulaError(
-                                aResult.maValue.maScalar.meError));
-                            return true;
-                        case serpn::RpnValueKind::Reference:
-                        case serpn::RpnValueKind::Matrix:
-                            return false;
-                    }
-
-                    return false;
                 };
                 const auto tryPushEngineBadLiteralError = [&]() {
                     addDispatchRuntimeStat(
@@ -13826,112 +12685,66 @@ StackVar ScInterpreter::Interpret()
                         }
                         break;
                     case ocAdd              :
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: subsystem-primitive
-                        if (!tryPushEngineScalarBinaryOp(serpn::BinaryScalarOperator::Add))
-                        {
-                            warnIfLegacyScalarRootReached(u"ADD");
-                            CalculateAddSub(false);
-                        }
+                        warnIfLegacyScalarRootReached(u"ADD");
+                        CalculateAddSub(false);
                         break;
                     case ocSub              :
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: subsystem-primitive
-                        if (!tryPushEngineScalarBinaryOp(
-                                serpn::BinaryScalarOperator::Subtract))
-                        {
-                            warnIfLegacyScalarRootReached(u"SUB");
-                            CalculateAddSub(true);
-                        }
+                        warnIfLegacyScalarRootReached(u"SUB");
+                        CalculateAddSub(true);
                         break;
                     case ocMul              :
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: subsystem-primitive
-                        if (!tryPushEngineScalarBinaryOp(
-                                serpn::BinaryScalarOperator::Multiply))
-                            ScMul();
+                        ScMul();
                         break;
                     case ocDiv              :
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: subsystem-primitive
-                        if (!tryPushEngineScalarBinaryOp(serpn::BinaryScalarOperator::Divide))
-                            ScDiv();
+                        ScDiv();
                         break;
                     case ocAmpersand        :
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: subsystem-primitive
-                        if (!tryPushEngineScalarBinaryOp(serpn::BinaryScalarOperator::Concat))
-                            ScAmpersand();
+                        ScAmpersand();
                         break;
                     case ocPow              :
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: subsystem-primitive
-                        if (!tryPushEngineScalarBinaryOp(serpn::BinaryScalarOperator::Power))
-                            ScPow();
+                        ScPow();
                         break;
                     case ocEqual            :
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: subsystem-primitive
-                        if (!tryPushEngineScalarBinaryOp(serpn::BinaryScalarOperator::Equal))
-                        {
-                            warnIfLegacyScalarRootReached(u"EQUAL");
-                            ScCompareOp(
-                                spreadsheetengine::compat::libreoffice::interpreterdispatch::
-                                    ComparisonMode::Equal,
-                                SC_EQUAL);
-                        }
+                        warnIfLegacyScalarRootReached(u"EQUAL");
+                        ScCompareOp(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                ComparisonMode::Equal,
+                            SC_EQUAL);
                         break;
                     case ocNotEqual         :
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: subsystem-primitive
-                        if (!tryPushEngineScalarBinaryOp(
-                                serpn::BinaryScalarOperator::NotEqual))
-                        {
-                            warnIfLegacyScalarRootReached(u"NOT_EQUAL");
-                            ScCompareOp(
-                                spreadsheetengine::compat::libreoffice::interpreterdispatch::
-                                    ComparisonMode::NotEqual,
-                                SC_NOT_EQUAL);
-                        }
+                        warnIfLegacyScalarRootReached(u"NOT_EQUAL");
+                        ScCompareOp(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                ComparisonMode::NotEqual,
+                            SC_NOT_EQUAL);
                         break;
                     case ocLess             :
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: subsystem-primitive
-                        if (!tryPushEngineScalarBinaryOp(serpn::BinaryScalarOperator::Less))
-                        {
-                            warnIfLegacyScalarRootReached(u"LESS");
-                            ScCompareOp(
-                                spreadsheetengine::compat::libreoffice::interpreterdispatch::
-                                    ComparisonMode::Less,
-                                SC_LESS);
-                        }
+                        warnIfLegacyScalarRootReached(u"LESS");
+                        ScCompareOp(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                ComparisonMode::Less,
+                            SC_LESS);
                         break;
                     case ocGreater          :
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: subsystem-primitive
-                        if (!tryPushEngineScalarBinaryOp(
-                                serpn::BinaryScalarOperator::Greater))
-                        {
-                            warnIfLegacyScalarRootReached(u"GREATER");
-                            ScCompareOp(
-                                spreadsheetengine::compat::libreoffice::interpreterdispatch::
-                                    ComparisonMode::Greater,
-                                SC_GREATER);
-                        }
+                        warnIfLegacyScalarRootReached(u"GREATER");
+                        ScCompareOp(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                ComparisonMode::Greater,
+                            SC_GREATER);
                         break;
                     case ocLessEqual        :
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: subsystem-primitive
-                        if (!tryPushEngineScalarBinaryOp(
-                                serpn::BinaryScalarOperator::LessEqual))
-                        {
-                            warnIfLegacyScalarRootReached(u"LESS_EQUAL");
-                            ScCompareOp(
-                                spreadsheetengine::compat::libreoffice::interpreterdispatch::
-                                    ComparisonMode::LessEqual,
-                                SC_LESS_EQUAL);
-                        }
+                        warnIfLegacyScalarRootReached(u"LESS_EQUAL");
+                        ScCompareOp(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                ComparisonMode::LessEqual,
+                            SC_LESS_EQUAL);
                         break;
                     case ocGreaterEqual     :
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: subsystem-primitive
-                        if (!tryPushEngineScalarBinaryOp(
-                                serpn::BinaryScalarOperator::GreaterEqual))
-                        {
-                            warnIfLegacyScalarRootReached(u"GREATER_EQUAL");
-                            ScCompareOp(
-                                spreadsheetengine::compat::libreoffice::interpreterdispatch::
-                                    ComparisonMode::GreaterEqual,
-                                SC_GREATER_EQUAL);
-                        }
+                        warnIfLegacyScalarRootReached(u"GREATER_EQUAL");
+                        ScCompareOp(
+                            spreadsheetengine::compat::libreoffice::interpreterdispatch::
+                                ComparisonMode::GreaterEqual,
+                            SC_GREATER_EQUAL);
                         break;
                     case ocAnd              :
                         warnLogicalDispatch(u"AND");
@@ -14540,33 +13353,19 @@ StackVar ScInterpreter::Interpret()
                         PushDouble(semath::inverseFisherTransform(GetDouble()));
                         break;
                     case ocIsEmpty          :
-                    {
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
-                        if (!tryPushEngineInformationPredicate(u"ISBLANK"))
-                        {
-                            warnInformationPredicateDispatch(u"ISBLANK");
-                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
-                                textInfoIsBlank(*this);
-                        }
-                    }
-                    break;
+                        warnInformationPredicateDispatch(u"ISBLANK");
+                        spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                            textInfoIsBlank(*this);
+                        break;
                     case ocIsString         :
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
-                        if (!tryPushEngineInformationPredicate(u"ISTEXT"))
-                        {
-                            warnInformationPredicateDispatch(u"ISTEXT");
-                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
-                                textInfoIsText(*this);
-                        }
+                        warnInformationPredicateDispatch(u"ISTEXT");
+                        spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                            textInfoIsText(*this);
                         break;
                     case ocIsNonString      :
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
-                        if (!tryPushEngineInformationPredicate(u"ISNONTEXT"))
-                        {
-                            warnInformationPredicateDispatch(u"ISNONTEXT");
-                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
-                                textInfoIsNonText(*this);
-                        }
+                        warnInformationPredicateDispatch(u"ISNONTEXT");
+                        spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                            textInfoIsNonText(*this);
                         break;
                     case ocIsLogical        :
                     {
@@ -14663,67 +13462,39 @@ StackVar ScInterpreter::Interpret()
                     }
                     break;
                     case ocIsValue          :
-                    {
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
-                        if (!tryPushEngineInformationPredicate(u"ISNUMBER"))
-                        {
-                            warnInformationPredicateDispatch(u"ISNUMBER");
-                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
-                                textInfoIsNumber(*this);
-                        }
-                    }
-                    break;
+                        warnInformationPredicateDispatch(u"ISNUMBER");
+                        spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                            textInfoIsNumber(*this);
+                        break;
                     case ocIsFormula        :
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
-                        if (!tryPushEngineFormulaInspectionFunction(u"ISFORMULA"))
-                        {
-                            warnInformationPredicateDispatch(u"ISFORMULA");
-                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
-                                formulaInspectionIsFormula(*this);
-                        }
+                        warnInformationPredicateDispatch(u"ISFORMULA");
+                        spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                            formulaInspectionIsFormula(*this);
                         break;
                     case ocFormula          :
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
-                        if (!tryPushEngineFormulaInspectionFunction(u"FORMULA"))
-                        {
-                            warnIfLegacyDispatchReached(
-                                "family-local default-on", u"FORMULA",
-                                [](std::u16string_view rFormula) {
-                                    return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
-                                },
-                                "family-local default-on FORMULA reached ScInterpreter", true);
-                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
-                                formulaInspectionFormulaText(*this);
-                        }
+                        warnIfLegacyDispatchReached(
+                            "family-local default-on", u"FORMULA",
+                            [](std::u16string_view rFormula) {
+                                return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
+                            },
+                            "family-local default-on FORMULA reached ScInterpreter", true);
+                        spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                            formulaInspectionFormulaText(*this);
                         break;
                     case ocIsNA             :
-                    {
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
-                        if (!tryPushEngineInformationPredicate(u"ISNA"))
-                        {
-                            warnInformationPredicateDispatch(u"ISNA");
-                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
-                                textInfoIsNA(*this);
-                        }
-                    }
-                    break;
+                        warnInformationPredicateDispatch(u"ISNA");
+                        spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                            textInfoIsNA(*this);
+                        break;
                     case ocIsErr            :
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
-                        if (!tryPushEngineInformationPredicate(u"ISERR"))
-                        {
-                            warnInformationPredicateDispatch(u"ISERR");
-                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
-                                textInfoIsErrLike(*this, false);
-                        }
+                        warnInformationPredicateDispatch(u"ISERR");
+                        spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                            textInfoIsErrLike(*this, false);
                         break;
                     case ocIsError          :
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
-                        if (!tryPushEngineInformationPredicate(u"ISERROR"))
-                        {
-                            warnInformationPredicateDispatch(u"ISERROR");
-                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
-                                textInfoIsErrLike(*this, true);
-                        }
+                        warnInformationPredicateDispatch(u"ISERROR");
+                        spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                            textInfoIsErrLike(*this, true);
                         break;
                     case ocIsEven           :
                         warnInformationPredicateDispatch(u"ISEVEN");
@@ -14735,52 +13506,36 @@ StackVar ScInterpreter::Interpret()
                         break;
                     case ocN                : ScN();                    break;
                     case ocGetDateValue     :
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
-                        if (!tryPushEngineTextParsingFunction(u"DATEVALUE", 1))
-                        {
-                            warnIfLegacyDispatchReached(
-                                "literal-only hard-routed", u"DATEVALUE",
-                                [](std::u16string_view rFormula) {
-                                    return setaileval::isHardRoutedFormula(rFormula);
-                                },
-                                "literal-only hard-routed text parsing slice reached "
-                                "ScInterpreter");
-                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
-                                textParsingDateValue(*this);
-                        }
+                        warnIfLegacyDispatchReached(
+                            "literal-only hard-routed", u"DATEVALUE",
+                            [](std::u16string_view rFormula) {
+                                return setaileval::isHardRoutedFormula(rFormula);
+                            },
+                            "literal-only hard-routed text parsing slice reached "
+                            "ScInterpreter");
+                        spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                            textParsingDateValue(*this);
                         break;
                     case ocGetTimeValue     :
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
-                        if (!tryPushEngineTextParsingFunction(u"TIMEVALUE", 1))
-                        {
-                            warnIfLegacyDispatchReached(
-                                "literal-only hard-routed", u"TIMEVALUE",
-                                [](std::u16string_view rFormula) {
-                                    return setaileval::isHardRoutedFormula(rFormula);
-                                },
-                                "literal-only hard-routed text parsing slice reached "
-                                "ScInterpreter");
-                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
-                                textParsingTimeValue(*this);
-                        }
+                        warnIfLegacyDispatchReached(
+                            "literal-only hard-routed", u"TIMEVALUE",
+                            [](std::u16string_view rFormula) {
+                                return setaileval::isHardRoutedFormula(rFormula);
+                            },
+                            "literal-only hard-routed text parsing slice reached "
+                            "ScInterpreter");
+                        spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                            textParsingTimeValue(*this);
                         break;
                     case ocCode             :
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
-                        if (!tryPushEngineTextUtility(u"CODE"))
-                        {
-                            warnTextUtilityDispatch(u"CODE");
-                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
-                                textInfoCode(*this);
-                        }
+                        warnTextUtilityDispatch(u"CODE");
+                        spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                            textInfoCode(*this);
                         break;
                     case ocTrim             :
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
-                        if (!tryPushEngineTextUtility(u"TRIM"))
-                        {
-                            warnTextUtilityDispatch(u"TRIM");
-                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
-                                textInfoTrim(*this);
-                        }
+                        warnTextUtilityDispatch(u"TRIM");
+                        spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                            textInfoTrim(*this);
                         break;
                     case ocUpper            :
                         pushLegacyUnaryTextTransform(
@@ -14804,13 +13559,9 @@ StackVar ScInterpreter::Interpret()
                             });
                         break;
                     case ocLen              :
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
-                        if (!tryPushEngineTextUtility(u"LEN"))
-                        {
-                            warnTextUtilityDispatch(u"LEN");
-                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
-                                textInfoLen(*this);
-                        }
+                        warnTextUtilityDispatch(u"LEN");
+                        spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                            textInfoLen(*this);
                         break;
                     case ocT                :
                         [&]() {
@@ -14879,43 +13630,27 @@ StackVar ScInterpreter::Interpret()
                         }();
                         break;
                     case ocClean            :
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
-                        if (!tryPushEngineTextUtility(u"CLEAN"))
-                        {
-                            warnTextUtilityDispatch(u"CLEAN");
-                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
-                                textInfoClean(*this);
-                        }
+                        warnTextUtilityDispatch(u"CLEAN");
+                        spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                            textInfoClean(*this);
                         break;
                     case ocValue            :
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
-                        if (!tryPushEngineTextParsingFunction(u"VALUE", 1))
-                        {
-                            warnTextUtilityDispatch(u"VALUE");
-                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
-                                textParsingValue(*this);
-                        }
+                        warnTextUtilityDispatch(u"VALUE");
+                        spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                            textParsingValue(*this);
                         break;
                     case ocNumberValue      :
                     {
                         const sal_uInt8 nParamCount = GetByte();
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
-                        if (!tryPushEngineTextParsingFunction(u"NUMBERVALUE", nParamCount))
-                        {
-                            warnTextUtilityDispatch(u"NUMBERVALUE");
-                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
-                                textParsingNumberValue(*this, nParamCount);
-                        }
+                        warnTextUtilityDispatch(u"NUMBERVALUE");
+                        spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                            textParsingNumberValue(*this, nParamCount);
                     }
                     break;
                     case ocChar             :
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
-                        if (!tryPushEngineTextUtility(u"CHAR"))
-                        {
-                            warnTextUtilityDispatch(u"CHAR");
-                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
-                                textInfoChar(*this);
-                        }
+                        warnTextUtilityDispatch(u"CHAR");
+                        spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                            textInfoChar(*this);
                         break;
                     case ocArcTan2          :
                         warnIfLegacyDefaultOnReached(
@@ -17556,22 +16291,14 @@ StackVar ScInterpreter::Interpret()
                     case ocBahtText         : pushLegacyBahtText();     break;
                     case ocGetPivotData     : ScGetPivotData();             break;
                     case ocJis              :
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
-                        if (!tryPushEngineTextUtility(u"JIS"))
-                        {
-                            warnTextUtilityDispatch(u"JIS");
-                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
-                                textInfoJis(*this);
-                        }
+                        warnTextUtilityDispatch(u"JIS");
+                        spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                            textInfoJis(*this);
                         break;
                     case ocAsc              :
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
-                        if (!tryPushEngineTextUtility(u"ASC"))
-                        {
-                            warnTextUtilityDispatch(u"ASC");
-                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
-                                textInfoAsc(*this);
-                        }
+                        warnTextUtilityDispatch(u"ASC");
+                        spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                            textInfoAsc(*this);
                         break;
                     case ocLenB             :
                         warnTextUtilityDispatch(u"LENB");
@@ -17584,22 +16311,14 @@ StackVar ScInterpreter::Interpret()
                     case ocFindB            : pushLegacyFindB();        break;
                     case ocSearchB          : pushLegacySearchB();      break;
                     case ocUnicode          :
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
-                        if (!tryPushEngineTextUtility(u"UNICODE"))
-                        {
-                            warnTextUtilityDispatch(u"UNICODE");
-                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
-                                textInfoUnicode(*this);
-                        }
+                        warnTextUtilityDispatch(u"UNICODE");
+                        spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                            textInfoUnicode(*this);
                         break;
                     case ocUnichar          :
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: deletion-backed
-                        if (!tryPushEngineTextUtility(u"UNICHAR"))
-                        {
-                            warnTextUtilityDispatch(u"UNICHAR");
-                            spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
-                                textInfoUnichar(*this);
-                        }
+                        warnTextUtilityDispatch(u"UNICHAR");
+                        spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
+                            textInfoUnichar(*this);
                         break;
                     case ocBitAnd           :
                         pushLegacyBitwise(u"BITAND",

@@ -375,6 +375,8 @@ Implemented result:
 
 ## Phase 5: Ambient Default-On Pilot
 
+Status: complete on the current tree
+
 ### Goal
 
 Prove one bounded family under real non-debug ambient conditions.
@@ -399,7 +401,54 @@ Prove one bounded family under real non-debug ambient conditions.
 - ambient mismatch rate is measured and acceptable
 - rollback controls are documented and proven
 
+Implemented result:
+
+- the authority gate in `InterpretTail()` is a two-knob system:
+  `authoritativeWhileOffEnabled()` (default true) combined with
+  `isFamilyLocalDefaultOnFormula()` determines whether a promoted family
+  takes the authoritative path — this fires independently of
+  `resolveRolloutMode()`, so promoted families are authoritative even when
+  the rollout mode is Observe (the default). Shadow comparison requires
+  **both** `ENGINE_EVALUATOR=shadow` **and** `AUTHORITATIVE_WHILE_OFF=false`
+  because the authoritative short-circuit at `formulacell.cxx:2394` returns
+  before legacy `Interpret()` runs
+- all three Phase 5 tests enable `sc::AutoCalcSwitch` on the document
+  (ordinary AutoCalc mode) and evaluate through the same `InterpretTail()`
+  path that AutoCalc-driven recalculation uses
+- all three tests are hermetic: each one explicitly sets both env vars via
+  `ScopedEnvironmentOverride` rather than relying on ambient process defaults
+- `testAmbientDefaultOnPilotAuthoritativeRoute` in
+  [interpret_tail_corpus.cxx](/home/ubuntu/repos/libreoffice/sc/qa/unit/interpret_tail_corpus.cxx)
+  proves that ScalarRoot, Conditional, and NumericAggregate families take the
+  authoritative route (`ENGINE_EVALUATOR=observe`, `AUTHORITATIVE_WHILE_OFF=true`)
+  under AutoCalc-driven recalculation, with zero authoritative fallbacks and
+  correct result values
+- `testAmbientDefaultOnPilotShadowParity` proves that under ShadowCompare
+  mode with `AUTHORITATIVE_WHILE_OFF=false` (the only configuration where
+  shadow comparison fires for promoted families) the engine and legacy
+  `ScInterpreter` produce identical results: shadow match count is non-zero
+  and all five mismatch reason counters (Error, NumericValue, FormatType,
+  ResultType, StringValue) are zero
+- `testAmbientDefaultOnPilotRollbackProven` proves both rollback levels:
+  partial rollback (`ENGINE_EVALUATOR=observe`, `AUTHORITATIVE_WHILE_OFF=false`)
+  causes the engine to observe-only while legacy remains authority; full
+  rollback (`ENGINE_EVALUATOR=off`, `AUTHORITATIVE_WHILE_OFF=false`) disables
+  all engine evaluation — no authoritative routes, no observations, no RPN
+  attempts
+- the "Ambient Authority" section in
+  [PROJECT_STATUS.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/PROJECT_STATUS.md)
+  now publishes authoritative route, shadow parity, and per-mismatch-reason
+  counter names alongside the existing RPN counters
+- a new "Rollback Controls" subsection in `PROJECT_STATUS.md` documents the
+  two environment variables (`SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR`
+  and `SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF`), their
+  accepted values, their interaction (the authoritative gate fires
+  independently of the rollout mode), and the partial and full rollback
+  procedures
+
 ## Phase 6: Seam Reconciliation
+
+Status: complete on the current tree.
 
 ### Goal
 
@@ -421,6 +470,47 @@ Stop carrying two partial execution stories for the same classes of work.
 - the two seams no longer both claim the same class of work
 - lower-seam engine-first code trends downward
 - the project can name one cut-over path instead of two overlapping ones
+
+### Implemented result
+
+Removed 34 lower-seam `if (!tryPushEngine*(...))` dispatch wrappers from
+`interpr4.cxx`. Each wrapper tried engine evaluation before falling back to
+the legacy Calc call; with the upper seam (`InterpretTail`) authoritative
+for all promoted families, this lower-seam scaffolding was redundant overlap.
+
+Removed code:
+- 5 lambda definitions: `tryPushEngineScalarBinaryOp`,
+  `tryPushEngineTextUtility`, `tryPushEngineInformationPredicate`,
+  `tryPushEngineTextParsingFunction`, `tryPushEngineFormulaInspectionFunction`
+- 8 operand-builder helpers: `tryBuildEngineScalarBinaryOperand`,
+  `tryBuildEngineScalarReferenceOperand`, `tryBuildEngineTextInfoDirectOperand`,
+  `tryBuildEngineTextInfoReferenceOperand`, `tryBuildEngineTextInfoOperand`,
+  `tryBuildEngineTextParsingReferenceOperand`, `tryBuildEngineTextParsingOperand`,
+  `pushEngineTextInfoValue`
+- 3 stats fields: `mnTextInfoEngineAttemptedCount/SucceededCount/DeclinedCount`
+- 2 tests: `testSharedInterpreterTextInfoDispatch`,
+  `testSharedInterpreterParsingInspectionDispatch`
+
+Retained lower-seam dispatch (2 sites):
+- `tryPushEngineBadLiteralError` (`ocBad`): retirement template — legacy
+  `ScBadName()` is fully deleted
+- `tryPushEngineBadLiteralRangeOpcode` + `tryPushEngineRangeReference`
+  (`ocRange`): parity-gap reference handling
+
+CI validation:
+- `testSeamReconciliationNoOverlap` asserts
+  `interp4_dispatch_engine_attempt_count == 2` and all remaining sites carry
+  PIVOT_ALLOW annotations
+- `testLowerSeamEngineAttemptsCarryPivotRationale` now validates 2 sites
+- `testSharedInterpreterOperatorDispatch` updated: scalar binary ops dispatch
+  directly to legacy calls, engine dispatch stats are zero in core-forced mode
+
+Exit criteria satisfied:
+1. The two seams no longer overlap — upper seam owns all promoted families,
+   lower seam retained only for ocBad (retirement) and ocRange (parity gap)
+2. Lower-seam engine-first code dropped from 36 dispatch sites to 2
+3. Single cut-over path: `InterpretTail` → `tryEvaluateFormula()` →
+   `FormulaEvaluator` → `RpnEvaluator`, documented in PROJECT_STATUS.md
 
 ## Phase 7: Retirement Wave 2
 

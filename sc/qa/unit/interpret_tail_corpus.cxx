@@ -5783,6 +5783,183 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testRpnCategoryRootsStayPrecise)
         aStats.maRpnCategorySucceeded[static_cast<std::size_t>(RpnCategory::Operator)] == 0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAmbientDefaultOnPilotAuthoritativeRoute)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    ScopedEnvironmentOverride aRollout(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "observe");
+    ScopedEnvironmentOverride aAuthOn(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF", "true");
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"Test"_ustr);
+    m_pDoc->SetValue(ScAddress(0, 0, 0), 1.0); // A1
+    m_pDoc->SetValue(ScAddress(1, 0, 0), 2.0); // B1
+    m_pDoc->SetString(ScAddress(2, 0, 0), u"=A1+B1"_ustr);          // C1: ScalarRoot
+    m_pDoc->SetString(ScAddress(3, 0, 0), u"=IF(A1>0;A1;-A1)"_ustr); // D1: Conditional
+    m_pDoc->SetString(ScAddress(4, 0, 0), u"=SUM(A1;B1)"_ustr);      // E1: NumericAggregate
+
+    ScFormulaCell* pAdd = m_pDoc->GetFormulaCell(ScAddress(2, 0, 0));
+    ScFormulaCell* pIf = m_pDoc->GetFormulaCell(ScAddress(3, 0, 0));
+    ScFormulaCell* pSum = m_pDoc->GetFormulaCell(ScAddress(4, 0, 0));
+    CPPUNIT_ASSERT(pAdd);
+    CPPUNIT_ASSERT(pIf);
+    CPPUNIT_ASSERT(pSum);
+
+    setaileval::resetStats();
+
+    pAdd->SetDirty();
+    (void)pAdd->Interpret();
+    pIf->SetDirty();
+    (void)pIf->Interpret();
+    pSum->SetDirty();
+    (void)pSum->Interpret();
+
+    const StatsSnapshot aStats = setaileval::getStatsSnapshot();
+
+    CPPUNIT_ASSERT_MESSAGE(
+        "promoted families should take the authoritative route under AutoCalc",
+        aStats.mnAuthoritativeCount > 0);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "no authoritative fallbacks expected for simple promoted formulas",
+        sal_uInt64(0), aStats.mnAuthoritativeFallbackCount);
+
+    CPPUNIT_ASSERT_EQUAL(3.0, m_pDoc->GetValue(ScAddress(2, 0, 0)));
+    CPPUNIT_ASSERT_EQUAL(1.0, m_pDoc->GetValue(ScAddress(3, 0, 0)));
+    CPPUNIT_ASSERT_EQUAL(3.0, m_pDoc->GetValue(ScAddress(4, 0, 0)));
+}
+
+CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAmbientDefaultOnPilotShadowParity)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    ScopedEnvironmentOverride aRollout(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "shadow");
+    ScopedEnvironmentOverride aAuthOff(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF", "false");
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"Test"_ustr);
+    m_pDoc->SetValue(ScAddress(0, 0, 0), 1.0); // A1
+    m_pDoc->SetValue(ScAddress(1, 0, 0), 2.0); // B1
+    m_pDoc->SetString(ScAddress(2, 0, 0), u"=A1+B1"_ustr);          // C1: arithmetic
+    m_pDoc->SetString(ScAddress(3, 0, 0), u"=A1>B1"_ustr);           // D1: comparison
+    m_pDoc->SetString(ScAddress(4, 0, 0), u"=IF(A1>0;A1;-A1)"_ustr); // E1: conditional
+    m_pDoc->SetString(ScAddress(5, 0, 0), u"=SUM(A1;B1)"_ustr);      // F1: aggregate
+
+    ScFormulaCell* pAdd = m_pDoc->GetFormulaCell(ScAddress(2, 0, 0));
+    ScFormulaCell* pCmp = m_pDoc->GetFormulaCell(ScAddress(3, 0, 0));
+    ScFormulaCell* pIf = m_pDoc->GetFormulaCell(ScAddress(4, 0, 0));
+    ScFormulaCell* pSum = m_pDoc->GetFormulaCell(ScAddress(5, 0, 0));
+    CPPUNIT_ASSERT(pAdd);
+    CPPUNIT_ASSERT(pCmp);
+    CPPUNIT_ASSERT(pIf);
+    CPPUNIT_ASSERT(pSum);
+
+    setaileval::resetStats();
+
+    pAdd->SetDirty();
+    (void)pAdd->Interpret();
+    pCmp->SetDirty();
+    (void)pCmp->Interpret();
+    pIf->SetDirty();
+    (void)pIf->Interpret();
+    pSum->SetDirty();
+    (void)pSum->Interpret();
+
+    const StatsSnapshot aStats = setaileval::getStatsSnapshot();
+
+    CPPUNIT_ASSERT_MESSAGE(
+        "shadow comparison should fire for promoted formulas under ShadowCompare mode",
+        aStats.mnShadowMatchCount > 0);
+
+    for (std::size_t i = 0; i < static_cast<std::size_t>(setaileval::MismatchReason::Count); ++i)
+    {
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(
+            "shadow comparison should produce zero mismatches for promoted families",
+            sal_uInt64(0), aStats.maMismatchReasons[i]);
+    }
+
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "authoritative path should not fire when authoritativeWhileOff is disabled",
+        sal_uInt64(0), aStats.mnAuthoritativeCount);
+}
+
+CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAmbientDefaultOnPilotRollbackProven)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    m_pDoc->InsertTab(0, u"Test"_ustr);
+    m_pDoc->SetValue(ScAddress(0, 0, 0), 1.0); // A1
+    m_pDoc->SetValue(ScAddress(1, 0, 0), 2.0); // B1
+    m_pDoc->SetString(ScAddress(2, 0, 0), u"=A1+B1"_ustr); // C1
+
+    ScFormulaCell* pFormula = m_pDoc->GetFormulaCell(ScAddress(2, 0, 0));
+    CPPUNIT_ASSERT(pFormula);
+
+    // Scenario A: partial rollback — engine observes but legacy is authority
+    {
+        ScopedEnvironmentOverride aRollout(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "observe");
+        ScopedEnvironmentOverride aAuthOff(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF", "false");
+
+        setaileval::resetStats();
+        pFormula->SetDirty();
+        (void)pFormula->Interpret();
+
+        const StatsSnapshot aStats = setaileval::getStatsSnapshot();
+
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(
+            "partial rollback: authoritative route should not fire",
+            sal_uInt64(0), aStats.mnAuthoritativeCount);
+        CPPUNIT_ASSERT_MESSAGE(
+            "partial rollback: engine should still observe for telemetry",
+            aStats.mnObserveCount > 0);
+        CPPUNIT_ASSERT_EQUAL(3.0, m_pDoc->GetValue(ScAddress(2, 0, 0)));
+    }
+
+    // Scenario B: full rollback — engine completely off
+    {
+        ScopedEnvironmentOverride aRollout(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+        ScopedEnvironmentOverride aAuthOff(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF", "false");
+
+        setaileval::resetStats();
+        pFormula->SetDirty();
+        (void)pFormula->Interpret();
+
+        const StatsSnapshot aStats = setaileval::getStatsSnapshot();
+
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(
+            "full rollback: authoritative route should not fire",
+            sal_uInt64(0), aStats.mnAuthoritativeCount);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(
+            "full rollback: observe should not fire when engine is off",
+            sal_uInt64(0), aStats.mnObserveCount);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(
+            "full rollback: no RPN attempts when engine is off",
+            sal_uInt64(0), aStats.mnRpnAttemptedTotal);
+        CPPUNIT_ASSERT_EQUAL(3.0, m_pDoc->GetValue(ScAddress(2, 0, 0)));
+    }
+}
+
+CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testSeamReconciliationNoOverlap)
+{
+    const Interp4EngineDispatchInventory aInventory = countInterp4EngineDispatchAttempts();
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "after seam reconciliation only ocBad and ocRange dispatch sites should remain",
+        std::size_t(2), aInventory.mnAttemptCaseCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "remaining lower-seam sites should carry pivot rationale annotations",
+        std::size_t(0), aInventory.maMissingPolicyLineNumbers.size());
+    std::cout << "interp4_dispatch_engine_attempt_count="
+              << aInventory.mnAttemptCaseCount << '\n';
+}
+
 } // namespace
 
 CPPUNIT_PLUGIN_IMPLEMENT();
