@@ -47,6 +47,7 @@
 #include <spreadsheetengine/api/Math.hxx>
 #include <spreadsheetengine/api/Lookup.hxx>
 #include <spreadsheetengine/api/Calendar.hxx>
+#include <spreadsheetengine/api/StringReference.hxx>
 #include <spreadsheetengine/api/Workday.hxx>
 #include <spreadsheetengine/compat/libreoffice/CompileHost.hxx>
 #include <spreadsheetengine/compat/libreoffice/Address.hxx>
@@ -54,8 +55,10 @@
 #include <spreadsheetengine/compat/libreoffice/Date.hxx>
 #include <spreadsheetengine/compat/libreoffice/ExternalReferenceExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/FormulaInspectionExecution.hxx>
+#include <spreadsheetengine/compat/libreoffice/Grammar.hxx>
 #include <spreadsheetengine/compat/libreoffice/Host.hxx>
 #include <spreadsheetengine/compat/libreoffice/LookupExecution.hxx>
+#include <spreadsheetengine/compat/libreoffice/RangeResolver.hxx>
 #include <spreadsheetengine/compat/libreoffice/ReferenceExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/String.hxx>
 #include <spreadsheetengine/compat/libreoffice/TextServices.hxx>
@@ -80,6 +83,7 @@
 #include <spreadsheetengine/runtime/QueryRuntime.hxx>
 #include <spreadsheetengine/runtime/RpnControlFlow.hxx>
 #include <spreadsheetengine/runtime/RpnDatabase.hxx>
+#include <spreadsheetengine/runtime/ScalarCoercion.hxx>
 #include <spreadsheetengine/runtime/RpnMatrix.hxx>
 #include <spreadsheetengine/runtime/ScalarCoercion.hxx>
 #include <spreadsheetengine/runtime/TextFunctionRuntime.hxx>
@@ -1388,6 +1392,8 @@ classifyImportedStoredHostTruthFunction(api::StringView rFunctionName)
         return FunctionKind::Selector;
     if (canonicalSpillFunctionName(rFunctionName))
         return FunctionKind::SpillArray;
+    if (rFunctionName == u"ADDRESS")
+        return FunctionKind::Lookup;
     if (rFunctionName == u"LOOKUP")
         return FunctionKind::Lookup;
     if (rFunctionName == u"VLOOKUP")
@@ -3457,43 +3463,34 @@ struct ParsedExternalNamedRefNode
 [[nodiscard]] inline Materialization<ScRange> resolveReferenceRangeNode(
     const core::formula::Node& rNode, const ScDocument& rDoc, const ScAddress& rFormulaPos)
 {
+    auto resolveBinding = [&](api::RangeResolutionKind eKind)
+        -> api::ValueResult<api::ResolvedRangeBinding> {
+        api::RangeResolutionRequest aRequest;
+        aRequest.meKind = eKind;
+        aRequest.maBaseAddress = { static_cast<api::SheetId>(rFormulaPos.Tab()),
+                                   static_cast<api::ColumnIndex>(rFormulaPos.Col()),
+                                   static_cast<api::RowIndex>(rFormulaPos.Row()) };
+        aRequest.meConvention = api::AddressConvention::OooA1;
+        aRequest.maPrimaryText = rNode.maPrimaryText;
+        if (rNode.meKind == core::formula::NodeKind::RangeReference)
+            aRequest.maSecondaryText = rNode.maSecondaryText;
+        DocumentRangeResolver aResolver(const_cast<ScDocument&>(rDoc));
+        return aResolver.resolveRange(aRequest);
+    };
+
     switch (rNode.meKind)
     {
         case core::formula::NodeKind::CellReference:
-        {
-            ScRefAddress aReference;
-            ScAddress::ExternalInfo aExternalInfo;
-            const OUString aText = normalizeReferenceToken(rNode.maPrimaryText);
-            const ScAddress::Details aDetails(formula::FormulaGrammar::CONV_OOO, rFormulaPos);
-            if (!ConvertSingleRef(rDoc, aText, rFormulaPos.Tab(), aReference, aDetails,
-                    &aExternalInfo)
-                || aExternalInfo.mbExternal)
-            {
-                return makeUnsupportedMaterialization<ScRange>(
-                    FallbackReason::UnsupportedHostSurface);
-            }
-
-            const ScAddress aAddress = aReference.GetAddress();
-            return makeMaterializedValue(ScRange(aAddress, aAddress));
-        }
         case core::formula::NodeKind::RangeReference:
         {
-            ScRefAddress aStart;
-            ScRefAddress aEnd;
-            ScAddress::ExternalInfo aExternalInfo;
-            OUString aText = normalizeReferenceToken(rNode.maPrimaryText);
-            aText += u":"_ustr;
-            aText += normalizeReferenceToken(rNode.maSecondaryText);
-            const ScAddress::Details aDetails(formula::FormulaGrammar::CONV_OOO, rFormulaPos);
-            if (!ConvertDoubleRef(rDoc, aText, rFormulaPos.Tab(), aStart, aEnd, aDetails,
-                    &aExternalInfo)
-                || aExternalInfo.mbExternal)
+            const auto aResolved = resolveBinding(api::RangeResolutionKind::DirectReference);
+            if (!aResolved
+                || aResolved.maValue.meKind != api::ResolvedRangeBindingKind::LocalRange)
             {
                 return makeUnsupportedMaterialization<ScRange>(
                     FallbackReason::UnsupportedHostSurface);
             }
-
-            return makeMaterializedValue(ScRange(aStart.GetAddress(), aEnd.GetAddress()));
+            return makeMaterializedValue(toLibreOfficeRange(aResolved.maValue.maRange));
         }
         case core::formula::NodeKind::NamedReference:
         {
@@ -3503,45 +3500,14 @@ struct ParsedExternalNamedRefNode
                     return makeMaterializedError<ScRange>(api::Error::IllegalArgument);
                 return makeMaterializedValue(toLibreOfficeRange(oBinding->maReference.maRange));
             }
-
-            const OUString aName = toLibreOfficeString(rNode.maPrimaryText);
-            ScRangeData* pRangeData = findNamedRangeData(aName, rDoc, rFormulaPos);
-            if (!pRangeData)
+            const auto aResolved = resolveBinding(api::RangeResolutionKind::NamedReference);
+            if (!aResolved
+                || aResolved.maValue.meKind != api::ResolvedRangeBindingKind::LocalRange)
             {
                 return makeUnsupportedMaterialization<ScRange>(
                     FallbackReason::UnsupportedHostSurface);
             }
-
-            // Scope-fence: structured table references (ocTableRef) with
-            // row-scope markers (THIS_ROW / ALL / HEADERS / DATA / TOTALS)
-            // need per-row intersection at the formula cell's position,
-            // e.g. =SUM(table[[#This Row]]) at L3 should resolve to the
-            // intersection of the table's data area with row 3, not to
-            // the full column range. tryResolveNamedRangeReference
-            // resolves at the name's anchor position and loses that
-            // per-row context, so decline to legacy ScInterpreter which
-            // honours the stored ScTableRefToken area and implicit-
-            // intersection rules.
-            if (const ScTokenArray* pCode = pRangeData->GetCode())
-            {
-                formula::FormulaTokenArrayPlainIterator aIter(*pCode);
-                for (const formula::FormulaToken* p = aIter.First(); p; p = aIter.Next())
-                {
-                    if (p->GetOpCode() == ocTableRef)
-                    {
-                        return makeUnsupportedMaterialization<ScRange>(
-                            FallbackReason::UnsupportedFormulaShape);
-                    }
-                }
-            }
-
-            ScRange aRange;
-            if (!tryResolveNamedRangeReference(aRange, *pRangeData, rDoc, rFormulaPos))
-            {
-                return makeUnsupportedMaterialization<ScRange>(
-                    FallbackReason::UnsupportedHostSurface);
-            }
-            return makeMaterializedValue(aRange);
+            return makeMaterializedValue(toLibreOfficeRange(aResolved.maValue.maRange));
         }
         default:
             return makeUnsupportedMaterialization<ScRange>(
@@ -3845,19 +3811,26 @@ inline void putScalarIntoMatrix(
     if (rNode.meKind != core::formula::NodeKind::CellReference)
         return std::nullopt;
 
-    ScRefAddress aReference;
-    ScAddress::ExternalInfo aExternalInfo;
-    const OUString aText = normalizeReferenceToken(rNode.maPrimaryText);
-    const ScAddress::Details aDetails(formula::FormulaGrammar::CONV_OOO, rFormulaPos);
-    if (!ConvertSingleRef(rDoc, aText, rFormulaPos.Tab(), aReference, aDetails, &aExternalInfo)
-        || !aExternalInfo.mbExternal)
+    api::RangeResolutionRequest aRequest;
+    aRequest.meKind = api::RangeResolutionKind::DirectReference;
+    aRequest.maBaseAddress = { static_cast<api::SheetId>(rFormulaPos.Tab()),
+                               static_cast<api::ColumnIndex>(rFormulaPos.Col()),
+                               static_cast<api::RowIndex>(rFormulaPos.Row()) };
+    aRequest.maPrimaryText = rNode.maPrimaryText;
+    aRequest.meConvention = api::AddressConvention::OooA1;
+    DocumentRangeResolver aResolver(const_cast<ScDocument&>(rDoc));
+    const auto aResolved = aResolver.resolveRange(aRequest);
+    if (!aResolved || aResolved.maValue.meKind != api::ResolvedRangeBindingKind::ExternalRange
+        || !aResolved.maValue.isSingleCell())
     {
         return std::nullopt;
     }
 
     ParsedExternalSingleRefNode aParsed;
-    aParsed.mnFileId = aExternalInfo.mnFileId;
-    aParsed.maTabName = aExternalInfo.maTabName;
+    aParsed.mnFileId = aResolved.maValue.mnFileId;
+    aParsed.maTabName = toLibreOfficeString(aResolved.maValue.maTabName);
+    ScRefAddress aReference(aResolved.maValue.maRange.maStart.mnColumn,
+        aResolved.maValue.maRange.maStart.mnRow, aResolved.maValue.maRange.maStart.mnSheet);
     aParsed.maReference.InitFromRefAddress(rDoc, aReference, rFormulaPos);
     return aParsed;
 }
@@ -3868,22 +3841,29 @@ inline void putScalarIntoMatrix(
     if (rNode.meKind != core::formula::NodeKind::RangeReference)
         return std::nullopt;
 
-    ScRefAddress aStart;
-    ScRefAddress aEnd;
-    ScAddress::ExternalInfo aExternalInfo;
-    OUString aText = normalizeReferenceToken(rNode.maPrimaryText);
-    aText += u":"_ustr;
-    aText += normalizeReferenceToken(rNode.maSecondaryText);
-    const ScAddress::Details aDetails(formula::FormulaGrammar::CONV_OOO, rFormulaPos);
-    if (!ConvertDoubleRef(rDoc, aText, rFormulaPos.Tab(), aStart, aEnd, aDetails, &aExternalInfo)
-        || !aExternalInfo.mbExternal)
+    api::RangeResolutionRequest aRequest;
+    aRequest.meKind = api::RangeResolutionKind::DirectReference;
+    aRequest.maBaseAddress = { static_cast<api::SheetId>(rFormulaPos.Tab()),
+                               static_cast<api::ColumnIndex>(rFormulaPos.Col()),
+                               static_cast<api::RowIndex>(rFormulaPos.Row()) };
+    aRequest.maPrimaryText = rNode.maPrimaryText;
+    aRequest.maSecondaryText = rNode.maSecondaryText;
+    aRequest.meConvention = api::AddressConvention::OooA1;
+    DocumentRangeResolver aResolver(const_cast<ScDocument&>(rDoc));
+    const auto aResolved = aResolver.resolveRange(aRequest);
+    if (!aResolved || aResolved.maValue.meKind != api::ResolvedRangeBindingKind::ExternalRange
+        || aResolved.maValue.isSingleCell())
     {
         return std::nullopt;
     }
 
     ParsedExternalDoubleRefNode aParsed;
-    aParsed.mnFileId = aExternalInfo.mnFileId;
-    aParsed.maTabName = aExternalInfo.maTabName;
+    aParsed.mnFileId = aResolved.maValue.mnFileId;
+    aParsed.maTabName = toLibreOfficeString(aResolved.maValue.maTabName);
+    ScRefAddress aStart(aResolved.maValue.maRange.maStart.mnColumn,
+        aResolved.maValue.maRange.maStart.mnRow, aResolved.maValue.maRange.maStart.mnSheet);
+    ScRefAddress aEnd(aResolved.maValue.maRange.maEnd.mnColumn,
+        aResolved.maValue.maRange.maEnd.mnRow, aResolved.maValue.maRange.maEnd.mnSheet);
     aParsed.maReference.InitFromRefAddresses(rDoc, aStart, aEnd, rFormulaPos);
     return aParsed;
 }
@@ -3897,18 +3877,20 @@ inline void putScalarIntoMatrix(
         return std::nullopt;
     }
 
-    const OUString aSymbol = normalizeReferenceToken(rNode.maPrimaryText);
+    api::RangeResolutionRequest aRequest;
+    aRequest.meKind = api::RangeResolutionKind::NamedReference;
+    aRequest.maBaseAddress = { static_cast<api::SheetId>(rFormulaPos.Tab()),
+                               static_cast<api::ColumnIndex>(rFormulaPos.Col()),
+                               static_cast<api::RowIndex>(rFormulaPos.Row()) };
+    aRequest.maPrimaryText = rNode.maPrimaryText;
+    DocumentRangeResolver aResolver(const_cast<ScDocument&>(rDoc));
+    const auto aResolved = aResolver.resolveRange(aRequest);
+    if (!aResolved
+        || aResolved.maValue.meKind != api::ResolvedRangeBindingKind::TokenBackedSymbol)
+        return std::nullopt;
+
+    const OUString aSymbol = toLibreOfficeString(aResolved.maValue.maSymbol);
     if (aSymbol.isEmpty() || aSymbol.indexOf('#') < 0)
-        return std::nullopt;
-
-    ScCompiler aCompiler(const_cast<ScDocument&>(rDoc), rFormulaPos,
-        formula::FormulaGrammar::GRAM_ODFF);
-    std::unique_ptr<ScTokenArray> pCode = aCompiler.CompileString(aSymbol);
-    if (!pCode || pCode->GetCodeError() != FormulaError::NONE || pCode->GetLen() != 1)
-        return std::nullopt;
-
-    const formula::FormulaToken* pToken = pCode->FirstToken();
-    if (!pToken || pToken->GetType() != formula::svExternalName)
         return std::nullopt;
 
     return ParsedExternalNamedRefNode { aSymbol };
@@ -14817,6 +14799,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     bool bImportedCanonicalSource)
 {
     const api::query::SearchType eSearchType = searchTypeFromDocument(rDoc);
+    const api::String aFunctionName = uppercaseAscii(rNode.maPrimaryText);
     auto materializeArgument = [&](const core::formula::Node& rArgument)
         -> Materialization<api::CellValue> {
         return materializeScalarNode(rArgument, rDoc, rContext, rFormulaPos);
@@ -14842,6 +14825,200 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
             return makeMaterializedError<sal_Int32>(api::Error::IllegalArgument);
         return makeMaterializedValue(*oWhole);
     };
+
+    if (aFunctionName == u"ADDRESS")
+    {
+        if (rNode.maChildren.size() < 2 || rNode.maChildren.size() > 5)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+        const auto aRow = normalizeWholeArgument(*rNode.maChildren[0]);
+        if (!aRow.mbSupported)
+            return makeUnsupported(eFunction, aRow.meFallbackReason);
+        if (!aRow.moValue || *aRow.moValue < 1)
+            return makeErrorResult(eFunction, aRow.moValue ? api::Error::IllegalArgument
+                                                           : aRow.meError);
+
+        const auto aColumn = normalizeWholeArgument(*rNode.maChildren[1]);
+        if (!aColumn.mbSupported)
+            return makeUnsupported(eFunction, aColumn.meFallbackReason);
+        if (!aColumn.moValue || *aColumn.moValue < 1)
+            return makeErrorResult(eFunction, aColumn.moValue ? api::Error::IllegalArgument
+                                                              : aColumn.meError);
+
+        sal_Int32 nAbsMode = 1;
+        if (rNode.maChildren.size() >= 3
+            && rNode.maChildren[2]->meKind != core::formula::NodeKind::EmptyArgument)
+        {
+            const auto aAbsMode = normalizeWholeArgument(*rNode.maChildren[2]);
+            if (!aAbsMode.mbSupported)
+                return makeUnsupported(eFunction, aAbsMode.meFallbackReason);
+            if (!aAbsMode.moValue)
+                return makeErrorResult(eFunction, aAbsMode.meError);
+            if (*aAbsMode.moValue < 1 || *aAbsMode.moValue > 4)
+                return makeErrorResult(eFunction, api::Error::IllegalArgument);
+            nAbsMode = *aAbsMode.moValue;
+        }
+
+        bool bA1Style = true;
+        if (rNode.maChildren.size() >= 4
+            && rNode.maChildren[3]->meKind != core::formula::NodeKind::EmptyArgument)
+        {
+            const auto aA1 = materializeArgument(*rNode.maChildren[3]);
+            if (!aA1.mbSupported)
+                return makeUnsupported(eFunction, aA1.meFallbackReason);
+            if (!aA1.moValue)
+                return makeErrorResult(eFunction, aA1.meError);
+            const auto aA1Bool = coerceScalarToBool(rDoc, rContext, *aA1.moValue);
+            if (!aA1Bool)
+                return makeErrorResult(eFunction, aA1Bool.meError);
+            bA1Style = aA1Bool.maValue;
+        }
+
+        OUString aSheetToken;
+        if (rNode.maChildren.size() >= 5
+            && rNode.maChildren[4]->meKind != core::formula::NodeKind::EmptyArgument)
+        {
+            const auto aSheet = materializeArgument(*rNode.maChildren[4]);
+            if (!aSheet.mbSupported)
+                return makeUnsupported(eFunction, aSheet.meFallbackReason);
+            if (!aSheet.moValue)
+                return makeErrorResult(eFunction, aSheet.meError);
+            const auto aSheetText = spreadsheetengine::core::coercion::coerceToString(
+                *aSheet.moValue);
+            if (!aSheetText)
+                return makeErrorResult(eFunction, aSheetText.meError);
+            aSheetToken = toLibreOfficeString(aSheetText.maValue);
+        }
+
+        const formula::FormulaGrammar::AddressConvention eConvention
+            = toLibreOfficeAddressConvention(api::stringreference::resolveAddressFunctionConvention(
+                toApiAddressConvention(rDoc.GetCalcConfig().meStringRefAddressSyntax),
+                toApiAddressConvention(rDoc.GetAddressConvention()), !bA1Style));
+
+        referenceexecution::AddressFunctionRequest aRequest;
+        aRequest.mnRow = *aRow.moValue - 1;
+        aRequest.mnColumn = *aColumn.moValue - 1;
+        aRequest.mnAbsMode = nAbsMode;
+        aRequest.mbA1Style = eConvention != formula::FormulaGrammar::CONV_XL_R1C1;
+        aRequest.maSheetToken = aSheetToken;
+        aRequest.meConvention = eConvention;
+
+        const auto aFormatted = referenceexecution::formatAddressFunctionResult(aRequest);
+        if (!aFormatted)
+            return makeErrorResult(eFunction, aFormatted.meError);
+        return makeStringResult(eFunction, aFormatted.maValue);
+    }
+
+    if (aFunctionName == u"INDIRECT")
+    {
+        if (rNode.maChildren.empty() || rNode.maChildren.size() > 2)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+        const auto aReferenceTextValue = materializeArgument(*rNode.maChildren[0]);
+        if (!aReferenceTextValue.mbSupported)
+            return makeUnsupported(eFunction, aReferenceTextValue.meFallbackReason);
+        if (!aReferenceTextValue.moValue)
+            return makeErrorResult(eFunction, aReferenceTextValue.meError);
+        const auto aReferenceText = spreadsheetengine::core::coercion::coerceToString(
+            *aReferenceTextValue.moValue);
+        if (!aReferenceText)
+            return makeErrorResult(eFunction, aReferenceText.meError);
+
+        bool bForceR1C1 = false;
+        if (rNode.maChildren.size() == 2
+            && rNode.maChildren[1]->meKind != core::formula::NodeKind::EmptyArgument)
+        {
+            const auto aA1Value = materializeArgument(*rNode.maChildren[1]);
+            if (!aA1Value.mbSupported)
+                return makeUnsupported(eFunction, aA1Value.meFallbackReason);
+            if (!aA1Value.moValue)
+                return makeErrorResult(eFunction, aA1Value.meError);
+            const auto aA1Bool = coerceScalarToBool(rDoc, rContext, *aA1Value.moValue);
+            if (!aA1Bool)
+                return makeErrorResult(eFunction, aA1Bool.meError);
+            bForceR1C1 = !aA1Bool.maValue;
+        }
+
+        const auto aSyntaxPolicy = api::stringreference::resolveIndirectAddressSyntaxPolicy(
+            toApiAddressConvention(rDoc.GetCalcConfig().meStringRefAddressSyntax),
+            toApiAddressConvention(rDoc.GetAddressConvention()),
+            rDoc.GetCalcConfig().meStringRefAddressSyntax
+                == formula::FormulaGrammar::CONV_A1_XL_A1,
+            bForceR1C1);
+
+        api::RangeResolutionRequest aRequest;
+        aRequest.meKind = api::RangeResolutionKind::IndirectText;
+        aRequest.maBaseAddress = { static_cast<api::SheetId>(rFormulaPos.Tab()),
+                                   static_cast<api::ColumnIndex>(rFormulaPos.Col()),
+                                   static_cast<api::RowIndex>(rFormulaPos.Row()) };
+        aRequest.maPrimaryText = aReferenceText.maValue;
+        aRequest.meConvention = aSyntaxPolicy.mePrimary;
+        aRequest.mbTryXlA1 = aSyntaxPolicy.moFallback == api::AddressConvention::XlA1;
+
+        DocumentRangeResolver aResolver(const_cast<ScDocument&>(rDoc));
+        const auto aResolved = aResolver.resolveRange(aRequest);
+        if (!aResolved)
+            return makeErrorResult(eFunction, api::Error::NoValue);
+
+        if (aResolved.maValue.meKind == api::ResolvedRangeBindingKind::LocalRange)
+        {
+            lookupexecution::LookupExecutionResult aResult;
+            aResult.meKind = lookupexecution::LookupExecutionResult::Kind::Reference;
+            aResult.maRange = toLibreOfficeRange(aResolved.maValue.maRange);
+            return materializeLookupResult(eFunction, rDoc, rContext, rFormulaPos, aResult);
+        }
+
+        if (aResolved.maValue.meKind == api::ResolvedRangeBindingKind::ExternalRange)
+        {
+            if (aResolved.maValue.isSingleCell())
+            {
+                ParsedExternalSingleRefNode aParsed;
+                aParsed.mnFileId = aResolved.maValue.mnFileId;
+                aParsed.maTabName = toLibreOfficeString(aResolved.maValue.maTabName);
+                ScRefAddress aReference(aResolved.maValue.maRange.maStart.mnColumn,
+                    aResolved.maValue.maRange.maStart.mnRow,
+                    aResolved.maValue.maRange.maStart.mnSheet);
+                aParsed.maReference.InitFromRefAddress(rDoc, aReference, rFormulaPos);
+                const auto aScalar = materializeExternalSingleRefValue(aParsed, rDoc, rFormulaPos);
+                if (!aScalar.mbSupported)
+                    return makeUnsupported(eFunction, aScalar.meFallbackReason);
+                if (!aScalar.moValue)
+                    return makeErrorResult(eFunction, aScalar.meError);
+                return makeScalarAttempt(eFunction, *aScalar.moValue);
+            }
+
+            ParsedExternalDoubleRefNode aParsed;
+            aParsed.mnFileId = aResolved.maValue.mnFileId;
+            aParsed.maTabName = toLibreOfficeString(aResolved.maValue.maTabName);
+            ScRefAddress aStart(aResolved.maValue.maRange.maStart.mnColumn,
+                aResolved.maValue.maRange.maStart.mnRow,
+                aResolved.maValue.maRange.maStart.mnSheet);
+            ScRefAddress aEnd(aResolved.maValue.maRange.maEnd.mnColumn,
+                aResolved.maValue.maRange.maEnd.mnRow,
+                aResolved.maValue.maRange.maEnd.mnSheet);
+            aParsed.maReference.InitFromRefAddresses(rDoc, aStart, aEnd, rFormulaPos);
+            const auto aMatrix = materializeExternalDoubleRefMatrix(aParsed, rDoc, rFormulaPos);
+            if (!aMatrix.mbSupported)
+                return makeUnsupported(eFunction, aMatrix.meFallbackReason);
+            if (!aMatrix.moValue)
+                return makeErrorResult(eFunction, aMatrix.meError);
+
+            lookupexecution::LookupExecutionResult aResult;
+            aResult.meKind = lookupexecution::LookupExecutionResult::Kind::Matrix;
+            aResult.mpMatrix = *aMatrix.moValue;
+            return materializeLookupResult(eFunction, rDoc, rContext, rFormulaPos, aResult);
+        }
+
+        ParsedExternalNamedRefNode aParsed {
+            toLibreOfficeString(aResolved.maValue.maSymbol)
+        };
+        const auto aScalar = materializeExternalNamedRefValue(aParsed, rDoc, rContext, rFormulaPos);
+        if (!aScalar.mbSupported)
+            return makeUnsupported(eFunction, aScalar.meFallbackReason);
+        if (!aScalar.moValue)
+            return makeErrorResult(eFunction, aScalar.meError);
+        return makeScalarAttempt(eFunction, *aScalar.moValue);
+    }
 
     if (eFunction == FunctionKind::Match)
     {

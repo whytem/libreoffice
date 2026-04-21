@@ -16,8 +16,11 @@
 #include <formula/grammar.hxx>
 #include <rangelst.hxx>
 #include <rangenam.hxx>
+#include <spreadsheetengine/api/RangeResolver.hxx>
 #include <spreadsheetengine/api/ReferenceData.hxx>
 #include <spreadsheetengine/compat/libreoffice/CompileHost.hxx>
+#include <spreadsheetengine/compat/libreoffice/RangeResolver.hxx>
+#include <spreadsheetengine/compat/libreoffice/String.hxx>
 #include <spreadsheetengine/compat/libreoffice/TokenBridge.hxx>
 #include <spreadsheetengine/detail/BuiltinExternalNames.hxx>
 
@@ -282,6 +285,139 @@ CPPUNIT_TEST_FIXTURE(TestCompileHost, testStringifyTokenArrayHelperMatchesLegacy
 
     CPPUNIT_ASSERT_EQUAL(aLegacyString, aHelperString);
 
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestCompileHost, testEvaluationTimeRangeResolver)
+{
+    using spreadsheetengine::api::RangeResolutionKind;
+    using spreadsheetengine::api::ResolvedRangeBindingKind;
+    using spreadsheetengine::compat::libreoffice::DocumentRangeResolver;
+    using spreadsheetengine::compat::libreoffice::toApiString;
+    using spreadsheetengine::compat::libreoffice::toLibreOfficeString;
+
+    m_pDoc->InsertTab(0, u"Sheet1"_ustr);
+    m_pDoc->InsertTab(1, u"Sheet2"_ustr);
+
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(
+        new ScRangeData(*m_pDoc, u"GlobalMetric"_ustr, u"$Sheet1.$A$1:$B$2"_ustr)));
+
+    auto pLocalNames = std::make_unique<ScRangeName>();
+    CPPUNIT_ASSERT(pLocalNames->insert(
+        new ScRangeData(*m_pDoc, u"LocalMetric"_ustr, u"$Sheet2.$C$3"_ustr)));
+    m_pDoc->SetRangeName(1, std::move(pLocalNames));
+
+    auto pDbData
+        = std::make_unique<ScDBData>(u"SalesTable"_ustr, 0, 0, 0, 2, 4, true, true, true);
+    CPPUNIT_ASSERT(m_pDoc->GetDBCollection()->getNamedDBs().insert(std::move(pDbData)));
+
+    static OUString constexpr aExternalFile(u"file:///range-resolver-external.fake"_ustr);
+    ScExternalRefManager* pRefMgr = m_pDoc->GetExternalRefManager();
+    CPPUNIT_ASSERT(pRefMgr);
+    const sal_uInt16 nFileId = pRefMgr->getExternalFileId(aExternalFile);
+
+    const ScCompiler::Convention* pConvention
+        = ScCompiler::GetRefConvention(formula::FormulaGrammar::CONV_OOO);
+    CPPUNIT_ASSERT(pConvention);
+
+    ScSingleRefData aExternalRef;
+    aExternalRef.InitAddress(ScAddress(4, 5, 0));
+    OUStringBuffer aExternalRefBuffer;
+    ScSheetLimits& rLimits = m_pDoc->GetSheetLimits();
+    pConvention->makeExternalRefStr(
+        rLimits, aExternalRefBuffer, ScAddress(0, 0, 0), nFileId, aExternalFile,
+        u"ExtSheet"_ustr, aExternalRef);
+    const OUString aExternalSingleRef = aExternalRefBuffer.makeStringAndClear();
+
+    ScTokenArray aExternalNameTokens(*m_pDoc);
+    aExternalNameTokens.AddDouble(42.0);
+    pRefMgr->storeRangeNameTokens(nFileId, u"ExternalMetric"_ustr, aExternalNameTokens);
+    const OUString aExternalName = pConvention->makeExternalNameStr(
+        nFileId, aExternalFile, u"ExternalMetric"_ustr);
+
+    DocumentRangeResolver aResolver(*m_pDoc);
+    auto makeRequest = [&](RangeResolutionKind eKind, const ScAddress& rBaseAddress,
+                           const OUString& rPrimary, const OUString& rSecondary = OUString()) {
+        spreadsheetengine::api::RangeResolutionRequest aRequest;
+        aRequest.meKind = eKind;
+        aRequest.maBaseAddress = { static_cast<spreadsheetengine::api::SheetId>(rBaseAddress.Tab()),
+                                   static_cast<spreadsheetengine::api::ColumnIndex>(
+                                       rBaseAddress.Col()),
+                                   static_cast<spreadsheetengine::api::RowIndex>(rBaseAddress.Row()) };
+        aRequest.maPrimaryText = toApiString(rPrimary);
+        aRequest.maSecondaryText = toApiString(rSecondary);
+        return aRequest;
+    };
+
+    const auto aDirectRange = aResolver.resolveRange(
+        makeRequest(RangeResolutionKind::DirectReference, ScAddress(0, 0, 0), u"A1"_ustr,
+            u"B2"_ustr));
+    CPPUNIT_ASSERT(aDirectRange);
+    CPPUNIT_ASSERT_EQUAL(ResolvedRangeBindingKind::LocalRange, aDirectRange.maValue.meKind);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::ColumnIndex(0),
+        aDirectRange.maValue.maRange.maStart.mnColumn);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::RowIndex(0),
+        aDirectRange.maValue.maRange.maStart.mnRow);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::ColumnIndex(1),
+        aDirectRange.maValue.maRange.maEnd.mnColumn);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::RowIndex(1),
+        aDirectRange.maValue.maRange.maEnd.mnRow);
+
+    const auto aGlobalNamed = aResolver.resolveRange(
+        makeRequest(RangeResolutionKind::NamedReference, ScAddress(0, 0, 0), u"GlobalMetric"_ustr));
+    CPPUNIT_ASSERT(aGlobalNamed);
+    CPPUNIT_ASSERT_EQUAL(ResolvedRangeBindingKind::LocalRange, aGlobalNamed.maValue.meKind);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::ColumnIndex(0),
+        aGlobalNamed.maValue.maRange.maStart.mnColumn);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::ColumnIndex(1),
+        aGlobalNamed.maValue.maRange.maEnd.mnColumn);
+
+    const auto aLocalNamed = aResolver.resolveRange(
+        makeRequest(RangeResolutionKind::NamedReference, ScAddress(0, 0, 1), u"LocalMetric"_ustr));
+    CPPUNIT_ASSERT(aLocalNamed);
+    CPPUNIT_ASSERT_EQUAL(ResolvedRangeBindingKind::LocalRange, aLocalNamed.maValue.meKind);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::SheetId(1),
+        aLocalNamed.maValue.maRange.maStart.mnSheet);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::ColumnIndex(2),
+        aLocalNamed.maValue.maRange.maStart.mnColumn);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::RowIndex(2),
+        aLocalNamed.maValue.maRange.maStart.mnRow);
+
+    const auto aDatabaseRange = aResolver.resolveRange(
+        makeRequest(RangeResolutionKind::NamedReference, ScAddress(0, 0, 0), u"SalesTable"_ustr));
+    CPPUNIT_ASSERT(aDatabaseRange);
+    CPPUNIT_ASSERT_EQUAL(ResolvedRangeBindingKind::LocalRange, aDatabaseRange.maValue.meKind);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::RowIndex(1),
+        aDatabaseRange.maValue.maRange.maStart.mnRow);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::RowIndex(3),
+        aDatabaseRange.maValue.maRange.maEnd.mnRow);
+
+    const auto aExternalRange = aResolver.resolveRange(
+        makeRequest(RangeResolutionKind::DirectReference, ScAddress(0, 0, 0), aExternalSingleRef));
+    CPPUNIT_ASSERT(aExternalRange);
+    CPPUNIT_ASSERT_EQUAL(ResolvedRangeBindingKind::ExternalRange, aExternalRange.maValue.meKind);
+    CPPUNIT_ASSERT_EQUAL(nFileId, aExternalRange.maValue.mnFileId);
+    CPPUNIT_ASSERT_EQUAL(u"ExtSheet"_ustr, toLibreOfficeString(aExternalRange.maValue.maTabName));
+    CPPUNIT_ASSERT(aExternalRange.maValue.isSingleCell());
+
+    const auto aExternalSymbol = aResolver.resolveRange(
+        makeRequest(RangeResolutionKind::NamedReference, ScAddress(0, 0, 0), aExternalName));
+    CPPUNIT_ASSERT(aExternalSymbol);
+    CPPUNIT_ASSERT_EQUAL(
+        ResolvedRangeBindingKind::TokenBackedSymbol, aExternalSymbol.maValue.meKind);
+    CPPUNIT_ASSERT_EQUAL(aExternalName, toLibreOfficeString(aExternalSymbol.maValue.maSymbol));
+
+    const auto aIndirect = aResolver.resolveRange(
+        makeRequest(RangeResolutionKind::IndirectText, ScAddress(0, 0, 0), u"A1:B2"_ustr));
+    CPPUNIT_ASSERT(aIndirect);
+    CPPUNIT_ASSERT_EQUAL(ResolvedRangeBindingKind::LocalRange, aIndirect.maValue.meKind);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::ColumnIndex(0),
+        aIndirect.maValue.maRange.maStart.mnColumn);
+    CPPUNIT_ASSERT_EQUAL(spreadsheetengine::api::RowIndex(1),
+        aIndirect.maValue.maRange.maEnd.mnRow);
+
+    m_pDoc->SetRangeName(1, nullptr);
+    m_pDoc->DeleteTab(1);
     m_pDoc->DeleteTab(0);
 }
 

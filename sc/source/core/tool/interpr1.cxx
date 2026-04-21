@@ -3487,7 +3487,7 @@ void ScInterpreter::IterateParametersIfs( double(*ResultFunc)( const sc::ParamIf
         PushDouble( ResultFunc( aRes));
 }
 
-void ScInterpreter::ScLookup()
+void ScInterpreter::ExecuteLookupTerminal()
 {
     const std::optional<OUString> oQuarantinedFormula
         = lclGetQuarantinedHardRoutedFormula(pMyFormulaCell, mrDoc, mrContext);
@@ -3678,7 +3678,7 @@ bool ScInterpreter::FillEntry(ScQueryEntry& rEntry)
     return true;
 }
 
-void ScInterpreter::ScXLookup()
+void ScInterpreter::ExecuteXLookupTerminal()
 {
     const std::optional<OUString> oQuarantinedFormula
         = lclGetQuarantinedHardRoutedFormula(pMyFormulaCell, mrDoc, mrContext);
@@ -4742,7 +4742,7 @@ void ScInterpreter::GetDBStVarParams( std::vector<double>& rValues )
         SetError( FormulaError::IllegalParameter);
 }
 
-void ScInterpreter::ScIndirect()
+void ScInterpreter::ExecuteIndirectTerminal()
 {
     sal_uInt8 nParamCount = GetByte();
     if ( !MustHaveParamCount( nParamCount, 1, 2 )  )
@@ -4796,7 +4796,7 @@ void ScInterpreter::ScIndirect()
     }
 }
 
-void ScInterpreter::ScAddressFunc()
+void ScInterpreter::ExecuteAddressTerminal()
 {
     OUString sTabStr;
 
@@ -4883,7 +4883,7 @@ void ScInterpreter::ScAddressFunc()
 }
 
 
-void ScInterpreter::ScIndex()
+void ScInterpreter::ExecuteIndexTerminal()
 {
     const std::optional<OUString> oQuarantinedFormula
         = lclGetQuarantinedHardRoutedFormula(pMyFormulaCell, mrDoc, mrContext);
@@ -5077,7 +5077,7 @@ void ScInterpreter::ScIndex()
     }
 }
 
-void ScInterpreter::ScMultiArea()
+void ScInterpreter::ExecuteMultiAreaTerminal()
 {
     // Legacy support, convert to RefList
     sal_uInt8 nParamCount = GetByte();
@@ -5085,7 +5085,7 @@ void ScInterpreter::ScMultiArea()
     {
         while (nGlobalError == FormulaError::NONE && nParamCount-- > 1)
         {
-            ScUnionFunc();
+            ExecuteUnionTerminal();
         }
     }
 }

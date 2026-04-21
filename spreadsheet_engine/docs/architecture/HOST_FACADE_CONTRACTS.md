@@ -53,8 +53,8 @@ quietly drift out of date.
 | Service category | Primary current contract(s) | Status | Representative remaining legacy surface | Ownership note |
 | --- | --- | --- | --- | --- |
 | Scalar cell read / visible value materialization | `CellReader`, `readMaterializedHostCellValue`, `CellValueView` | `already exposed` | text/info predicates, VALUE/DATEVALUE/TIMEVALUE, DB aggregate admissions, matrix consumers | Host owns cell read mechanics; engine owns coercion, aggregation, and error propagation |
-| Basic reference resolution | `ReferenceResolver::resolveReference`, external-ref fetch helpers, `resolveIndirectReference` | `exposed but too broad` | `ScLookup`, `ScXLookup`, `ScIndirect`, `ScAddressFunc`, `ScIndex`, `ScMultiArea`, `ScExternal`, `ScMissing`, residual `ocRange` handling | Usable today, but compile-time and evaluation-time reference resolution are still fragmented |
-| Named / external / database / structured range resolution | compile-host lookup resolvers plus the INDIRECT resolver | `missing` | named DB ranges, external names, structured-table references, INDIRECT database/name resolution | Needs a single evaluation-time `RangeResolver` contract |
+| Basic reference resolution | `RangeResolver::resolveRange`, `ReferenceResolver::resolveReference`, external-ref fetch helpers | `already exposed` | host-only union/intersection/range terminals, external add-in terminals | Compile-time and evaluation-time reference resolution now share one contract; the remaining Calc sites are explicit host terminals rather than duplicate evaluator logic |
+| Named / external / database / structured range resolution | compile-host lookup resolvers, `RangeResolver::resolveRange`, `DocumentRangeResolver` | `already exposed` | query-family range walking, structured-reference materialization follow-ups | One evaluation-time resolver now covers named, DB, external, and INDIRECT-driven range binding; structured references that cannot flatten still round-trip as `TokenBackedSymbol` |
 | Matrix materialization | `materializeHostRangeToMatrixOperand`, `CellValueView::matrixReference`, matrix operand bridges | `already exposed` | `ScMatValue`, `ScMatRef`, `ScFrequency`, `ScForecast_Ets`, matrix-return lookup/stat tails | Stable compat-layer contract; may later move behind public API if non-LO hosts need it |
 | Criteria / range iteration | `CriteriaAggregateMaterializer` stopgap inside query runtime | `missing` | `ScSubTotal`, DB-family tails, COUNTBLANK widening, future streaming criteria work | Needs a standalone `RangeIterator` or equivalent streaming walker |
 | Formula text / inspection | family-local compat helpers for `FORMULA` / `ISFORMULA` | `missing` | `ScCell`, `ScCellExternal`, `ScCurrent`, `ScStyle`, formula inspection residue | Behavior exists, but no explicit engine-facing host interface yet |
@@ -77,10 +77,10 @@ quietly drift out of date.
 
 | Legacy cluster | Representative surviving surface | Required host-service categories | Contract status summary |
 | --- | --- | --- | --- |
-| Reference / lookup / addressing | `ScLookup`, `ScXLookup`, `ScIndirect`, `ScAddressFunc`, `ScIndex`, `ScMultiArea`, `ScExternal`, `ScMissing`, `ScRangeFunc`, `ScUnionFunc`, `ScIntersect` | reference resolution, named/external/database range resolution, matrix materialization | Still gated on unifying the fragmented reference/range resolver surface |
+| Reference / lookup / addressing | `ExecuteLookupTerminal`, `ExecuteXLookupTerminal`, `ExecuteIndirectTerminal`, `ExecuteAddressTerminal`, `ExecuteIndexTerminal`, `ExecuteMultiAreaTerminal`, `ExecuteExternalTerminal`, `ExecuteMissingTerminal`, `ExecuteRangeReferenceTerminal`, `ExecuteUnionTerminal`, `ExecuteIntersectTerminal` | reference resolution, named/external/database range resolution, matrix materialization | Phase 4 moved evaluator-worthy lookup/address logic behind `RangeResolver`; the remaining Calc terminals are explicit host-owned stack/reference glue |
 | DB / criteria / transform | `ScSubTotal`, `ScDBArea`, `ScSortBy`, `ScColRowNameAuto` | criteria/range iteration, named/database range resolution, spill allocation | The major missing contract here is streaming range iteration; spill is defined but not yet the limiting blocker |
 | Cell / metadata / inspection | `ScType`, `ScCell`, `ScCellExternal`, `ScCurrent`, `ScStyle`, `ScInfo`, `ScN` | scalar cell read, formula text/inspection, format/type inspection | Host interfaces exist only partially; inspection behavior is still mostly Calc-local |
-| Operator / control / stack state | `ScCompareOp`, `ScLogicalFoldOp`, `ScUnaryMatrixOrScalarOp`, `ScSyntheticBinaryOp`, `ScLet` | control-flow/interpreter state, matrix materialization, format propagation | Not a Host-facade gap; this is engine-native evaluator-state work |
+| Operator / control / stack state | `ExecuteComparisonKernel`, `ExecuteLogicalFoldKernel`, `ExecuteUnaryMatrixOrScalarKernel`, `ExecuteBinaryMathKernel`, `ExecuteLetKernel` | control-flow/interpreter state, matrix materialization, format propagation | Phase 3 already moved this surface into engine-native runtime helpers; no Host-facade gap remains here |
 | Matrix / statistical tails | `ScMatValue`, `ScMatRef`, `ScFrequency`, `ScForecast_Ets`, `ScFourier`, `ScSumXMY2` | matrix materialization, scalar cell read, criteria/range iteration | Matrix materialization is real; iteration and matrix-frame state still limit wider retirement |
 | Random / system-policy | `ScRandom`, `ScRandbetween`, `ScRandArray`, `ScRandomImpl` | locale/calendar/date mode, deterministic system-state policy | Host environment contract exists, but deterministic/random policy still needs an explicit project decision |
 | External computation terminals | `ScMacro`, `ScDde`, `ScWebservice`, `ScFilterXML`, `ScGetPivotData`, `ScHyperLink` | external computation | Intentionally host-owned and outside the engine-native evaluator contract |
@@ -90,7 +90,6 @@ quietly drift out of date.
 | Contract | Current status | Why it is still needed |
 | --- | --- | --- |
 | `RangeIterator` | `missing` | Required to stop baking iteration into query/materializer helpers and to widen DB / criteria / COUNTBLANK work honestly |
-| Evaluation-time `RangeResolver` | `missing` | Required to reconcile compile-time, INDIRECT-time, and classic-evaluation reference resolution into one engine-facing surface |
 | `RuntimeEnvironment::getSearchType()` | `missing` | Required to remove the current direct `ScDocOptions` stopgap from regex / wildcard admissions |
 | Explicit formula inspection host interface | `missing` | Required to finish `FORMULA` / `ISFORMULA`-adjacent and cell-inspection migration without leaning on raw Calc document access |
 | Narrow cell/type inspection API | `exposed but too broad` | Required to shrink the host-sensitive text/formatting tail without growing a catch-all "tell me everything about this cell" surface |
@@ -172,11 +171,14 @@ in
 
 ### Range resolution
 
-Range resolution is currently split between **compile-time** binding
-(via `DocumentCompileHost`) and **evaluation-time** dereferencing
-(still inside the legacy dispatch tail). The engine sees opaque
-indices at RPN-generation time and asks the host to dereference them
-at evaluation time.
+Range resolution now has two explicit layers:
+
+- **Compile-time binding** via `DocumentCompileHost`, which resolves
+  names and table metadata into opaque compiler tokens.
+- **Evaluation-time dereferencing** via `RangeResolver`, which turns
+  direct references, named/database symbols, and INDIRECT text into
+  materialized local/external bindings or a token-backed symbol that
+  the evaluator can continue lowering.
 
 #### `DocumentCompileHost::lookupRangeName` — named range resolver
 
@@ -293,6 +295,72 @@ Errors map directly to `FormulaError`:
 The companion `projectExternalDoubleRefMatrix` extracts an
 `ScMatrixRef` from the cache array for callers that want the
 double-ref as a matrix.
+
+#### `RangeResolver::resolveRange` / `DocumentRangeResolver` — unified evaluation-time range resolver
+
+Declared in
+[`api/RangeResolver.hxx`](../../inc/spreadsheetengine/api/RangeResolver.hxx)
+and implemented for the LibreOffice host in
+[`compat/libreoffice/RangeResolver.hxx`](../../inc/spreadsheetengine/compat/libreoffice/RangeResolver.hxx).
+
+```cpp
+enum class RangeResolutionKind : std::uint8_t {
+    DirectReference,
+    NamedReference,
+    IndirectText
+};
+
+struct RangeResolutionRequest {
+    RangeResolutionKind meKind;
+    CellAddress maBaseAddress;
+    String maPrimaryText;
+    String maSecondaryText;
+    AddressConvention meConvention;
+    bool mbTryXlA1;
+};
+
+class RangeResolver {
+public:
+    virtual ValueResult<ResolvedRangeBinding> resolveRange(
+        const RangeResolutionRequest& rRequest) const = 0;
+};
+```
+
+`ResolvedRangeBinding::meKind` distinguishes three evaluation-time
+results:
+
+1. `LocalRange` — a concrete in-document `CellRange`.
+2. `ExternalRange` — an external reference carrying
+   `(mnFileId, maTabName, maRange)`.
+3. `TokenBackedSymbol` — a symbol that still needs token-level
+   materialization (for example an external name or a structured
+   reference that does not flatten directly to a plain range).
+
+**Semantics.**
+
+- `DirectReference` routes through `ConvertSingleRef` /
+  `ConvertDoubleRef`, returning either `LocalRange` or
+  `ExternalRange`.
+- `NamedReference` checks local/global `ScRangeName`, strips header /
+  totals rows for named DB ranges, then falls through to compile-based
+  symbol resolution so external names and structured references share
+  the same evaluation-time contract.
+- `IndirectText` delegates to `resolveIndirectReference`, but normalizes
+  the result onto the same `ResolvedRangeBinding` surface used by the
+  direct/named paths.
+
+**Error modes.** Misses return `ValueResult::failure(...)` with the
+appropriate engine error (`NoName` for unresolved named symbols,
+`IllegalArgument` for malformed direct/INDIRECT text, etc.). The
+resolver is intentionally "range-shaped": it never materializes a cell
+value itself.
+
+**Current production callers.** `InterpretTailEngineEvaluator.hxx`
+uses `DocumentRangeResolver` in `resolveReferenceRangeNode`,
+`tryParseExternalSingleRefNode`, `tryParseExternalDoubleRefNode`,
+`tryParseExternalNamedRefNode`, and the authoritative `ADDRESS` /
+`INDIRECT` lookup handling. That is the Phase 4 closeout: lookup and
+addressing formulas no longer need duplicate Calc-side resolver logic.
 
 ### Matrix materialization
 
@@ -594,44 +662,17 @@ Low-risk rename once the standalone test host grows the same
 surface. Removes one `ScDocument` dependency from the engine-first
 planners.
 
-### Consolidated evaluation-time range resolver
+### Evaluation-time `RangeResolver` follow-ups
 
-**Current state.** Three different surfaces resolve ranges today:
+Phase 4 landed the evaluation-time `RangeResolver` contract described
+above and wired it into the production LibreOffice compat adapter.
+That closes the "missing contract" blocker from the Phase 2 inventory.
 
-1. **Compile-time** — `DocumentCompileHost` (above) covers the
-   compile path through the `NameResolver` /
-   `DatabaseRangeResolver` / `TableRefResolver` /
-   `ColRowNameResolver` / `ExternalNameResolver` interfaces.
-2. **Indirect-time** — `resolveIndirectReference` (above) runs an
-   ad-hoc ordered search that partly duplicates the compile-host
-   logic.
-3. **Evaluation-time** — the legacy `ScInterpreter` body still
-   bridges external names / DB references through its own
-   `ScInterpreter::*` entries.
-
-**Desired formalization.** A single evaluation-time resolver
-paralleling the compile-host interfaces but returning materialized
-`ResolvedReference` / `CellRange` shapes instead of opaque indices:
-
-```cpp
-class RangeResolver {
-public:
-    virtual ValueResult<ResolvedReference> resolveNamedRange(
-        StringView rName, std::optional<SheetId> onSheet) const = 0;
-    virtual ValueResult<ResolvedReference> resolveDatabaseRange(
-        StringView rName) const = 0;
-    virtual ValueResult<ResolvedReference> resolveExternalReference(
-        sal_uInt16 nFileId, StringView rTabName,
-        const SingleRefData&) const = 0;
-    // double-ref variant; structured-table variant; ...
-};
-```
-
-**Blocker.** The three existing paths have subtly different
-behavior (header / totals stripping on DB ranges via indirect but
-not via compile-time; structured-table evaluation is deferred to the
-runtime token resolver, etc.). Unifying them into a single
-evaluation-time surface is a substrate project, not a refactor.
+The remaining follow-up is narrow: if a future non-LibreOffice host
+needs to distinguish structured-table references from external names
+more explicitly than `ResolvedRangeBindingKind::TokenBackedSymbol`,
+the contract may grow a finer-grained discriminator. That is an
+evolution concern, not an open migration blocker.
 
 ### Spill allocation host implementation (Phase 5B)
 
@@ -707,6 +748,12 @@ green on the admission commit.
 
 ## Change log
 
+- 2026-04 — Phase 4 range-resolution closeout. Landed
+  `api/RangeResolver.hxx` plus the LibreOffice
+  `DocumentRangeResolver` adapter, documented the unified
+  evaluation-time range contract, and updated the inventory rows so
+  reference / lookup / addressing work is no longer blocked on a
+  missing resolver contract.
 - 2026-04 — Phase I closeout sweep. Extended the Phase D stub with
   explicit contract sections for address resolution
   (`resolveIndirectReference`), named / external / DB range

@@ -1658,6 +1658,116 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterReferenceAxisOrdinalDisp
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorReferenceLookupAddressAuthoritative)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    ScopedEnvironmentOverride aMode(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
+
+    m_pDoc->InsertTab(0, u"RefAuthority"_ustr);
+    resetScInterpreterClassicOpcodeRuntimeStats();
+    resetScInterpreterReachabilityStats();
+    setaileval::resetStats();
+
+    m_pDoc->SetValue(ScAddress(0, 0, 0), 1.0);
+    m_pDoc->SetValue(ScAddress(1, 0, 0), 2.0);
+    m_pDoc->SetValue(ScAddress(2, 0, 0), 3.0);
+    m_pDoc->SetValue(ScAddress(0, 1, 0), 4.0);
+    m_pDoc->SetValue(ScAddress(1, 1, 0), 5.0);
+    m_pDoc->SetValue(ScAddress(2, 1, 0), 6.0);
+    m_pDoc->SetValue(ScAddress(0, 2, 0), 7.0);
+    m_pDoc->SetValue(ScAddress(1, 2, 0), 8.0);
+    m_pDoc->SetValue(ScAddress(2, 2, 0), 9.0);
+    m_pDoc->SetValue(ScAddress(2, 5, 0), 77.0); // C6
+
+    auto pLocalRangeNames = std::make_unique<ScRangeName>();
+    CPPUNIT_ASSERT(pLocalRangeNames->insert(
+        new ScRangeData(*m_pDoc, u"MetricRef"_ustr, u"$RefAuthority.$C$6"_ustr)));
+    m_pDoc->SetRangeName(0, std::move(pLocalRangeNames));
+
+    m_pDoc->SetString(ScAddress(0, 10, 0), u"=ADDRESS(6;3)"_ustr);
+    m_pDoc->SetString(ScAddress(1, 10, 0), u"=INDIRECT(\"C6\")"_ustr);
+    m_pDoc->SetString(ScAddress(2, 10, 0), u"=INDIRECT(\"MetricRef\")"_ustr);
+    m_pDoc->SetString(
+        ScAddress(3, 10, 0), u"=LOOKUP(2;{1;2;3};{\"one\";\"two\";\"three\"})"_ustr);
+    m_pDoc->SetString(
+        ScAddress(4, 10, 0), u"=XLOOKUP(2;{1;2;3};{\"one\";\"two\";\"three\"})"_ustr);
+    m_pDoc->SetString(ScAddress(5, 10, 0), u"=INDEX(A1:C3;2;2)"_ustr);
+
+    CPPUNIT_ASSERT_EQUAL(u"$C$6"_ustr, m_pDoc->GetString(ScAddress(0, 10, 0)));
+    ASSERT_DOUBLES_EQUAL(77.0, m_pDoc->GetValue(ScAddress(1, 10, 0)));
+    ASSERT_DOUBLES_EQUAL(77.0, m_pDoc->GetValue(ScAddress(2, 10, 0)));
+    CPPUNIT_ASSERT_EQUAL(u"two"_ustr, m_pDoc->GetString(ScAddress(3, 10, 0)));
+    CPPUNIT_ASSERT_EQUAL(u"two"_ustr, m_pDoc->GetString(ScAddress(4, 10, 0)));
+    ASSERT_DOUBLES_EQUAL(5.0, m_pDoc->GetValue(ScAddress(5, 10, 0)));
+
+    const auto aStats = setaileval::getStatsSnapshot();
+    const std::string aStatsLabel
+        = "auth=" + std::to_string(aStats.mnAuthoritativeCount)
+          + " fallback=" + std::to_string(aStats.mnAuthoritativeFallbackCount)
+          + " lookup="
+          + std::to_string(aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::Lookup)])
+          + " xlookup="
+          + std::to_string(aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::XLookup)])
+          + " index="
+          + std::to_string(aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::Index)]);
+    CPPUNIT_ASSERT_MESSAGE(aStatsLabel, aStats.mnAuthoritativeCount >= 6);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(aStatsLabel, static_cast<sal_uInt64>(0),
+        aStats.mnAuthoritativeFallbackCount);
+    CPPUNIT_ASSERT_MESSAGE(
+        aStatsLabel,
+        aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+            setaileval::FunctionKind::Lookup)]
+        >= 4);
+    CPPUNIT_ASSERT_MESSAGE(
+        aStatsLabel,
+        aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+            setaileval::FunctionKind::XLookup)]
+        >= 1);
+    CPPUNIT_ASSERT_MESSAGE(
+        aStatsLabel,
+        aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+            setaileval::FunctionKind::Index)]
+        >= 1);
+
+    const auto aReachabilityStats = getScInterpreterReachabilityStatsSnapshot();
+    const std::string aReachabilityStatsLabel
+        = "formula_cell=" + std::to_string(aReachabilityStats.mnFormulaCellInterpretCount)
+          + " interpret_tail=" + std::to_string(aReachabilityStats.mnInterpretTailCount)
+          + " classic=" + std::to_string(aReachabilityStats.mnClassicInterpretCount);
+    CPPUNIT_ASSERT_MESSAGE(aReachabilityStatsLabel,
+        aReachabilityStats.mnFormulaCellInterpretCount > 0);
+    CPPUNIT_ASSERT_MESSAGE(aReachabilityStatsLabel,
+        aReachabilityStats.mnInterpretTailCount > 0);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(aReachabilityStatsLabel, sal_uInt64(0),
+        aReachabilityStats.mnClassicInterpretCount);
+
+    const auto aClassicOpcodeStats = getScInterpreterClassicOpcodeRuntimeStatsSnapshot();
+    CPPUNIT_ASSERT_EQUAL(
+        sal_uInt64(0),
+        aClassicOpcodeStats.maOpcodeCounts[static_cast<std::size_t>(ocAddress)]);
+    CPPUNIT_ASSERT_EQUAL(
+        sal_uInt64(0),
+        aClassicOpcodeStats.maOpcodeCounts[static_cast<std::size_t>(ocIndirect)]);
+    CPPUNIT_ASSERT_EQUAL(
+        sal_uInt64(0),
+        aClassicOpcodeStats.maOpcodeCounts[static_cast<std::size_t>(ocLookup)]);
+    CPPUNIT_ASSERT_EQUAL(
+        sal_uInt64(0),
+        aClassicOpcodeStats.maOpcodeCounts[static_cast<std::size_t>(ocXLookup)]);
+    CPPUNIT_ASSERT_EQUAL(
+        sal_uInt64(0),
+        aClassicOpcodeStats.maOpcodeCounts[static_cast<std::size_t>(ocIndex)]);
+
+    m_pDoc->SetRangeName(0, nullptr);
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterMatrixEngineDispatch)
 {
     sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);

@@ -276,7 +276,7 @@ double ScInterpreter::ScGetIpmt(double fRate, double fPer, double fNper, double 
     return aResult.mfInterest;
 }
 
-void ScInterpreter::ScIntersect()
+void ScInterpreter::ExecuteIntersectTerminal()
 {
     formula::FormulaConstTokenRef p2nd = PopToken();
     formula::FormulaConstTokenRef p1st = PopToken();
@@ -396,7 +396,7 @@ void ScInterpreter::ScIntersect()
     }
 }
 
-void ScInterpreter::ScRangeFunc()
+void ScInterpreter::ExecuteRangeReferenceTerminal()
 {
     formula::FormulaConstTokenRef x2 = PopToken();
     formula::FormulaConstTokenRef x1 = PopToken();
@@ -416,7 +416,7 @@ void ScInterpreter::ScRangeFunc()
         PushTokenRef( xRes);
 }
 
-void ScInterpreter::ScUnionFunc()
+void ScInterpreter::ExecuteUnionTerminal()
 {
     formula::FormulaConstTokenRef p2nd = PopToken();
     formula::FormulaConstTokenRef p1st = PopToken();

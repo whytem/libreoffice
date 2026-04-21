@@ -353,6 +353,12 @@ struct Interp4LegacyStackKernelInventory
     std::vector<std::string> maLegacyCallNames;
 };
 
+struct Interp4LegacyReferenceKernelInventory
+{
+    std::size_t mnLegacyCaseCallCount = 0;
+    std::vector<std::string> maLegacyCallNames;
+};
+
 std::filesystem::path repoRootPath()
 {
     return std::filesystem::path(SPREADSHEETENGINE_TEST_ROOT).parent_path();
@@ -644,6 +650,29 @@ Interp4LegacyStackKernelInventory countInterp4LegacyStackKernelCalls()
     Interp4LegacyStackKernelInventory aInventory;
     static const std::regex aLegacyCallPattern(
         R"(\b(ScMul|ScDiv|ScAmpersand|ScPow|ScCompareOp|ScLogicalFoldOp|ScUnaryMatrixOrScalarOp|ScSyntheticBinaryOp|ScLet)\s*\()");
+
+    for (std::string aLine; std::getline(aStream, aLine);)
+    {
+        for (std::sregex_iterator aIt(aLine.begin(), aLine.end(), aLegacyCallPattern), aEnd;
+             aIt != aEnd; ++aIt)
+        {
+            ++aInventory.mnLegacyCaseCallCount;
+            aInventory.maLegacyCallNames.push_back((*aIt)[1].str());
+        }
+    }
+
+    return aInventory;
+}
+
+Interp4LegacyReferenceKernelInventory countInterp4LegacyReferenceKernelCalls()
+{
+    std::ifstream aStream(repoRootPath() / "sc" / "source" / "core" / "tool" / "interpr4.cxx");
+    if (!aStream.is_open())
+        return {};
+
+    Interp4LegacyReferenceKernelInventory aInventory;
+    static const std::regex aLegacyCallPattern(
+        R"(\b(ScLookup|ScXLookup|ScIndirect|ScAddressFunc|ScIndex|ScMultiArea|ScExternal|ScMissing|ScRangeFunc|ScUnionFunc|ScIntersect)\s*\()");
 
     for (std::string aLine; std::getline(aStream, aLine);)
     {
@@ -6034,6 +6063,15 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testSeamReconciliationLegacyStackK
     const Interp4LegacyStackKernelInventory aInventory = countInterp4LegacyStackKernelCalls();
     CPPUNIT_ASSERT_EQUAL_MESSAGE(
         "Interpret() should no longer dispatch operator/control stack kernels through legacy Sc* entry points",
+        std::size_t(0), aInventory.mnLegacyCaseCallCount);
+}
+
+CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testSeamReconciliationLegacyReferenceKernelFloor)
+{
+    const Interp4LegacyReferenceKernelInventory aInventory
+        = countInterp4LegacyReferenceKernelCalls();
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "Interpret() should no longer dispatch reference/lookup/address kernels through legacy Sc* entry points",
         std::size_t(0), aInventory.mnLegacyCaseCallCount);
 }
 

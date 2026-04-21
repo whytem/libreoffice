@@ -636,9 +636,9 @@ private:
      */
     sc::RangeMatrix CompareMat( ScQueryOp eOp, sc::CompareOptions* pOptions = nullptr );
     ScMatrixRef QueryMat( const ScMatrixRef& pMat, sc::CompareOptions& rOptions );
-    void ScIntersect();
-    void ScRangeFunc();
-    void ScUnionFunc();
+    void ExecuteIntersectTerminal();
+    void ExecuteRangeReferenceTerminal();
+    void ExecuteUnionTerminal();
     void ScRandom();
     void ScRandbetween();
     void ScRandArray();
@@ -661,8 +661,8 @@ private:
     void GetStVarParams( bool bTextAsZero, double(*VarResult)( double fVal, size_t nValCount ) );
     void IterateParametersIf( ScIterFuncIf );
     void IterateParametersIfs( double(*ResultFunc)( const sc::ParamIfsResult& rRes ) );
-    void ScLookup();
-    void ScXLookup();
+    void ExecuteLookupTerminal();
+    void ExecuteXLookupTerminal();
     void ScSortBy();
     void ScSubTotal();
 
@@ -691,12 +691,12 @@ public:
 
     void DBIterator( ScIterFunc );
     void GetDBStVarParams( std::vector<double>& rValues );
-    void ScIndirect();
-    void ScAddressFunc();
-    void ScIndex();
-    void ScMultiArea();
-    void ScExternal();
-    void ScMissing();
+    void ExecuteIndirectTerminal();
+    void ExecuteAddressTerminal();
+    void ExecuteIndexTerminal();
+    void ExecuteMultiAreaTerminal();
+    void ExecuteExternalTerminal();
+    void ExecuteMissingTerminal();
     void ScMacro();
     bool SetSbxVariable( SbxVariable* pVar, const ScAddress& );
     FormulaError GetErrorType();

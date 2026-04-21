@@ -3004,7 +3004,7 @@ svl::SharedString ScInterpreter::GetStringFromDouble( double fVal )
     return mrStrPool.intern(mrContext.NFGetInputLineString(fVal, nIndex));
 }
 
-void ScInterpreter::ScExternal()
+void ScInterpreter::ExecuteExternalTerminal()
 {
     sal_uInt8 nParamCount = GetByte();
     OUString aUnoName;
@@ -3585,7 +3585,7 @@ void ScInterpreter::ScExternal()
     }
 }
 
-void ScInterpreter::ScMissing()
+void ScInterpreter::ExecuteMissingTerminal()
 {
     if ( aCode.IsEndOfPath() )
         PushTempToken( new ScEmptyCellToken( false, false ) );
@@ -10190,7 +10190,8 @@ StackVar ScInterpreter::Interpret()
                 // 2-argument form (row, col). Uses default A1 convention
                 // and absolute mode 1. Any other parameter combination
                 // (3-5 args with abs mode, style flag, sheet token) or
-                // non-scalar arguments defer to legacy ScAddressFunc.
+                // Non-scalar arguments still defer to the host-owned
+                // ADDRESS terminal.
                 [[maybe_unused]] const auto tryPlanEngineIndirect = [&]() -> bool {
                     addDispatchRuntimeStat(
                         interpreterDispatchRuntimeStatsStore()
@@ -11838,7 +11839,7 @@ StackVar ScInterpreter::Interpret()
                 {
                     case ocSep:
                     case ocClose:           // pushed by the compiler
-                    case ocMissing          : ScMissing();                  break;
+                    case ocMissing          : ExecuteMissingTerminal();     break;
                     case ocMacro            : ScMacro();                    break;
                     case ocDBArea           : ScDBArea();                   break;
                     case ocColRowNameAuto   : ScColRowNameAuto();           break;
@@ -11964,7 +11965,7 @@ StackVar ScInterpreter::Interpret()
                             spreadsheetengine::compat::libreoffice::interpreterdispatch::
                                 LogicalFoldMode::Xor);
                         break;
-                    case ocIntersect        : ScIntersect();                break;
+                    case ocIntersect        : ExecuteIntersectTerminal();   break;
                     case ocRange            :
                         if (!pushRootErrorLiteralTerminal())
                         {
@@ -11976,10 +11977,10 @@ StackVar ScInterpreter::Interpret()
                                     return setaileval::isRootRangeReferenceFormula(rFormula);
                                 },
                                 "host-owned root range reference reached ScInterpreter");
-                            ScRangeFunc();
+                            ExecuteRangeReferenceTerminal();
                         }
                         break;
-                    case ocUnion            : ScUnionFunc();                break;
+                    case ocUnion            : ExecuteUnionTerminal();       break;
                     case ocNot              :
                         warnLogicalDispatch(u"NOT");
                         nFuncFmtType = SvNumFormatType::LOGICAL;
@@ -14034,8 +14035,8 @@ StackVar ScInterpreter::Interpret()
                         warnIfLegacyCriteriaAggregateReached(u"DVARP");
                         evaluateLegacyDBStVar(/*bSample*/false, /*bStdDev*/false);
                         break;
-                    case ocIndirect         : ScIndirect(); break;
-                    case ocAddress          : ScAddressFunc(); break;
+                    case ocIndirect         : ExecuteIndirectTerminal(); break;
+                    case ocAddress          : ExecuteAddressTerminal(); break;
                     case ocMatch:
                     {
                         warnIfLegacyDispatchReached(
@@ -14108,7 +14109,7 @@ StackVar ScInterpreter::Interpret()
                                 [](const sc::ParamIfsResult& rRes) { return rRes.mfCount; });
                     }
                     break;
-                    case ocLookup           : ScLookup();               break;
+                    case ocLookup           : ExecuteLookupTerminal();      break;
                     case ocVLookup:
                         warnIfLegacyDispatchReached(
                             "literal-only hard-routed", u"VLOOKUP",
@@ -14118,7 +14119,7 @@ StackVar ScInterpreter::Interpret()
                             "hard-routed VLOOKUP reached ScInterpreter");
                         CalculateLookup(false);
                         break;
-                    case ocXLookup          : ScXLookup();              break;
+                    case ocXLookup          : ExecuteXLookupTerminal();     break;
                     case ocHLookup:
                         warnIfLegacyDispatchReached(
                             "literal-only hard-routed", u"HLOOKUP",
@@ -14135,9 +14136,9 @@ StackVar ScInterpreter::Interpret()
                                 return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
                             },
                             "family-local default-on INDEX reached ScInterpreter");
-                        ScIndex();
+                        ExecuteIndexTerminal();
                         break;
-                    case ocMultiArea        : ScMultiArea();                break;
+                    case ocMultiArea        : ExecuteMultiAreaTerminal();   break;
                     case ocOffset           :
                         dispatchOffset();
                         break;
@@ -15160,7 +15161,7 @@ StackVar ScInterpreter::Interpret()
                         warnIfLegacyMatrixMathReached(u"ORG.LIBREOFFICE.FOURIER");
                         ScFourier();
                         break;
-                    case ocExternal         : ScExternal();                 break;
+                    case ocExternal         : ExecuteExternalTerminal();    break;
                     case ocTableOp          : ScTableOp();                  break;
                     case ocStop :                                           break;
                     case ocErrorType:
