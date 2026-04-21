@@ -4709,10 +4709,8 @@ StackVar ScInterpreter::Interpret()
                     PushError(selibreoffice::toFormulaError(aAttempt.maResult.meError));
                     return true;
                 };
-                const auto tryPushEngineRetiredScalar = [&](const char* /*pOpName*/) -> bool {
+                const auto pushRetiredScalarResult = [&]() -> bool {
                     sal_uInt8 nParamCount = GetByte();
-                    addDispatchRuntimeStat(
-                        interpreterDispatchRuntimeStatsStore().mnEngineAttemptedCount);
 
                     const auto popOperands = [&]() {
                         for (sal_uInt8 i = 0; i < nParamCount; ++i)
@@ -4721,8 +4719,6 @@ StackVar ScInterpreter::Interpret()
 
                     if (!pMyFormulaCell || !pArr)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore().mnEngineDeclinedCount);
                         popOperands();
                         return false;
                     }
@@ -4731,8 +4727,6 @@ StackVar ScInterpreter::Interpret()
                         = pMyFormulaCell->GetFormula(FormulaGrammar::GRAM_ODFF, &mrContext);
                     if (aFormulaSource.isEmpty())
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore().mnEngineDeclinedCount);
                         popOperands();
                         return false;
                     }
@@ -4743,16 +4737,12 @@ StackVar ScInterpreter::Interpret()
                         mrDoc.GetCalcConfig().mbEmptyStringAsZero, pArr);
                     if (!aAttempt.mbSupported)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore().mnEngineDeclinedCount);
                         popOperands();
                         return false;
                     }
 
                     popOperands();
                     nGlobalError = FormulaError::NONE;
-                    addDispatchRuntimeStat(
-                        interpreterDispatchRuntimeStatsStore().mnEngineSucceededCount);
                     switch (aAttempt.maResult.meType)
                     {
                         case spreadsheetengine::api::formulavalue::ValueType::Value:
@@ -4766,9 +4756,6 @@ StackVar ScInterpreter::Interpret()
                             PushError(selibreoffice::toFormulaError(aAttempt.maResult.meError));
                             return true;
                         default:
-                            interpreterDispatchRuntimeStatsStore().mnEngineSucceededCount--;
-                            addDispatchRuntimeStat(
-                                interpreterDispatchRuntimeStatsStore().mnEngineDeclinedCount);
                             return false;
                     }
                 };
@@ -13206,17 +13193,13 @@ StackVar ScInterpreter::Interpret()
                     }
                     break;
                     case ocGCD:
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: MathScalar/GCD — retired via
-                        // engine evaluation; legacy deleted. Phase 7 retirement wave 2.
-                        if (!tryPushEngineRetiredScalar("GCD"))
+                        if (!pushRetiredScalarResult())
                         {
                             PushError(FormulaError::UnknownState);
                         }
                         break;
                     case ocLCM:
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: MathScalar/LCM — retired via
-                        // engine evaluation; legacy deleted. Phase 7 retirement wave 2.
-                        if (!tryPushEngineRetiredScalar("LCM"))
+                        if (!pushRetiredScalarResult())
                         {
                             PushError(FormulaError::UnknownState);
                         }
@@ -14621,17 +14604,13 @@ StackVar ScInterpreter::Interpret()
                     }
                     break;
                     case ocCombin:
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: MathScalar/COMBIN — retired via
-                        // engine evaluation; legacy deleted. Phase 7 retirement wave 2.
-                        if (!tryPushEngineRetiredScalar("COMBIN"))
+                        if (!pushRetiredScalarResult())
                         {
                             PushError(FormulaError::UnknownState);
                         }
                         break;
                     case ocCombinA:
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: MathScalar/COMBINA — retired via
-                        // engine evaluation; legacy deleted. Phase 7 retirement wave 2.
-                        if (!tryPushEngineRetiredScalar("COMBINA"))
+                        if (!pushRetiredScalarResult())
                         {
                             PushError(FormulaError::UnknownState);
                         }
@@ -15562,41 +15541,31 @@ StackVar ScInterpreter::Interpret()
                             textInfoUnichar(*this);
                         break;
                     case ocBitAnd:
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: MathScalar/BITAND — retired via
-                        // engine evaluation; legacy deleted. Phase 7 retirement wave 2.
-                        if (!tryPushEngineRetiredScalar("BITAND"))
+                        if (!pushRetiredScalarResult())
                         {
                             PushError(FormulaError::UnknownState);
                         }
                         break;
                     case ocBitOr:
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: MathScalar/BITOR — retired via
-                        // engine evaluation; legacy deleted. Phase 7 retirement wave 2.
-                        if (!tryPushEngineRetiredScalar("BITOR"))
+                        if (!pushRetiredScalarResult())
                         {
                             PushError(FormulaError::UnknownState);
                         }
                         break;
                     case ocBitXor:
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: MathScalar/BITXOR — retired via
-                        // engine evaluation; legacy deleted. Phase 7 retirement wave 2.
-                        if (!tryPushEngineRetiredScalar("BITXOR"))
+                        if (!pushRetiredScalarResult())
                         {
                             PushError(FormulaError::UnknownState);
                         }
                         break;
                     case ocBitRshift:
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: MathScalar/BITRSHIFT — retired via
-                        // engine evaluation; legacy deleted. Phase 7 retirement wave 2.
-                        if (!tryPushEngineRetiredScalar("BITRSHIFT"))
+                        if (!pushRetiredScalarResult())
                         {
                             PushError(FormulaError::UnknownState);
                         }
                         break;
                     case ocBitLshift:
-                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: MathScalar/BITLSHIFT — retired via
-                        // engine evaluation; legacy deleted. Phase 7 retirement wave 2.
-                        if (!tryPushEngineRetiredScalar("BITLSHIFT"))
+                        if (!pushRetiredScalarResult())
                         {
                             PushError(FormulaError::UnknownState);
                         }

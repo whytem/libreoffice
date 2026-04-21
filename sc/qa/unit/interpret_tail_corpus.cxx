@@ -5981,8 +5981,8 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testSeamReconciliationTryPushWrapp
 {
     const Interp4EngineDispatchInventory aInventory = countInterp4EngineDispatchAttempts();
     CPPUNIT_ASSERT_EQUAL_MESSAGE(
-        "tryPushEngine sites should be ocBad, ocRange, plus 9 Phase 7 retired scalars",
-        std::size_t(11), aInventory.mnTryPushAttemptCaseCount);
+        "tryPushEngine sites should now be only the residual ocBad and ocRange wrappers",
+        std::size_t(2), aInventory.mnTryPushAttemptCaseCount);
     CPPUNIT_ASSERT_EQUAL_MESSAGE(
         "remaining tryPushEngine sites should carry pivot rationale annotations",
         std::size_t(0), aInventory.maTryPushMissingPolicyLineNumbers.size());

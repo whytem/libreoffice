@@ -1982,7 +1982,7 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterBadLiteralDispatch)
     m_pDoc->DeleteTab(0);
 }
 
-CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailRetiredMathScalarCoreForcedAuditLane)
+CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailRetiredMathScalarCoreForcedTerminal)
 {
     sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
     ScopedEnvironmentOverride aMode(
@@ -2050,12 +2050,18 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailRetiredMathScalarCoreForcedA
         = "attempted=" + std::to_string(aDispatchStats.mnEngineAttemptedCount)
           + " succeeded=" + std::to_string(aDispatchStats.mnEngineSucceededCount)
           + " declined=" + std::to_string(aDispatchStats.mnEngineDeclinedCount);
-    CPPUNIT_ASSERT_MESSAGE("retired scalar audit lane should attempt engine evaluation: "
-                               + aDispatchStatsLabel,
-                           aDispatchStats.mnEngineAttemptedCount >= 15);
-    CPPUNIT_ASSERT_MESSAGE("retired scalar audit lane should succeed through the engine path: "
-                               + aDispatchStatsLabel,
-                           aDispatchStats.mnEngineSucceededCount >= 15);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "retired scalar helpers should no longer count as active lower-seam engine debt: "
+            + aDispatchStatsLabel,
+        sal_uInt64(0), aDispatchStats.mnEngineAttemptedCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "retired scalar helpers should no longer report synthetic lower-seam successes: "
+            + aDispatchStatsLabel,
+        sal_uInt64(0), aDispatchStats.mnEngineSucceededCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "retired scalar helpers should no longer report synthetic lower-seam declines: "
+            + aDispatchStatsLabel,
+        sal_uInt64(0), aDispatchStats.mnEngineDeclinedCount);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("dispatch accounting should stay balanced: "
                                      + aDispatchStatsLabel,
                                  aDispatchStats.mnEngineAttemptedCount,
@@ -9072,12 +9078,18 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testExternalRefFunctions)
             = "attempted=" + std::to_string(aDispatchStats.mnEngineAttemptedCount)
               + " succeeded=" + std::to_string(aDispatchStats.mnEngineSucceededCount)
               + " declined=" + std::to_string(aDispatchStats.mnEngineDeclinedCount);
-        CPPUNIT_ASSERT_MESSAGE("external retired scalar audit lane should attempt engine evaluation: "
-                                   + aDispatchStatsLabel,
-                               aDispatchStats.mnEngineAttemptedCount >= 4);
-        CPPUNIT_ASSERT_MESSAGE("external retired scalar audit lane should succeed through the engine path: "
-                                   + aDispatchStatsLabel,
-                               aDispatchStats.mnEngineSucceededCount >= 4);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(
+            "external retired scalar helpers should no longer count as active lower-seam debt: "
+                + aDispatchStatsLabel,
+            sal_uInt64(0), aDispatchStats.mnEngineAttemptedCount);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(
+            "external retired scalar helpers should no longer report synthetic successes: "
+                + aDispatchStatsLabel,
+            sal_uInt64(0), aDispatchStats.mnEngineSucceededCount);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(
+            "external retired scalar helpers should no longer report synthetic declines: "
+                + aDispatchStatsLabel,
+            sal_uInt64(0), aDispatchStats.mnEngineDeclinedCount);
         CPPUNIT_ASSERT_EQUAL_MESSAGE("external retired scalar dispatch accounting should stay balanced: "
                                          + aDispatchStatsLabel,
                                      aDispatchStats.mnEngineAttemptedCount,
@@ -9176,6 +9188,91 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testExternalRefFunctions)
     testExtRefConcat(m_pDoc, rExtDoc);
 
     // Unload the external document shell.
+    xExtDocSh->DoClose();
+    CPPUNIT_ASSERT_MESSAGE("external document instance should have been unloaded.",
+                           !findLoadedDocShellByName(aExtDocName));
+
+    m_pDoc->DeleteTab(0);
+#endif
+}
+
+CPPUNIT_TEST_FIXTURE(TestFormula2, testRetiredMathScalarExternalRefsCoreForcedTerminal)
+{
+#ifndef DISABLE_NAN_TESTS
+    ScDocShellRef xExtDocSh = new ScDocShell;
+    OUString aExtDocName(u"file:///extdata.fake"_ustr);
+    SfxMedium* pMed = new SfxMedium(aExtDocName, StreamMode::STD_READWRITE);
+    xExtDocSh->DoLoad(pMed);
+    CPPUNIT_ASSERT_MESSAGE("external document instance not loaded.",
+                           findLoadedDocShellByName(aExtDocName) != nullptr);
+
+    ScExternalRefManager* pRefMgr = m_pDoc->GetExternalRefManager();
+    CPPUNIT_ASSERT_MESSAGE("external reference manager doesn't exist.", pRefMgr);
+    sal_uInt16 nFileId = pRefMgr->getExternalFileId(aExtDocName);
+    const OUString* pFileName = pRefMgr->getExternalFileName(nFileId);
+    CPPUNIT_ASSERT_MESSAGE("file name registration has somehow failed.", pFileName);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("file name registration has somehow failed.", aExtDocName,
+                                 *pFileName);
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+
+    ScDocument& rExtDoc = xExtDocSh->GetDocument();
+    rExtDoc.InsertTab(0, u"Data"_ustr);
+    rExtDoc.SetValue(0, 0, 0, 1.0);
+    rExtDoc.SetValue(0, 1, 0, 2.0);
+    rExtDoc.SetValue(1, 1, 0, 2.0);
+    rExtDoc.SetValue(0, 2, 0, 3.0);
+    rExtDoc.SetValue(1, 2, 0, 3.0);
+    rExtDoc.SetValue(0, 3, 0, 4.0);
+    rExtDoc.SetValue(1, 3, 0, 4.0);
+
+    m_pDoc->InsertTab(0, u"RetiredScalarExternal"_ustr);
+
+    ScopedEnvironmentOverride aMode(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+    ScopedEnvironmentOverride aForceCalculation("SC_FORCE_CALCULATION", "core");
+    ScopedEnvironmentOverride aDisableAuthorityWhileOff(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF", "0");
+    resetScInterpreterDispatchRuntimeStats();
+
+    static const struct
+    {
+        const char* pFormula;
+        double fResult;
+    } aChecks[] = {
+        { "=GCD('file:///extdata.fake'#Data.A1)", 1 },
+        { "=LCM('file:///extdata.fake'#Data.B1)", 0 },
+        { "=GCD('file:///extdata.fake'#Data.A1:A4)", 1 },
+        { "=LCM('file:///extdata.fake'#Data.B1:B4)", 12 },
+    };
+
+    for (const auto& rCheck : aChecks)
+    {
+        m_pDoc->SetString(0, 0, 0, OUString::createFromAscii(rCheck.pFormula));
+        const double fValue = m_pDoc->GetValue(0, 0, 0);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(
+            "unexpected retired scalar result involving external references.",
+            rCheck.fResult, fValue, 1e-15);
+    }
+
+    const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
+    const std::string aDispatchStatsLabel
+        = "attempted=" + std::to_string(aDispatchStats.mnEngineAttemptedCount)
+          + " succeeded=" + std::to_string(aDispatchStats.mnEngineSucceededCount)
+          + " declined=" + std::to_string(aDispatchStats.mnEngineDeclinedCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "external retired scalar helpers should no longer count as active lower-seam debt: "
+            + aDispatchStatsLabel,
+        sal_uInt64(0), aDispatchStats.mnEngineAttemptedCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "external retired scalar helpers should no longer report synthetic successes: "
+            + aDispatchStatsLabel,
+        sal_uInt64(0), aDispatchStats.mnEngineSucceededCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "external retired scalar helpers should no longer report synthetic declines: "
+            + aDispatchStatsLabel,
+        sal_uInt64(0), aDispatchStats.mnEngineDeclinedCount);
+
     xExtDocSh->DoClose();
     CPPUNIT_ASSERT_MESSAGE("external document instance should have been unloaded.",
                            !findLoadedDocShellByName(aExtDocName));
