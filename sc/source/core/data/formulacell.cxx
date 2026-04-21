@@ -1978,8 +1978,23 @@ void ScFormulaCell::InterpretTail( ScInterpreterContext& rContext, ScInterpretTa
         }
         return *oEngineDelegatedFunction;
     };
+    const bool bScalarMatrixFormulaTailEligible = [&]() {
+        if (cMatrixFlag != ScMatrixMode::Formula)
+            return false;
+
+        // The upper seam still projects only scalar results back into
+        // ScFormulaCell. Admit only 1x1 matrix origins here so we can route
+        // scalar-result array formulas upstream without claiming multi-cell
+        // matrix ownership before the broader matrix-frame handoff lands.
+        SCCOL nCols = 0;
+        SCROW nRows = 0;
+        GetMatColsRows(nCols, nRows);
+        return nCols == 1 && nRows == 1;
+    }();
     const bool bTailEligible = eTailParam == SCITP_NORMAL && !bIsIterCell
-                               && cMatrixFlag == ScMatrixMode::NONE && !pCode->IsHyperLink()
+                               && (cMatrixFlag == ScMatrixMode::NONE
+                                   || bScalarMatrixFormulaTailEligible)
+                               && !pCode->IsHyperLink()
                                && !rContext.pInterpreter
                                && !rDocument.IsThreadedGroupCalcInProgress();
     // Family-local default-on rollout stays intentionally narrower than the
