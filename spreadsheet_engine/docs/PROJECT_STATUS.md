@@ -392,21 +392,28 @@ equality-to-zero test is preserved so near-singular-but-non-zero
 pivots still invert. `serpn::planMatrixMultiply` and
 `serpn::planMatrixInverse` bridge the numerical cores to the RPN
 matrix operand shape via a shared `tryFlattenNumericMatrix` helper.
-Scope fence: MMULT / MINVERSE require in-memory svMatrix tokens;
-range-input widening for these two waits on the same host-facade
-primitive used below by TRANSPOSE / MDETERM.
+Scope fence: svRefList and the remaining matrix-frame
+broadcast/jump-matrix edges still defer, but local and external
+single/double refs now feed the same MatrixOperand bridge for
+TRANSPOSE / MDETERM / MMULT / MINVERSE.
 
-Phase D of the Close-Out Plan widens the TRANSPOSE and MDETERM
-admissions to accept svSingleRef / svDoubleRef range tokens by
-landing the first documented Host facade primitive,
+Phase D of the Close-Out Plan widens the matrix admissions to accept
+local svSingleRef / svDoubleRef range tokens by landing the first
+documented Host facade primitive,
 `seitee::detail::materializeHostRangeToMatrixOperand`. The helper
 wraps the existing `readMaterializedHostCellValue` pipeline and
 produces a `serpn::MatrixOperand` directly, so the engine-first
-dispatch path no longer declines when a single-cell or range
-reference reaches the TRANSPOSE / MDETERM admissions (e.g.
-`=MDETERM(A1)`, `=TRANSPOSE(A1:C2)`). svRefList and multi-sheet
-surfaces still decline; MMULT / MINVERSE / the SUMPRODUCT family
-will pick up the same bridge when their own admissions extend.
+dispatch path no longer declines when a local single-cell or range
+reference reaches the admitted matrix consumers (e.g.
+`=MDETERM(A1)`, `=TRANSPOSE(A1:C2)`). The same lower-seam
+MatrixOperand bridge now also accepts `svExternalSingleRef` /
+`svExternalDoubleRef` by routing them through the shared
+external-reference cache helpers before rejoining the same
+MatrixOperand path, so forced-core audit coverage now proves
+external TRANSPOSE / MDETERM / MMULT / MINVERSE parity as well.
+svRefList and multi-sheet surfaces still decline, and the remaining
+Phase 4 external-reference work is now the authoritative upper-seam
+story rather than this lower-seam matrix bridge.
 The contract for this primitive is tracked in
 [architecture/HOST_FACADE_CONTRACTS.md](architecture/HOST_FACADE_CONTRACTS.md);
 Phase I will extend that document with the remaining address /

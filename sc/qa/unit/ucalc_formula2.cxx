@@ -7306,6 +7306,7 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testExternalRefFunctions)
     // Populate the external source document.
     ScDocument& rExtDoc = xExtDocSh->GetDocument();
     rExtDoc.InsertTab(0, u"Data"_ustr);
+    rExtDoc.InsertTab(1, u"Matrix"_ustr);
     double val = 1;
     rExtDoc.SetValue(0, 0, 0, val);
     // leave cell B1 empty.
@@ -7318,6 +7319,17 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testExternalRefFunctions)
     val = 4;
     rExtDoc.SetValue(0, 3, 0, val);
     rExtDoc.SetValue(1, 3, 0, val);
+    // Matrix fixtures used by the forced-core engine audit lane. Keep them on
+    // a dedicated external tab so the older whole-sheet aggregate checks on
+    // Data.1:1048576 stay stable.
+    rExtDoc.SetValue(2, 0, 1, 1.0); // Matrix.C1
+    rExtDoc.SetValue(3, 0, 1, 2.0); // Matrix.D1
+    rExtDoc.SetValue(2, 1, 1, 3.0); // Matrix.C2
+    rExtDoc.SetValue(3, 1, 1, 4.0); // Matrix.D2
+    rExtDoc.SetValue(4, 0, 1, 1.0); // Matrix.E1
+    rExtDoc.SetValue(5, 0, 1, 0.0); // Matrix.F1
+    rExtDoc.SetValue(4, 1, 1, 0.0); // Matrix.E2
+    rExtDoc.SetValue(5, 1, 1, 1.0); // Matrix.F2
 
     m_pDoc->InsertTab(0, u"Test"_ustr);
 
@@ -7389,6 +7401,63 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testExternalRefFunctions)
                                      aDispatchStats.mnEngineAttemptedCount,
                                      aDispatchStats.mnEngineSucceededCount
                                          + aDispatchStats.mnEngineDeclinedCount);
+    }
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+        ScopedEnvironmentOverride aForceCalculation("SC_FORCE_CALCULATION", "core");
+        ScopedEnvironmentOverride aDisableAuthorityWhileOff(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF", "0");
+        resetScInterpreterDispatchRuntimeStats();
+
+        ScMarkData aMark(m_pDoc->GetSheetLimits());
+        aMark.SelectOneTable(0);
+
+        // External single refs now share the same MatrixOperand bridge as
+        // local refs, so scalar-shaped matrix consumers no longer need to
+        // decline back to legacy in the forced-core audit lane.
+        m_pDoc->SetString(7, 0, 0, u"=TRANSPOSE('file:///extdata.fake'#Matrix.C1)"_ustr);
+        ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(7, 0, 0)));
+        m_pDoc->SetString(7, 1, 0, u"=MDETERM('file:///extdata.fake'#Matrix.C1)"_ustr);
+        ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(7, 1, 0)));
+
+        // External double refs now materialize through the shared bridge too,
+        // so the matrix-consuming engine admissions can evaluate the same
+        // external cache-backed shapes as local ranges.
+        m_pDoc->SetString(7, 2, 0, u"=MDETERM('file:///extdata.fake'#Matrix.C1:D2)"_ustr);
+        ASSERT_DOUBLES_EQUAL(-2.0, m_pDoc->GetValue(ScAddress(7, 2, 0)));
+
+        m_pDoc->InsertMatrixFormula(7, 4, 8, 5, aMark,
+                                    u"=MMULT('file:///extdata.fake'#Matrix.C1:D2;'file:///extdata.fake'#Matrix.E1:F2)"_ustr);
+        ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(7, 4, 0)));
+        ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(8, 4, 0)));
+        ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(ScAddress(7, 5, 0)));
+        ASSERT_DOUBLES_EQUAL(4.0, m_pDoc->GetValue(ScAddress(8, 5, 0)));
+
+        m_pDoc->InsertMatrixFormula(7, 7, 8, 8, aMark,
+                                    u"=MINVERSE('file:///extdata.fake'#Matrix.C1:D2)"_ustr);
+        ASSERT_DOUBLES_EQUAL(-2.0, m_pDoc->GetValue(ScAddress(7, 7, 0)));
+        ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(8, 7, 0)));
+        ASSERT_DOUBLES_EQUAL(1.5, m_pDoc->GetValue(ScAddress(7, 8, 0)));
+        ASSERT_DOUBLES_EQUAL(-0.5, m_pDoc->GetValue(ScAddress(8, 8, 0)));
+
+        const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
+        const std::string aDispatchStatsLabel
+            = "matrix_attempted=" + std::to_string(aDispatchStats.mnMatrixEngineAttemptedCount)
+              + " succeeded=" + std::to_string(aDispatchStats.mnMatrixEngineSucceededCount)
+              + " declined=" + std::to_string(aDispatchStats.mnMatrixEngineDeclinedCount);
+        CPPUNIT_ASSERT_MESSAGE("external matrix audit lane should attempt engine evaluation: "
+                                   + aDispatchStatsLabel,
+                               aDispatchStats.mnMatrixEngineAttemptedCount >= 4);
+        CPPUNIT_ASSERT_MESSAGE("external matrix audit lane should succeed through the engine path: "
+                                   + aDispatchStatsLabel,
+                               aDispatchStats.mnMatrixEngineSucceededCount >= 4);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("external matrix dispatch accounting should stay balanced: "
+                                         + aDispatchStatsLabel,
+                                     aDispatchStats.mnMatrixEngineAttemptedCount,
+                                     aDispatchStats.mnMatrixEngineSucceededCount
+                                         + aDispatchStats.mnMatrixEngineDeclinedCount);
     }
 
     // A huge external range should not crash, the matrix generated from the

@@ -362,10 +362,13 @@ re-calling on overlapping ranges in the same dispatch pass.
 **Consumers (Phase D landing):** `tryPlanEngineTranspose`,
 `tryPlanEngineMatrixDeterminant`.
 
-**Future consumers:** `tryPlanEngineMatrixMultiply`,
-`tryPlanEngineMatrixInverse` (Phase C widening);
-`tryPlanEngineSumProduct` family (Phase E); INDEX matrix-return
-form (Phase D follow-up).
+**Current pairing:** lower-seam matrix admissions now pair this local-range
+helper with `fetchExternalSingleRef` / `fetchExternalDoubleRef` when the
+source token is external, so one MatrixOperand bridge spans both local and
+external reference-backed inputs.
+
+**Future consumers:** `tryPlanEngineSumProduct` family (Phase E); INDEX
+matrix-return form (Phase D follow-up).
 
 #### `readMaterializedHostCellValue` — canonical single-cell read
 

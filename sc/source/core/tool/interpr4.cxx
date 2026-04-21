@@ -7058,10 +7058,9 @@ StackVar ScInterpreter::Interpret()
                 // range materialization; MMULT / MINVERSE exercise the
                 // matrix-consuming path with in-memory svMatrix
                 // tokens; TRANSPOSE / MDETERM additionally accept
-                // svSingleRef / svDoubleRef range tokens routed through
-                // the `materializeHostRangeToMatrixOperand` host-facade
-                // primitive. The SUMPRODUCT family and range-input
-                // widening for MMULT / MINVERSE still defer to legacy.
+                // local and external range tokens routed through one
+                // MatrixOperand bridge. The SUMPRODUCT family and
+                // broadcast/jump-matrix widening still defer to legacy.
                 const auto convertMatrixOperandToMatrixRef
                     = [&](const serpn::MatrixOperand& rOperand) -> ScMatrixRef {
                     if (rOperand.isEmpty())
@@ -7163,16 +7162,19 @@ StackVar ScInterpreter::Interpret()
                     return aOperand;
                 };
 
-                // Host facade bridge: materialize a svSingleRef /
-                // svDoubleRef token into a serpn::MatrixOperand so the
+                // Range bridge: materialize local or external reference
+                // tokens into a serpn::MatrixOperand so the
                 // matrix-consuming engine admissions (TRANSPOSE /
-                // MDETERM / ...) can accept range inputs without needing
-                // to iterate the host document themselves. Delegates to
-                // `seitee::detail::materializeHostRangeToMatrixOperand`,
-                // which wraps the existing `readMaterializedHostCellValue`
-                // pipeline. Returns std::nullopt for unsupported surfaces
-                // (multi-sheet ranges, svRefList, unresolved references);
-                // callers should decline to legacy in that case.
+                // MDETERM / MMULT / MINVERSE) can accept reference
+                // inputs without re-implementing document/cache walks at
+                // each call site. Local refs delegate to
+                // `materializeHostRangeToMatrixOperand`; external refs
+                // reuse the shared external-reference cache helpers and
+                // then project the fetched token/matrix into the same
+                // MatrixOperand shape. Returns std::nullopt for
+                // unsupported surfaces (multi-sheet ranges, svRefList,
+                // unresolved references); callers should decline to
+                // legacy in that case.
                 const auto materializeRangeTokenToMatrixOperand
                     = [&](const FormulaToken* pTok)
                     -> std::optional<serpn::MatrixOperand> {
@@ -7193,6 +7195,70 @@ StackVar ScInterpreter::Interpret()
                             const ScComplexRefData& rRef = *pTok->GetDoubleRef();
                             aAbs = rRef.toAbs(mrDoc, aPos);
                             break;
+                        }
+                        case svExternalSingleRef:
+                        {
+                            const auto aFetch = seexternalexec::fetchExternalSingleRef(
+                                mrDoc, aPos, pTok->GetIndex(), pTok->GetString().getString(),
+                                *pTok->GetSingleRef());
+                            if (aFetch.meError != FormulaError::NONE || !aFetch.mxToken)
+                                return std::nullopt;
+
+                            serpn::MatrixOperand aOperand;
+                            aOperand.maDimensions = { 1, 1 };
+                            aOperand.meProvenance
+                                = serpn::MatrixProvenance::MaterializedReference;
+                            switch (aFetch.mxToken->GetType())
+                            {
+                                case svDouble:
+                                    aOperand.maValues.push_back(
+                                        spreadsheetengine::api::CellValue::number(
+                                            aFetch.mxToken->GetDouble()));
+                                    return aOperand;
+                                case svString:
+                                    aOperand.maValues.push_back(
+                                        spreadsheetengine::api::CellValue::text(
+                                            selibreoffice::toApiString(
+                                                aFetch.mxToken->GetString().getString())));
+                                    return aOperand;
+                                case svEmptyCell:
+                                    aOperand.maValues.push_back(
+                                        spreadsheetengine::api::CellValue::empty());
+                                    return aOperand;
+                                case svError:
+                                    aOperand.maValues.push_back(
+                                        spreadsheetengine::api::CellValue::error(
+                                            selibreoffice::toApiError(
+                                                aFetch.mxToken->GetError())));
+                                    return aOperand;
+                                default:
+                                    return std::nullopt;
+                            }
+                        }
+                        case svExternalDoubleRef:
+                        {
+                            const auto aFetch = seexternalexec::fetchExternalDoubleRef(
+                                mrDoc, aPos, pTok->GetIndex(), pTok->GetString().getString(),
+                                *pTok->GetDoubleRef());
+                            if (aFetch.meError != FormulaError::NONE)
+                                return std::nullopt;
+
+                            const auto aProjection
+                                = seexternalexec::projectExternalDoubleRefMatrix(aFetch.mxArray);
+                            if (aProjection.meError != FormulaError::NONE
+                                || !aProjection.mxMatrix)
+                            {
+                                return std::nullopt;
+                            }
+
+                            auto oOperand
+                                = convertMatrixRefToMatrixOperand(*aProjection.mxMatrix);
+                            if (oOperand)
+                            {
+                                oOperand->meProvenance
+                                    = serpn::MatrixProvenance::MaterializedReference;
+                            }
+                            return oOperand;
                         }
                         default:
                             return std::nullopt;
@@ -7361,16 +7427,17 @@ StackVar ScInterpreter::Interpret()
                         return false;
                     }
                     // Scope fence: admit in-memory matrix operands and
-                    // svSingleRef / svDoubleRef range tokens (routed
-                    // through the Phase D host-facade materialization
-                    // primitive). svRefList still defers: its
-                    // multi-area iteration shape is out of scope for
-                    // this admission.
+                    // local/external single- or double-ref range tokens
+                    // routed through the shared MatrixOperand bridge.
+                    // svRefList still defers: its multi-area iteration
+                    // shape is out of scope for this admission.
                     const FormulaToken* pTok = pStack[sp - 1];
                     if (!pTok
                         || (pTok->GetType() != svMatrix
                             && pTok->GetType() != svSingleRef
-                            && pTok->GetType() != svDoubleRef))
+                            && pTok->GetType() != svDoubleRef
+                            && pTok->GetType() != svExternalSingleRef
+                            && pTok->GetType() != svExternalDoubleRef))
                     {
                         addDispatchRuntimeStat(
                             interpreterDispatchRuntimeStatsStore()
@@ -7442,14 +7509,16 @@ StackVar ScInterpreter::Interpret()
                         return false;
                     }
                     // Scope fence: admit svMatrix sources plus
-                    // svSingleRef / svDoubleRef range tokens via the
-                    // Phase D host-facade materialization primitive.
-                    // svRefList still defers.
+                    // local/external single- or double-ref range tokens
+                    // via the shared MatrixOperand bridge. svRefList
+                    // still defers.
                     const FormulaToken* pTok = pStack[sp - 1];
                     if (!pTok
                         || (pTok->GetType() != svMatrix
                             && pTok->GetType() != svSingleRef
-                            && pTok->GetType() != svDoubleRef))
+                            && pTok->GetType() != svDoubleRef
+                            && pTok->GetType() != svExternalSingleRef
+                            && pTok->GetType() != svExternalDoubleRef))
                     {
                         addDispatchRuntimeStat(
                             interpreterDispatchRuntimeStatsStore()
@@ -7519,10 +7588,9 @@ StackVar ScInterpreter::Interpret()
                         return false;
                     }
                     // Scope fence: both arguments may be in-memory
-                    // svMatrix tokens or svSingleRef / svDoubleRef
-                    // range tokens (routed through the Phase D
-                    // host-facade materialization primitive).
-                    // svRefList still defers.
+                    // svMatrix tokens or local/external single- or
+                    // double-ref range tokens routed through the shared
+                    // MatrixOperand bridge. svRefList still defers.
                     const FormulaToken* pRightTok = pStack[sp - 1];
                     const FormulaToken* pLeftTok = pStack[sp - 2];
                     auto isAccepted = [](const FormulaToken* pTok) {
@@ -7530,7 +7598,9 @@ StackVar ScInterpreter::Interpret()
                             return false;
                         const StackVar eType = pTok->GetType();
                         return eType == svMatrix || eType == svSingleRef
-                               || eType == svDoubleRef;
+                               || eType == svDoubleRef
+                               || eType == svExternalSingleRef
+                               || eType == svExternalDoubleRef;
                     };
                     if (!isAccepted(pRightTok) || !isAccepted(pLeftTok))
                     {
@@ -7628,14 +7698,16 @@ StackVar ScInterpreter::Interpret()
                         return false;
                     }
                     // Scope fence: admit in-memory svMatrix tokens
-                    // plus svSingleRef / svDoubleRef range tokens via
-                    // the Phase D host-facade materialization
-                    // primitive. svRefList still defers.
+                    // plus local/external single- or double-ref range
+                    // tokens via the shared MatrixOperand bridge.
+                    // svRefList still defers.
                     const FormulaToken* pTok = pStack[sp - 1];
                     if (!pTok
                         || (pTok->GetType() != svMatrix
                             && pTok->GetType() != svSingleRef
-                            && pTok->GetType() != svDoubleRef))
+                            && pTok->GetType() != svDoubleRef
+                            && pTok->GetType() != svExternalSingleRef
+                            && pTok->GetType() != svExternalDoubleRef))
                     {
                         addDispatchRuntimeStat(
                             interpreterDispatchRuntimeStatsStore()
