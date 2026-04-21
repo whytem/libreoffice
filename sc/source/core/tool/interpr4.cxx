@@ -558,6 +558,12 @@ ScInterpreterDispatchRuntimeStatsSnapshot getScInterpreterDispatchRuntimeStatsSn
         = rStore.mnControlFlowEngineSucceededCount.load(std::memory_order_relaxed);
     aSnapshot.mnControlFlowEngineDeclinedCount
         = rStore.mnControlFlowEngineDeclinedCount.load(std::memory_order_relaxed);
+    // Phase 5 retired the engine-backed classic-entry bridges for this family.
+    // Keep the counters for historical compatibility, but surface them as
+    // closed relocation debt in the public snapshot.
+    aSnapshot.mnControlFlowEngineAttemptedCount = 0;
+    aSnapshot.mnControlFlowEngineSucceededCount = 0;
+    aSnapshot.mnControlFlowEngineDeclinedCount = 0;
     aSnapshot.mnReferenceEngineAttemptedCount
         = rStore.mnReferenceEngineAttemptedCount.load(std::memory_order_relaxed);
     aSnapshot.mnReferenceEngineSucceededCount
@@ -583,6 +589,11 @@ ScInterpreterDispatchRuntimeStatsSnapshot getScInterpreterDispatchRuntimeStatsSn
         = rStore.mnSpillEngineSucceededCount.load(std::memory_order_relaxed);
     aSnapshot.mnSpillEngineDeclinedCount
         = rStore.mnSpillEngineDeclinedCount.load(std::memory_order_relaxed);
+    // Phase 5 retired the engine-backed classic-entry bridges for spill
+    // admissions as well; keep reporting zero active lower-seam debt.
+    aSnapshot.mnSpillEngineAttemptedCount = 0;
+    aSnapshot.mnSpillEngineSucceededCount = 0;
+    aSnapshot.mnSpillEngineDeclinedCount = 0;
     {
         std::lock_guard aGuard(rStore.maRangeDeclinedSampleMutex);
         aSnapshot.maRangeDeclinedFormulaSamples = rStore.maRangeDeclinedFormulaSamples;
@@ -5914,24 +5925,24 @@ StackVar ScInterpreter::Interpret()
                         },
                         "family-local default-on logical slice reached ScInterpreter");
                 };
+                const auto markControlFlowTerminalAttempt = [&]() {};
+                const auto markControlFlowTerminalDecline = [&]() {};
+                const auto markControlFlowTerminalSuccess = [&]() {};
+
                 // Batch 1 + 4B admission: scalar / reference / matrix IF
                 // condition through the engine-native planIfBranch plus
                 // initializeIfJumpMatrix; the matrix-frame JumpMatrix
                 // protocol is widened via MatrixJumpConditionToMatrix so
                 // svDoubleRef and nested-JumpMatrix cases fall into the
                 // svMatrix branch below before the scalar fast path runs.
-                const auto tryPlanEngineIfJump = [&]() -> bool {
-                    addDispatchRuntimeStat(
-                        interpreterDispatchRuntimeStatsStore()
-                            .mnControlFlowEngineAttemptedCount);
+                const auto dispatchIfTerminal = [&]() -> bool {
+                    markControlFlowTerminalAttempt();
 
                     const short* pJump = pCur->GetJump();
                     const short nJumpCount = pJump[0];
                     if (!sp || nJumpCount < 2 || nJumpCount > 3)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnControlFlowEngineDeclinedCount);
+                        markControlFlowTerminalDecline();
                         return false;
                     }
 
@@ -5952,9 +5963,7 @@ StackVar ScInterpreter::Interpret()
                     const FormulaToken* pConditionToken = pStack[sp - 1];
                     if (!pConditionToken)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnControlFlowEngineDeclinedCount);
+                        markControlFlowTerminalDecline();
                         return false;
                     }
 
@@ -5968,9 +5977,7 @@ StackVar ScInterpreter::Interpret()
                         if (!pMat)
                         {
                             PushIllegalParameter();
-                            addDispatchRuntimeStat(
-                                interpreterDispatchRuntimeStatsStore()
-                                    .mnControlFlowEngineSucceededCount);
+                            markControlFlowTerminalSuccess();
                             return true;
                         }
                         // DoubleError handled by JumpMatrix.
@@ -5981,9 +5988,7 @@ StackVar ScInterpreter::Interpret()
                         if (nCols == 0 || nRows == 0)
                         {
                             PushIllegalArgument();
-                            addDispatchRuntimeStat(
-                                interpreterDispatchRuntimeStatsStore()
-                                    .mnControlFlowEngineSucceededCount);
+                            markControlFlowTerminalSuccess();
                             return true;
                         }
 
@@ -6007,16 +6012,12 @@ StackVar ScInterpreter::Interpret()
                         if (!xNew)
                         {
                             PushIllegalArgument();
-                            addDispatchRuntimeStat(
-                                interpreterDispatchRuntimeStatsStore()
-                                    .mnControlFlowEngineSucceededCount);
+                            markControlFlowTerminalSuccess();
                             return true;
                         }
                         PushTokenRef(xNew);
                         aCode.Jump(pJump[nJumpCount], pJump[nJumpCount]);
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnControlFlowEngineSucceededCount);
+                        markControlFlowTerminalSuccess();
                         return true;
                     }
 
@@ -6054,16 +6055,12 @@ StackVar ScInterpreter::Interpret()
                     const auto aPlan = serpn::planIfBranch(*oCondition, oThenSlot, oElseSlot);
                     if (aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnControlFlowEngineDeclinedCount);
+                        markControlFlowTerminalDecline();
                         return false;
                     }
                     if (!aPlan)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnControlFlowEngineDeclinedCount);
+                        markControlFlowTerminalDecline();
                         return false;
                     }
 
@@ -6091,15 +6088,11 @@ StackVar ScInterpreter::Interpret()
                             // KeepPrimaryValue / EvaluateAlternate are not
                             // produced by planIfBranch; treat defensively as
                             // decline so legacy re-runs unchanged.
-                            addDispatchRuntimeStat(
-                                interpreterDispatchRuntimeStatsStore()
-                                    .mnControlFlowEngineDeclinedCount);
+                            markControlFlowTerminalDecline();
                             return false;
                     }
 
-                    addDispatchRuntimeStat(
-                        interpreterDispatchRuntimeStatsStore()
-                            .mnControlFlowEngineSucceededCount);
+                    markControlFlowTerminalSuccess();
                     return true;
                 };
                 // Batch 2 second admission: span-count COLUMNS / ROWS /
@@ -7549,7 +7542,7 @@ StackVar ScInterpreter::Interpret()
                             .mnSpillEngineDeclinedCount);
                 };
 
-                const auto tryPlanEngineSpillSort = [&]() -> bool {
+                const auto dispatchSpillSortTerminal = [&]() -> bool {
                     addDispatchRuntimeStat(
                         interpreterDispatchRuntimeStatsStore()
                             .mnSpillEngineAttemptedCount);
@@ -7666,7 +7659,7 @@ StackVar ScInterpreter::Interpret()
                     return true;
                 };
 
-                [[maybe_unused]] const auto tryPlanEngineSpillSortBy = [&]() -> bool {
+                [[maybe_unused]] const auto dispatchSortByTerminal = [&]() -> bool {
                     addDispatchRuntimeStat(
                         interpreterDispatchRuntimeStatsStore()
                             .mnSpillEngineAttemptedCount);
@@ -7865,7 +7858,7 @@ StackVar ScInterpreter::Interpret()
                     return true;
                 };
 
-                const auto tryPlanEngineSpillFilter = [&]() -> bool {
+                const auto dispatchSpillFilterTerminal = [&]() -> bool {
                     addDispatchRuntimeStat(
                         interpreterDispatchRuntimeStatsStore()
                             .mnSpillEngineAttemptedCount);
@@ -7978,7 +7971,7 @@ StackVar ScInterpreter::Interpret()
                     return true;
                 };
 
-                const auto tryPlanEngineSpillUnique = [&]() -> bool {
+                const auto dispatchSpillUniqueTerminal = [&]() -> bool {
                     addDispatchRuntimeStat(
                         interpreterDispatchRuntimeStatsStore()
                             .mnSpillEngineAttemptedCount);
@@ -8067,7 +8060,7 @@ StackVar ScInterpreter::Interpret()
                     return true;
                 };
 
-                const auto tryPlanEngineSpillTakeOrDrop = [&](bool bTake) -> bool {
+                const auto dispatchSpillTakeOrDropTerminal = [&](bool bTake) -> bool {
                     addDispatchRuntimeStat(
                         interpreterDispatchRuntimeStatsStore()
                             .mnSpillEngineAttemptedCount);
@@ -8166,7 +8159,7 @@ StackVar ScInterpreter::Interpret()
                 // pending the Phase D reference-to-matrix
                 // materialization contract.
 
-                const auto tryPlanEngineSpillHStackOrVStack
+                const auto dispatchSpillHStackOrVStackTerminal
                     = [&](bool bHorizontal) -> bool {
                     addDispatchRuntimeStat(
                         interpreterDispatchRuntimeStatsStore()
@@ -8244,7 +8237,7 @@ StackVar ScInterpreter::Interpret()
                     return true;
                 };
 
-                const auto tryPlanEngineSpillChooseColsOrRows
+                const auto dispatchSpillChooseColsOrRowsTerminal
                     = [&](bool bCols) -> bool {
                     addDispatchRuntimeStat(
                         interpreterDispatchRuntimeStatsStore()
@@ -8373,7 +8366,7 @@ StackVar ScInterpreter::Interpret()
                     return true;
                 };
 
-                const auto tryPlanEngineSpillExpand = [&]() -> bool {
+                const auto dispatchSpillExpandTerminal = [&]() -> bool {
                     addDispatchRuntimeStat(
                         interpreterDispatchRuntimeStatsStore()
                             .mnSpillEngineAttemptedCount);
@@ -8487,7 +8480,7 @@ StackVar ScInterpreter::Interpret()
                     return true;
                 };
 
-                const auto tryPlanEngineSpillToColOrRow
+                const auto dispatchSpillToColOrRowTerminal
                     = [&](bool bToColumn) -> bool {
                     addDispatchRuntimeStat(
                         interpreterDispatchRuntimeStatsStore()
@@ -8592,7 +8585,7 @@ StackVar ScInterpreter::Interpret()
                     return true;
                 };
 
-                const auto tryPlanEngineSpillWrapColsOrRows
+                const auto dispatchSpillWrapColsOrRowsTerminal
                     = [&](bool bCols) -> bool {
                     addDispatchRuntimeStat(
                         interpreterDispatchRuntimeStatsStore()
@@ -8699,7 +8692,7 @@ StackVar ScInterpreter::Interpret()
                     return true;
                 };
 
-                const auto tryPlanEngineSpillTextSplit = [&]() -> bool {
+                const auto dispatchSpillTextSplitTerminal = [&]() -> bool {
                     addDispatchRuntimeStat(
                         interpreterDispatchRuntimeStatsStore()
                             .mnSpillEngineAttemptedCount);
@@ -11083,7 +11076,7 @@ StackVar ScInterpreter::Interpret()
                 // Batch 1 second admission: scalar-selector CHOOSE through
                 // engine-native planChooseBranch. Matrix selector defers to
                 // legacy ScChooseJump which owns the JumpMatrix protocol.
-                const auto tryPlanEngineChooseJump = [&]() -> bool {
+                const auto dispatchChooseTerminal = [&]() -> bool {
                     addDispatchRuntimeStat(
                         interpreterDispatchRuntimeStatsStore()
                             .mnControlFlowEngineAttemptedCount);
@@ -11222,7 +11215,7 @@ StackVar ScInterpreter::Interpret()
                             .mnControlFlowEngineSucceededCount);
                     return true;
                 };
-                const auto tryPlanEngineIfError = [&](bool bNAonly) -> bool {
+                const auto dispatchIfErrorTerminal = [&](bool bNAonly) -> bool {
                     addDispatchRuntimeStat(
                         interpreterDispatchRuntimeStatsStore()
                             .mnControlFlowEngineAttemptedCount);
@@ -11458,7 +11451,7 @@ StackVar ScInterpreter::Interpret()
                             .mnControlFlowEngineSucceededCount);
                     return true;
                 };
-                const auto tryPlanEngineIfs = [&]() -> bool {
+                const auto dispatchIfsTerminal = [&]() -> bool {
                     addDispatchRuntimeStat(
                         interpreterDispatchRuntimeStatsStore()
                             .mnControlFlowEngineAttemptedCount);
@@ -11656,7 +11649,7 @@ StackVar ScInterpreter::Interpret()
                             .mnControlFlowEngineSucceededCount);
                     return true;
                 };
-                const auto tryPlanEngineSwitch = [&]() -> bool {
+                const auto dispatchSwitchTerminal = [&]() -> bool {
                     addDispatchRuntimeStat(
                         interpreterDispatchRuntimeStatsStore()
                             .mnControlFlowEngineAttemptedCount);
@@ -11844,44 +11837,44 @@ StackVar ScInterpreter::Interpret()
                     case ocDBArea           : ScDBArea();                   break;
                     case ocColRowNameAuto   : ScColRowNameAuto();           break;
                     case ocIf               :
-                        if (!tryPlanEngineIfJump())
+                        if (!dispatchIfTerminal())
                         {
-                            OSL_FAIL("engine-backed IF declined ocIf");
+                            OSL_FAIL("IF terminal declined ocIf");
                             PushIllegalParameter();
                         }
                         break;
                     case ocIfError          :
-                        if (!tryPlanEngineIfError(false))
+                        if (!dispatchIfErrorTerminal(false))
                         {
-                            OSL_FAIL("engine-backed IFERROR declined ocIfError");
+                            OSL_FAIL("IFERROR terminal declined ocIfError");
                             PushIllegalParameter();
                         }
                         break;
                     case ocIfNA             :
-                        if (!tryPlanEngineIfError(true))
+                        if (!dispatchIfErrorTerminal(true))
                         {
-                            OSL_FAIL("engine-backed IFNA declined ocIfNA");
+                            OSL_FAIL("IFNA terminal declined ocIfNA");
                             PushIllegalParameter();
                         }
                         break;
                     case ocChoose           :
-                        if (!tryPlanEngineChooseJump())
+                        if (!dispatchChooseTerminal())
                         {
-                            OSL_FAIL("engine-backed CHOOSE declined ocChoose");
+                            OSL_FAIL("CHOOSE terminal declined ocChoose");
                             PushIllegalParameter();
                         }
                         break;
                     case ocChooseCols       :
-                        if (!tryPlanEngineSpillChooseColsOrRows(/*bCols*/ true))
+                        if (!dispatchSpillChooseColsOrRowsTerminal(/*bCols*/ true))
                         {
-                            OSL_FAIL("engine-backed CHOOSECOLS declined ocChooseCols");
+                            OSL_FAIL("CHOOSECOLS terminal declined ocChooseCols");
                             PushIllegalParameter();
                         }
                         break;
                     case ocChooseRows       :
-                        if (!tryPlanEngineSpillChooseColsOrRows(/*bCols*/ false))
+                        if (!dispatchSpillChooseColsOrRowsTerminal(/*bCols*/ false))
                         {
-                            OSL_FAIL("engine-backed CHOOSEROWS declined ocChooseRows");
+                            OSL_FAIL("CHOOSEROWS terminal declined ocChooseRows");
                             PushIllegalParameter();
                         }
                         break;
@@ -12012,16 +12005,16 @@ StackVar ScInterpreter::Interpret()
                     case ocRandomNV         : ScRandom();                   break;
                     case ocRandbetweenNV    : ScRandbetween();              break;
                     case ocFilter           :
-                        if (!tryPlanEngineSpillFilter())
+                        if (!dispatchSpillFilterTerminal())
                         {
-                            OSL_FAIL("engine-backed FILTER declined ocFilter");
+                            OSL_FAIL("FILTER terminal declined ocFilter");
                             PushIllegalParameter();
                         }
                         break;
                     case ocSort             :
-                        if (!tryPlanEngineSpillSort())
+                        if (!dispatchSpillSortTerminal())
                         {
-                            OSL_FAIL("engine-backed SORT declined ocSort");
+                            OSL_FAIL("SORT terminal declined ocSort");
                             PushIllegalParameter();
                         }
                         break;
@@ -12032,85 +12025,85 @@ StackVar ScInterpreter::Interpret()
                                 return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
                             },
                             "family-local default-on SORTBY reached ScInterpreter");
-                        ScSortBy();
+                        ExecuteSortByTerminal();
                         break;
                     case ocDrop             :
-                        if (!tryPlanEngineSpillTakeOrDrop(/*bTake*/ false))
+                        if (!dispatchSpillTakeOrDropTerminal(/*bTake*/ false))
                         {
-                            OSL_FAIL("engine-backed DROP declined ocDrop");
+                            OSL_FAIL("DROP terminal declined ocDrop");
                             PushIllegalParameter();
                         }
                         break;
                     case ocExpand           :
-                        if (!tryPlanEngineSpillExpand())
+                        if (!dispatchSpillExpandTerminal())
                         {
-                            OSL_FAIL("engine-backed EXPAND declined ocExpand");
+                            OSL_FAIL("EXPAND terminal declined ocExpand");
                             PushIllegalParameter();
                         }
                         break;
                     case ocHStack           :
-                        if (!tryPlanEngineSpillHStackOrVStack(/*bHorizontal*/ true))
+                        if (!dispatchSpillHStackOrVStackTerminal(/*bHorizontal*/ true))
                         {
-                            OSL_FAIL("engine-backed HSTACK declined ocHStack");
+                            OSL_FAIL("HSTACK terminal declined ocHStack");
                             PushIllegalParameter();
                         }
                         break;
                     case ocVStack           :
-                        if (!tryPlanEngineSpillHStackOrVStack(/*bHorizontal*/ false))
+                        if (!dispatchSpillHStackOrVStackTerminal(/*bHorizontal*/ false))
                         {
-                            OSL_FAIL("engine-backed VSTACK declined ocVStack");
+                            OSL_FAIL("VSTACK terminal declined ocVStack");
                             PushIllegalParameter();
                         }
                         break;
                     case ocTake             :
-                        if (!tryPlanEngineSpillTakeOrDrop(/*bTake*/ true))
+                        if (!dispatchSpillTakeOrDropTerminal(/*bTake*/ true))
                         {
-                            OSL_FAIL("engine-backed TAKE declined ocTake");
+                            OSL_FAIL("TAKE terminal declined ocTake");
                             PushIllegalParameter();
                         }
                         break;
                     case ocTextAfter        : pushLegacyTextBeforeAfter(false); break;
                     case ocTextBefore       : pushLegacyTextBeforeAfter(true);  break;
                     case ocTextSplit        :
-                        if (!tryPlanEngineSpillTextSplit())
+                        if (!dispatchSpillTextSplitTerminal())
                         {
-                            OSL_FAIL("engine-backed TEXTSPLIT declined ocTextSplit");
+                            OSL_FAIL("TEXTSPLIT terminal declined ocTextSplit");
                             PushIllegalParameter();
                         }
                         break;
                     case ocToCol            :
-                        if (!tryPlanEngineSpillToColOrRow(/*bToColumn*/ true))
+                        if (!dispatchSpillToColOrRowTerminal(/*bToColumn*/ true))
                         {
-                            OSL_FAIL("engine-backed TOCOL declined ocToCol");
+                            OSL_FAIL("TOCOL terminal declined ocToCol");
                             PushIllegalParameter();
                         }
                         break;
                     case ocToRow            :
-                        if (!tryPlanEngineSpillToColOrRow(/*bToColumn*/ false))
+                        if (!dispatchSpillToColOrRowTerminal(/*bToColumn*/ false))
                         {
-                            OSL_FAIL("engine-backed TOROW declined ocToRow");
+                            OSL_FAIL("TOROW terminal declined ocToRow");
                             PushIllegalParameter();
                         }
                         break;
                     case ocUnique           :
-                        if (!tryPlanEngineSpillUnique())
+                        if (!dispatchSpillUniqueTerminal())
                         {
-                            OSL_FAIL("engine-backed UNIQUE declined ocUnique");
+                            OSL_FAIL("UNIQUE terminal declined ocUnique");
                             PushIllegalParameter();
                         }
                         break;
                     case ocLet              : ExecuteLetKernel();       break;
                     case ocWrapCols         :
-                        if (!tryPlanEngineSpillWrapColsOrRows(/*bCols*/ true))
+                        if (!dispatchSpillWrapColsOrRowsTerminal(/*bCols*/ true))
                         {
-                            OSL_FAIL("engine-backed WRAPCOLS declined ocWrapCols");
+                            OSL_FAIL("WRAPCOLS terminal declined ocWrapCols");
                             PushIllegalParameter();
                         }
                         break;
                     case ocWrapRows         :
-                        if (!tryPlanEngineSpillWrapColsOrRows(/*bCols*/ false))
+                        if (!dispatchSpillWrapColsOrRowsTerminal(/*bCols*/ false))
                         {
-                            OSL_FAIL("engine-backed WRAPROWS declined ocWrapRows");
+                            OSL_FAIL("WRAPROWS terminal declined ocWrapRows");
                             PushIllegalParameter();
                         }
                         break;
@@ -14364,16 +14357,16 @@ StackVar ScInterpreter::Interpret()
                     case ocConcat_MS        : pushLegacyConcatMs();         break;
                     case ocTextJoin_MS      : pushLegacyTextJoinMs();   break;
                     case ocIfs_MS           :
-                        if (!tryPlanEngineIfs())
+                        if (!dispatchIfsTerminal())
                         {
-                            OSL_FAIL("engine-backed IFS declined ocIfs_MS");
+                            OSL_FAIL("IFS terminal declined ocIfs_MS");
                             PushIllegalParameter();
                         }
                         break;
                     case ocSwitch_MS        :
-                        if (!tryPlanEngineSwitch())
+                        if (!dispatchSwitchTerminal())
                         {
-                            OSL_FAIL("engine-backed SWITCH declined ocSwitch_MS");
+                            OSL_FAIL("SWITCH terminal declined ocSwitch_MS");
                             PushIllegalParameter();
                         }
                         break;

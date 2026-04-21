@@ -663,7 +663,7 @@ private:
     void IterateParametersIfs( double(*ResultFunc)( const sc::ParamIfsResult& rRes ) );
     void ExecuteLookupTerminal();
     void ExecuteXLookupTerminal();
-    void ScSortBy();
+    void ExecuteSortByTerminal();
     void ScSubTotal();
 
 private:

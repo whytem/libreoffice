@@ -789,6 +789,12 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterControlFlowIfDispatch)
         u"=SUM(IF(EXACT(OFFSET(A10;0;0):OFFSET(A10;2;0);A9);OFFSET(A10;0;1):OFFSET(A10;2;1);0))"_ustr);
     ASSERT_DOUBLES_EQUAL(5.0, m_pDoc->GetValue(ScAddress(4, 1, 0)));
 
+    m_pDoc->SetString(ScAddress(5, 0, 0), u"=IFERROR(1/0;99)"_ustr);
+    ASSERT_DOUBLES_EQUAL(99.0, m_pDoc->GetValue(ScAddress(5, 0, 0)));
+
+    m_pDoc->SetString(ScAddress(5, 1, 0), u"=IFNA(NA();77)"_ustr);
+    ASSERT_DOUBLES_EQUAL(77.0, m_pDoc->GetValue(ScAddress(5, 1, 0)));
+
     const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
     const std::string aLabel
         = "controlflow_attempted="
@@ -797,10 +803,15 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterControlFlowIfDispatch)
           + std::to_string(aDispatchStats.mnControlFlowEngineSucceededCount)
           + " declined="
           + std::to_string(aDispatchStats.mnControlFlowEngineDeclinedCount);
-    CPPUNIT_ASSERT_MESSAGE("IF dispatch should attempt engine evaluation: " + aLabel,
-                           aDispatchStats.mnControlFlowEngineAttemptedCount > 0);
-    CPPUNIT_ASSERT_MESSAGE("IF should succeed through engine across every shape: " + aLabel,
-                           aDispatchStats.mnControlFlowEngineSucceededCount > 0);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "control-flow lower-seam debt should stay retired after Phase 5: " + aLabel,
+        sal_uInt64(0), aDispatchStats.mnControlFlowEngineAttemptedCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "control-flow lower-seam successes should stay retired after Phase 5: " + aLabel,
+        sal_uInt64(0), aDispatchStats.mnControlFlowEngineSucceededCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "control-flow lower-seam declines should stay retired after Phase 5: " + aLabel,
+        sal_uInt64(0), aDispatchStats.mnControlFlowEngineDeclinedCount);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("control-flow dispatch accounting should stay balanced: " + aLabel,
                                  aDispatchStats.mnControlFlowEngineAttemptedCount,
                                  aDispatchStats.mnControlFlowEngineSucceededCount
@@ -841,12 +852,15 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterControlFlowChooseDispatc
           + std::to_string(aDispatchStats.mnControlFlowEngineSucceededCount)
           + " declined="
           + std::to_string(aDispatchStats.mnControlFlowEngineDeclinedCount);
-    CPPUNIT_ASSERT_MESSAGE(
-        "CHOOSE should attempt engine dispatch: " + aLabel,
-        aDispatchStats.mnControlFlowEngineAttemptedCount > 0);
-    CPPUNIT_ASSERT_MESSAGE(
-        "CHOOSE with scalar selector should succeed through engine: " + aLabel,
-        aDispatchStats.mnControlFlowEngineSucceededCount > 0);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "CHOOSE lower-seam debt should stay retired after Phase 5: " + aLabel,
+        sal_uInt64(0), aDispatchStats.mnControlFlowEngineAttemptedCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "CHOOSE lower-seam successes should stay retired after Phase 5: " + aLabel,
+        sal_uInt64(0), aDispatchStats.mnControlFlowEngineSucceededCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "CHOOSE lower-seam declines should stay retired after Phase 5: " + aLabel,
+        sal_uInt64(0), aDispatchStats.mnControlFlowEngineDeclinedCount);
     CPPUNIT_ASSERT_EQUAL_MESSAGE(
         "control-flow dispatch accounting should stay balanced: " + aLabel,
         aDispatchStats.mnControlFlowEngineAttemptedCount,
@@ -2369,9 +2383,15 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterSpillEngineDispatch)
           + std::to_string(aDispatchStats.mnSpillEngineSucceededCount)
           + " declined="
           + std::to_string(aDispatchStats.mnSpillEngineDeclinedCount);
-    CPPUNIT_ASSERT_MESSAGE(
-        "spill admissions should attempt engine dispatch: " + aLabel,
-        aDispatchStats.mnSpillEngineAttemptedCount > 0);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "spill lower-seam debt should stay retired after Phase 5: " + aLabel,
+        sal_uInt64(0), aDispatchStats.mnSpillEngineAttemptedCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "spill lower-seam successes should stay retired after Phase 5: " + aLabel,
+        sal_uInt64(0), aDispatchStats.mnSpillEngineSucceededCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "spill lower-seam declines should stay retired after Phase 5: " + aLabel,
+        sal_uInt64(0), aDispatchStats.mnSpillEngineDeclinedCount);
     CPPUNIT_ASSERT_EQUAL_MESSAGE(
         "spill dispatch accounting should stay balanced: " + aLabel,
         aDispatchStats.mnSpillEngineAttemptedCount,

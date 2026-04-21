@@ -6048,8 +6048,8 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testSeamReconciliationTryPushWrapp
         "duplicate lower-seam tryPlanEngine overlap should be fully retired once Slice 7 lands",
         std::size_t(0), aInventory.mnTryPlanAttemptCaseCount);
     CPPUNIT_ASSERT_EQUAL_MESSAGE(
-        "engine-backed lower-seam tryPlanEngine admissions should now be only the non-overlap residual set",
-        std::size_t(21), aInventory.mnTryPlanEngineBackedCaseCount);
+        "engine-backed lower-seam tryPlanEngine admissions should be fully retired by Phase 5",
+        std::size_t(0), aInventory.mnTryPlanEngineBackedCaseCount);
     std::cout << "interp4_dispatch_engine_attempt_count="
               << aInventory.mnTryPushAttemptCaseCount << '\n';
     std::cout << "interp4_dispatch_plan_engine_attempt_count="

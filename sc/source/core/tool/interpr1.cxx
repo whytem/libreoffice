@@ -3787,7 +3787,7 @@ void ScInterpreter::ExecuteXLookupTerminal()
     PushLookupExecutionResult(aResult.maValue, true);
 }
 
-void ScInterpreter::ScSortBy()
+void ScInterpreter::ExecuteSortByTerminal()
 {
     sal_uInt8 nParamCount = GetByte();
 
