@@ -14897,6 +14897,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
            || eFunction == FunctionKind::Conversion
            || eFunction == FunctionKind::Rate
            || eFunction == FunctionKind::NumericAggregate
+           || eFunction == FunctionKind::CriteriaAggregate
            || eFunction == FunctionKind::StatisticalAggregate
            || eFunction == FunctionKind::StatisticalDistribution
            || eFunction == FunctionKind::InformationPredicate

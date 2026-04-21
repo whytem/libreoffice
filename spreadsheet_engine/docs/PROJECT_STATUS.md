@@ -819,8 +819,10 @@ Today:
   quarantine cluster, while logical constants, logical folds, `NOT`,
   conditionals, scalar-root formulas, text utility, formula text,
   conversion, information predicates, round-family roots, significant
-  rounding, math-scalar roots, bitwise, aggregate, matrix determinant,
-  and `PROB` now also have family-local default-on rollout paths
+  rounding, math-scalar roots, bitwise, aggregate, criteria aggregate
+  roots (`COUNTIF` / `SUMIF` / `AVERAGEIF` / `COUNTIFS` / `SUMIFS` /
+  `AVERAGEIFS` / `MINIFS` / `MAXIFS`), matrix determinant, and `PROB`
+  now also have family-local default-on rollout paths
 - the full replay corpus now has a true all-formula live-routing denominator
 - replay-imported promoted formulas now reach the seam broadly, and bounded
   top-level `INDEX` / `XLOOKUP` slice results now stay inside it
