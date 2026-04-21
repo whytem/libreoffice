@@ -33,9 +33,8 @@ is complete on the current tree:
   - `exposed but too broad`
   - `missing`
   - `intentionally unsupported`
-- the next subsystem phases can now point at named missing contracts
-  (`RangeIterator`, evaluation-time `RangeResolver`, explicit search-policy
-  API, formula-inspection API) instead of reopening the audit from scratch
+- the relocation backlog now uses those landed contracts as baseline rather
+  than treating them as open blockers
 
 ## Audit Scope
 
@@ -70,17 +69,15 @@ inventory later in this document.
 - `HS3` evaluation-time concrete reference normalization
   Current contracts: `api::ReferenceResolver`, `ResolvedReference`,
   external-ref fetch helpers.
-  Status: `exposed but too broad`.
+  Status: `already exposed`.
   Ownership: host normalizes concrete cell/range coordinates; engine should not
   see `ScAddress` / `ScRange` internals.
-  Gap: this does not yet unify named / DB / table / external symbolic
-  resolution at evaluation time.
 - `HS4` evaluation-time symbolic range resolution
-  Current shape: `resolveIndirectReference` plus scattered legacy interpreter
-  bodies.
-  Status: `missing`.
-  Ownership: host must resolve names / DB ranges / table refs / external refs
-  into `ResolvedReference`-shaped results; engine owns downstream execution.
+  Current shape: `RangeResolver`, `resolveIndirectReference`, and the compile
+  host lookup resolvers.
+  Status: `already exposed`.
+  Ownership: host resolves names / DB ranges / table refs / external refs into
+  `ResolvedReference`-shaped results; engine owns downstream execution.
 - `HS5` matrix materialization and matrix-reference projection
   Current contracts: `materializeHostRangeToMatrixOperand`,
   `projectExternalDoubleRefMatrix`, matrix-reference aware `CellValueView`.
@@ -88,20 +85,19 @@ inventory later in this document.
   Ownership: host reads cells and cache arrays; engine owns matrix planners and
   coercion.
 - `HS6` range iteration / criteria walk
-  Current shape: `CriteriaAggregateMaterializer` stopgap embedded in compat
-  code.
-  Status: `missing`.
-  Ownership: host should provide ordered range walking with visibility /
-  emptiness semantics; engine owns aggregate/query policy.
+  Current shape: `RangeIterator`, `CriteriaAggregateMaterializer::iterate`.
+  Status: `already exposed`.
+  Ownership: host provides ordered range walking with visibility / emptiness
+  semantics; engine owns aggregate/query policy.
 - `HS7` cell type / format inspection
-  Current shape: direct `ScDocument` / `ScRefCellValue` inspection and a
-  handful of compat helpers.
-  Status: `exposed but too broad`.
-  Ownership: host should answer narrow questions about cell kind / format /
-  inspection data; engine should stop poking raw document internals.
+  Current shape: `runtime::cellinspection::*`,
+  `DirectCellInspectionAdapter`, `DirectHostCellInspectionAdapter`.
+  Status: `already exposed`.
+  Ownership: host answers narrow questions about cell kind / format /
+  inspection data; engine owns evaluator semantics.
 - `HS8` runtime search / regex / wildcard policy
-  Current shape: `searchTypeFromDocument(const ScDocument&)`.
-  Status: `missing`.
+  Current shape: `RuntimeEnvironment::getSearchType()`.
+  Status: `already exposed`.
   Ownership: host supplies search policy (`Normal` / `Wildcard` / `Regex`);
   engine owns matching semantics.
 - `HS9` spill allocation lifecycle
@@ -110,16 +106,15 @@ inventory later in this document.
   Status: `already exposed`.
   Ownership: host owns collision checks and spill reservation; engine owns
   result-shape planning.
-  Gap: the abstract allocator is defined, but `EvaluationHost` binding and
-  downstream bounds lifecycle are still pending.
 - `HS10` runtime environment / workbook metadata
   Current contracts: `WorkbookInfo`, `RuntimeEnvironment`.
   Status: `already exposed`.
   Ownership: host owns sheet catalog, locale tag, null-date, and document
   environment.
 - `HS11` evaluator state / control flow / typed stack
-  Current shape: `RpnValue.hxx` plus legacy `ScInterpreter` state.
-  Status: `missing`.
+  Current shape: engine-native `RpnValue.hxx`, `RpnControlFlow`, plus residual
+  legacy `ScInterpreter` state.
+  Status: `intentionally unsupported`.
   Ownership: engine must own the evaluator state object, typed stack, operator
   dispatch, and control-flow loop; host should not re-grow stack-machine state.
 - `HS12` external computation terminals
@@ -131,52 +126,47 @@ inventory later in this document.
 
 ## Phase 2 Remaining Legacy Surface Inventory
 
-Every remaining `Sc*` method and `pushLegacy*` lambda is now mapped to one or
+Every remaining relocation-relevant interpreter method is now mapped to one or
 more service IDs from the ledger above.
 
 ### `Sc*` methods by primary host-service dependency
 
 - `HS11` evaluator state / control flow / typed stack:
-  `ScTableOp`, `ScLet`, `ScCompareOp`, `ScLogicalFoldOp`,
-  `ScUnaryMatrixOrScalarOp`, `ScSyntheticBinaryOp`, `ScAmpersand`, `ScMul`,
-  `ScDiv`, `ScPow`, `ScTTT`, `ScDebugVar`
+  `ExecuteComparisonKernel`, `ExecuteLogicalFoldKernel`,
+  `ExecuteUnaryMatrixOrScalarKernel`, `ExecuteBinaryMathKernel`,
+  `ExecuteConcatKernel`, `ExecuteLetKernel`
 - `HS4` symbolic range resolution with `HS3` / `HS5` follow-through:
-  `ScIntersect`, `ScRangeFunc`, `ScUnionFunc`, `ScLookup`, `ScXLookup`,
-  `ScMatchOp`, `ScIndirect`, `ScAddressFunc`, `ScIndex`, `ScMultiArea`,
-  `ScExternal`, `ScMissing`, `ScColRowNameAuto`
+  `ExecuteIntersectTerminal`, `ExecuteRangeReferenceTerminal`,
+  `ExecuteUnionTerminal`, `ExecuteLookupTerminal`, `ExecuteXLookupTerminal`,
+  `ScMatchOp`, `ExecuteIndirectTerminal`, `ExecuteAddressTerminal`,
+  `ExecuteIndexTerminal`, `ExecuteMultiAreaTerminal`,
+  `ExecuteExternalTerminal`, `ExecuteMissingTerminal`,
+  `ExecuteColRowNameAutoTerminal`
 - `HS7` cell type / format inspection:
-  `ScType`, `ScCell`, `ScCellExternal`, `ScCurrent`, `ScStyle`, `ScInfo`
+  `ExecuteTypeTerminal`, `ExecuteCellTerminal`,
+  `ExecuteCellExternalTerminal`, `ExecuteCurrentTerminal`,
+  `ExecuteStyleTerminal`, `ExecuteInfoTerminal`, `ExecuteNTerminal`
 - `HS6` range iteration / criteria walk:
-  `ScSubTotal`, `ScDBArea`
+  `ExecuteSubTotalTerminal`, `ExecuteDBAreaTerminal`,
+  `ExecuteSortByTerminal`
 - `HS5` matrix materialization / matrix frame, often with `HS6`:
-  `ScSortBy`, `ExecuteMatValueTerminal`, `ExecuteMatRefTerminal`,
+  `ExecuteMatValueTerminal`, `ExecuteMatRefTerminal`,
   `ExecuteSumXMY2Terminal`, `ExecuteFourierTerminal`,
   `ExecuteFrequencyTerminal`, `ExecuteForecastEtsTerminal`
 - `HS10` runtime environment / workbook metadata:
   `ExecuteRandomTerminal`, `ExecuteRandbetweenTerminal`,
   `ExecuteRandArrayTerminal`
-- `HS1` visible scalar read / text parse / formatting plus `HS11` coercion:
-  `ScN`
+- explicit host/debug utilities outside relocation debt:
+  `ScTableOp`, `ScTTT`, `ScDebugVar`
 - `HS12` intentionally unsupported host terminals:
   `ScMacro`, `ScDde`, `ScGetPivotData`, `ScHyperLink`, `ScFilterXML`,
   `ScWebservice`
 
 ### `pushLegacy*` lambdas by primary host-service dependency
 
-- `HS11` evaluator state / operator substrate:
-  `pushLegacyGcdOrLcm`, `pushLegacyCombin`, `pushLegacyBitwise`,
-  `pushLegacyTextJoinMs`, `pushLegacyConcatMs`
-- `HS1` visible scalar read / text parse / formatting:
-  `pushLegacyReplace`, `pushLegacySubstitute`, `pushLegacyLeftRight`,
-  `pushLegacyEncodeUrl`, `pushLegacyRightB`, `pushLegacyLeftB`,
-  `pushLegacyMidB`, `pushLegacyReplaceB`
-- `HS8` runtime search / regex / wildcard policy, with `HS1` string material:
-  `pushLegacyRegex`, `pushLegacyFindB`, `pushLegacySearchB`
-- `HS7` cell type / format inspection:
-  `pushLegacyCurrency`, `pushLegacyText`
-- `HS10` runtime environment / locale-sensitive text services:
-  `pushLegacyUnaryTextTransform`, `pushLegacyTextBeforeAfter`,
-  `pushLegacyBahtText`
+No live `pushLegacy*` lambdas remain on the current tree. Phase 6 of the
+relocation work retired that ad hoc lambda surface and replaced it with named
+dispatch terminals plus explicit runtime contracts.
 
 These inventories are intentionally exhaustive for the current tree. When the
 remaining legacy surface changes, this document must be updated in the same

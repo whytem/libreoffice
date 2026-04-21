@@ -4,9 +4,9 @@ Phase 2 deliverable for the
 [Computational Substrate Authority Transfer Pivot Plan](COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md).
 This document is the explicit contract inventory for the remaining
 Calc-resident evaluator surface: it records which host-facing services are
-already real, which are still too broad or fragmented, which are missing, and
-which are intentionally staying on the host side rather than being absorbed
-into the standalone engine.
+already real, which execution shells are now only adapter residue, and which
+surfaces are intentionally staying on the host side rather than being
+absorbed into the standalone engine.
 
 ## How to read this doc
 
@@ -14,9 +14,8 @@ into the standalone engine.
   engine side and the `libreoffice` compat adapter. Each entry lists
   signature, semantics, preconditions, error modes, thread safety,
   and representative callers.
-- **Pending contracts** — surfaces still implicit (scattered across
-  ad-hoc call sites, or missing entirely), with the shape we expect
-  when they are formalized.
+- **Pending contracts** — surfaces that were previously implicit or
+  fragmented, with the shape we expected while they were being formalized.
 - **Principles** — policy for when to add a new primitive vs.
   extend one, how contracts are versioned, and what level of tests
   an admission needs before it is marked stable.
@@ -81,9 +80,10 @@ contracts above rather than an ad hoc `pushLegacy*` inventory.
 | Reference / lookup / addressing | `ExecuteLookupTerminal`, `ExecuteXLookupTerminal`, `ExecuteIndirectTerminal`, `ExecuteAddressTerminal`, `ExecuteIndexTerminal`, `ExecuteMultiAreaTerminal`, `ExecuteExternalTerminal`, `ExecuteMissingTerminal`, `ExecuteRangeReferenceTerminal`, `ExecuteUnionTerminal`, `ExecuteIntersectTerminal` | reference resolution, named/external/database range resolution, matrix materialization | Phase 4 moved evaluator-worthy lookup/address logic behind `RangeResolver`; the remaining Calc terminals are explicit host-owned stack/reference glue |
 | DB / criteria / transform | `ExecuteSubTotalTerminal`, `ExecuteDBAreaTerminal`, `ExecuteSortByTerminal`, `ExecuteColRowNameAutoTerminal` | criteria/range iteration, named/database range resolution, spill allocation | Phase 7 moved the remaining query/subtotal glue onto explicit terminals now that `RangeIterator` owns production iteration |
 | Cell / metadata / inspection | `ExecuteTypeTerminal`, `ExecuteCellTerminal`, `ExecuteCellExternalTerminal`, `ExecuteCurrentTerminal`, `ExecuteStyleTerminal`, `ExecuteInfoTerminal`, `ExecuteNTerminal` | scalar cell read, formula text/inspection, format/type inspection | Phase 6 moved the remaining inspection/text-search surface onto explicit runtime contracts plus host-owned terminals; the residual Calc logic is terminal glue rather than hidden evaluator policy |
-| Operator / control / stack state | `ExecuteComparisonKernel`, `ExecuteLogicalFoldKernel`, `ExecuteUnaryMatrixOrScalarKernel`, `ExecuteBinaryMathKernel`, `ExecuteLetKernel` | control-flow/interpreter state, matrix materialization, format propagation | Phase 3 already moved this surface into engine-native runtime helpers; no Host-facade gap remains here |
+| Operator / control / stack state | `ExecuteComparisonKernel`, `ExecuteLogicalFoldKernel`, `ExecuteUnaryMatrixOrScalarKernel`, `ExecuteBinaryMathKernel`, `ExecuteConcatKernel`, `ExecuteLetKernel` | control-flow/interpreter state, matrix materialization, format propagation | Phase 3 already moved this surface into engine-native runtime helpers; the remaining Calc ownership is adapter residue, not a Host-facade gap |
 | Matrix / statistical tails | `ExecuteMatValueTerminal`, `ExecuteMatRefTerminal`, `ExecuteFrequencyTerminal`, `ExecuteForecastEtsTerminal`, `ExecuteFourierTerminal`, `ExecuteSumXMY2Terminal` | matrix materialization, scalar cell read, criteria/range iteration | Phase 8 retired the engine-worthy computation into runtime planners; only the explicit matrix-reference projection terminals remain Calc-owned |
 | Random / system-policy | `ExecuteRandomTerminal`, `ExecuteRandbetweenTerminal`, `ExecuteRandArrayTerminal` | runtime RNG state, locale/calendar/date mode | Phase 9 moved RAND / RANDBETWEEN.NV / RANDARRAY behind `RuntimeEnvironment::sampleUniformReal()` plus engine-native random planners; the remaining Calc surface is terminal glue for stack/matrix context only |
+| Host/debug utilities | `ScTableOp`, `ScTTT`, `ScDebugVar` | document mutation / repeated-operation state, debug-only projection | Phase 1 of the relocation backlog classified these as explicit host/debug utilities rather than active relocation debt |
 | External computation terminals | `ScMacro`, `ScDde`, `ScWebservice`, `ScFilterXML`, `ScGetPivotData`, `ScHyperLink` | external computation | Intentionally host-owned and outside the engine-native evaluator contract |
 
 ### Missing or fragmented contracts that Phase 8+ depend on

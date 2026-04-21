@@ -4,398 +4,340 @@ Status: active relocation backlog
 
 ## Purpose
 
-Carry the now-closed authority-transfer pivot forward as one
-dependency-ordered relocation backlog that can be worked commit-by-commit.
+Track only the remaining Calc-resident stack-machine surface that is still
+live on the current tree.
 
-This backlog starts from the current tree state:
+Completed relocation slices, already-landed host contracts, and closed
+authority-transfer work are intentionally omitted from this file. Historical
+closeout lives in:
 
-- Phase 4 is now complete: external-reference execution and
-  broadcast/jump-matrix matrix-frame semantics have both landed at the upper
-  seam through Slices 1-3
-- Phase 6 is now complete: duplicate lower-seam `tryPlanEngine*` overlap has
-  been retired, and the remaining `tryPlanEngine*` admissions are the
-  engine-backed residual classic-entry set rather than duplicate ownership
+- [../archive/authority_transfer/](../archive/authority_transfer/)
+- [COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md](COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md)
 
-The intended end state is one production execution story:
+The intended end state remains one production execution story:
 
 `ScFormulaCell::InterpretTail()` -> `tryEvaluateFormula()` ->
 `FormulaEvaluator` -> `RpnEvaluator`
 
-`ScInterpreter::Interpret()` remains only as a residual legacy fallback for
-families that are explicitly not yet relocated.
+`ScInterpreter::Interpret()` should remain only for explicitly host-owned
+terminals or intentionally retained Calc policy.
 
-## Close-Out Rules
+## Current Baseline
 
-1. Finish missing substrate before deleting overlap.
-2. Retire lower-seam `tryPlanEngine*` admissions only after the upper seam can
-   carry the same class of work authoritatively.
-3. Count lower-seam audit coverage as useful validation, but not as ambient
-   authority transfer.
-4. Keep docs honest: Phase 4 is closed only because the external-reference and
-   matrix-frame gaps are now covered; Phase 6 closes only when overlapping
-   lower-seam admissions are gone.
+The remaining backlog is no longer about missing host contracts. The major
+contract gaps that previously blocked relocation are already landed:
 
-## Execution Tracking
+- `RangeResolver`
+- `RangeIterator`
+- formula-inspection providers
+- cell/type-inspection adapters
+- `RuntimeEnvironment::getSearchType()`
+- `RuntimeEnvironment::sampleUniformReal()`
+- `SpillRangeAllocator`
 
-1. Slice 1: complete
-   Verified with `CppunitTest_sc_ucalc_formula2` covering
-   `testInterpretTailEngineEvaluatorExternalReferenceRoutes` and
-   `testExternalRefFunctions`.
-2. Slice 2: complete
-   Verified with `CppunitTest_sc_ucalc_formula2` covering
-   `testInterpretTailEngineEvaluatorAuthoritativeWithFallback`,
-   `testInterpretTailEngineEvaluatorInformationPredicateDefaultOn`,
-   `testInterpretTailEngineEvaluatorExternalReferenceRoutes`,
-   `testExternalRefFunctions`, and
-   `testSharedInterpreterReferenceOffsetDispatch`.
-3. Slice 3: complete
-   Verified with `CppunitTest_sc_ucalc_formula2` covering
-   `testInterpretTailEngineEvaluatorMatrixMathDefaultOn`,
-   `testInterpretTailEngineEvaluatorExternalReferenceRoutes`,
-   `testInterpretTailEngineEvaluatorSingleCellMatrixExactDefaultOn`,
-   `testInterpretTailEngineEvaluatorSingleCellMatrixOffsetExactDefaultOn`,
-   `testInterpretTailEngineEvaluatorArrayContextIfDefaultOn`,
-   `testInterpretTailEngineEvaluatorBroadcastMatrixDefaultOn`,
-   `testInterpretTailEngineEvaluatorMultiCellSelectorMatrixDefaultOn`,
-   `testInterpretTailEngineEvaluatorMultiCellSpillMatrixDefaultOn`,
-   `testInterpretTailEngineEvaluatorMultiCellConditionalMatrixDefaultOn`, and
-   `testInterpretTailEngineEvaluatorMixedLocalExternalConditionalMatrixDefaultOn`.
-4. Slice 4: complete
-   Verified with `CppunitTest_sc_ucalc_formula2` covering
-   `testSharedInterpreterReferenceIndexDispatch` and
-   `testSharedInterpreterRetiredMatrixReferenceWave`, plus
-   `CppunitTest_sc_interpret_tail_corpus` covering
-   `testSeamReconciliationTryPushWrapperFloor`.
-5. Slice 5: complete
-   Verified with `CppunitTest_sc_ucalc_formula2` covering
-   `testInterpretTailEngineEvaluatorCriteriaAggregateAuthoritative`,
-   `testInterpretTailEngineEvaluatorCriteriaAggregateDefaultOn`,
-   `testInterpretTailEngineEvaluatorDatabaseAggregateAuthoritative`,
-   `testInterpretTailEngineEvaluatorDatabaseAggregateDefaultOn`,
-   `testSharedInterpreterDatabaseDispatch`,
-   `testSharedInterpreterDatabaseGetDispatch`,
-   `testSharedInterpreterDatabaseVarianceDispatch`, and
-   `testSharedInterpreterDatabaseCountDispatch`, plus
-   `spreadsheetengine_execution_tests`.
-6. Slice 6: complete
-   Verified with `CppunitTest_sc_ucalc_formula2` covering
-   `testInterpretTailEngineEvaluatorGrowthDefaultOn`,
-   `testInterpretTailEngineEvaluatorRegressionStatsDefaultOn`,
-   `testInterpretTailEngineEvaluatorRegressionMatrixDefaultOn`,
-   `testInterpretTailEngineEvaluatorForecastAuthoritative`, and
-   `testInterpretTailEngineEvaluatorStatisticalDistributionDefaultOn`, plus
-   `CppunitTest_sc_ucalc_shared_cases` covering
-   `testInterpretTailEngineEvaluatorGrowthHelper`,
-   `testInterpretTailEngineEvaluatorRegressionMatrixHelper`, and
-   `testInterpretTailEngineEvaluatorForecastHelper`, plus
-   `spreadsheetengine_execution_tests`.
-7. Slice 7: complete
-   Verified with `CppunitTest_sc_ucalc_formula2` covering
-   `testSharedInterpreterCriteriaCountIfDispatch`,
-   `testSharedInterpreterDatabaseDispatch`,
-   `testSharedInterpreterDatabaseGetDispatch`,
-   `testSharedInterpreterCountEmptyCellsDispatch`,
-   `testSharedInterpreterDatabaseVarianceDispatch`,
-   `testSharedInterpreterDatabaseCountDispatch`,
-   `testSharedInterpreterReferenceAddressDispatch`,
-   `testSharedInterpreterLinestEngineDispatch`,
-   `testSharedInterpreterControlFlowIfDispatch`, and
-   `testSharedInterpreterSpillEngineDispatch`, plus
-   `CppunitTest_sc_interpret_tail_corpus` covering
-   `testSeamReconciliationTryPushWrapperFloor`,
-   `testLowerSeamEngineAttemptsCarryPivotRationale`, and
-   `testProjectStatusOwnsCanonicalDashboardMetrics`.
-8. Slice 8: complete
-   Verified with `CppunitTest_sc_interpret_tail_corpus` covering
-   `testProjectStatusOwnsCanonicalDashboardMetrics` and
-   `testSeamReconciliationTryPushWrapperFloor`.
+The work that remains is now one of three kinds:
 
-## Backlog
+- semantic migration of still-live Calc terminals
+- retirement of Calc wrappers that are already engine-backed in substance
 
-### Slice 1: External-reference matrix materialization bridge
+Phase 1 of the relocation backlog is now complete:
 
-Status: complete
+- `ScTableOp` is treated as explicit host-owned repeated-operation state
+- `ScTTT` and `ScDebugVar` are treated as retained debug utilities
+- canonical relocation-debt metrics now track the live `Execute*` /
+  `ScMatchOp` closure set rather than a broad historical `Sc*` regex
 
-Goal: remove the first remaining Phase 4 blocker by letting matrix-consuming
-engine admissions consume external single/double refs instead of declining to
-legacy.
+## Working Rules
 
-Scope:
+1. Do not reopen closed contract-gap work unless the code proves a new gap.
+2. Prefer deleting Calc execution ownership over moving logic sideways inside
+   Calc.
+3. When a Calc path is intentionally retained, classify it as host-owned in
+   the same commit that removes it from this backlog.
+4. Adapter-only wrappers are not considered complete until normal execution no
+   longer depends on them.
+5. Keep this file, [HOST_FACADE_CONTRACTS.md](HOST_FACADE_CONTRACTS.md), and
+   [COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md](COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md)
+   aligned in the same change whenever ownership changes.
 
-- widen the lower-seam range-to-matrix bridge to accept
-  `svExternalSingleRef` / `svExternalDoubleRef`
-- reuse the existing external-reference cache helpers instead of adding a new
-  Calc-local materialization path
-- cover `TRANSPOSE`, `MDETERM`, `MMULT`, and `MINVERSE` with focused external
-  reference tests
+## Outstanding Inventory
 
-Definition of done:
+### Structural Shell And Classic-Entry Debt
 
-- external matrix formulas no longer decline purely because the source is
-  external
-- targeted matrix dispatch tests pass in forced-core mode
+- `ScInterpreter::Interpret()`
+- classic stack/token machinery in `interpre.hxx` and `interpr4.cxx`,
+  including `sp`, `maxsp`, `Push*`, `Pop*`, token iteration helpers, and
+  dispatch bookkeeping
+- engine-backed classic-entry dispatch that still runs through `Interpret()`
+  for:
+  `IF`, `IFERROR`, `IFNA`, `CHOOSE`, `IFS`, `SWITCH`,
+  `CHOOSECOLS`, `CHOOSEROWS`, `FILTER`, `SORT`, `DROP`, `EXPAND`,
+  `HSTACK`, `VSTACK`, `TAKE`, `TEXTSPLIT`, `TOCOL`, `TOROW`, `UNIQUE`,
+  `WRAPCOLS`, `WRAPROWS`
 
-### Slice 2: Upper-seam external-reference completion
+### Reference / Lookup / Addressing
 
-Status: complete
+- `ExecuteLookupTerminal`
+- `ExecuteXLookupTerminal`
+- `ExecuteIndirectTerminal`
+- `ExecuteAddressTerminal`
+- `ExecuteIndexTerminal`
+- `ExecuteMultiAreaTerminal`
+- `ExecuteExternalTerminal`
+- `ExecuteMissingTerminal`
+- `ExecuteRangeReferenceTerminal`
+- `ExecuteUnionTerminal`
+- `ExecuteIntersectTerminal`
+- `ScMatchOp`
 
-Goal: finish the Phase 4 "external refs" item at the authoritative seam rather
-than only in lower-seam audit lanes.
+These still need either upper-seam ownership or an explicit decision that the
+remaining terminal-only behavior is permanent host-owned glue.
 
-Current landing on the tree:
+### DB / Criteria / Transform
 
-- direct external single-cell refs now materialize authoritatively for
-  scalar-root formulas and the first matrix-math consumer
-- broader authoritative external-range / external-name support still remains
-  open
+- `ExecuteSubTotalTerminal`
+- `ExecuteDBAreaTerminal`
+- `ExecuteSortByTerminal`
+- `ExecuteColRowNameAutoTerminal`
+
+### Cell / Metadata / Inspection
+
+- `ExecuteTypeTerminal`
+- `ExecuteCellTerminal`
+- `ExecuteCellExternalTerminal`
+- `ExecuteCurrentTerminal`
+- `ExecuteStyleTerminal`
+- `ExecuteInfoTerminal`
+- `ExecuteNTerminal`
+
+### Matrix / Reference Projection
+
+- `ExecuteMatValueTerminal`
+- `ExecuteMatRefTerminal`
+
+These are the remaining Calc-side matrix-reference projection terminals that
+still block full shell deletion even though the broader matrix/statistical
+waves already landed upstream.
+
+### Adapter-Only Engine-Backed Residue
+
+These surfaces are already engine-owned in substance, but Calc still carries
+entrypoint or dispatch residue for them:
+
+- `ExecuteComparisonKernel`
+- `ExecuteLogicalFoldKernel`
+- `ExecuteUnaryMatrixOrScalarKernel`
+- `ExecuteBinaryMathKernel`
+- `ExecuteConcatKernel`
+- `ExecuteLetKernel`
+- `ExecuteFrequencyTerminal`
+- `ExecuteForecastEtsTerminal`
+- `ExecuteFourierTerminal`
+- `ExecuteSumXMY2Terminal`
+- `ExecuteRandomTerminal`
+- `ExecuteRandbetweenTerminal`
+- `ExecuteRandArrayTerminal`
+
+## Phased Implementation Plan
+
+### Phase 2: Engine-Backed Classic-Entry And Operator-Kernel Retirement
+
+Goal: remove the cases where the engine already owns execution semantics, but
+Calc still re-enters through classic-entry or kernel wrappers.
 
 Scope:
 
-- unify remaining external-ref scalar/range resolution in the compat AST walker
-- ensure matrix and reference consumers share one external-ref materialization
+- retire engine-backed classic-entry dispatch for:
+  `IF`, `IFERROR`, `IFNA`, `CHOOSE`, `IFS`, `SWITCH`,
+  `CHOOSECOLS`, `CHOOSEROWS`, `FILTER`, `SORT`, `DROP`, `EXPAND`,
+  `HSTACK`, `VSTACK`, `TAKE`, `TEXTSPLIT`, `TOCOL`, `TOROW`, `UNIQUE`,
+  `WRAPCOLS`, `WRAPROWS`
+- retire Calc execution ownership for:
+  `ExecuteComparisonKernel`, `ExecuteLogicalFoldKernel`,
+  `ExecuteUnaryMatrixOrScalarKernel`, `ExecuteBinaryMathKernel`,
+  `ExecuteConcatKernel`, `ExecuteLetKernel`
+- remove parity-only bridges whose only job is to feed already-engine-native
+  execution
+- keep control-flow and typed-stack state in engine runtime code rather than
+  reopening host-facade work
+
+Exit criteria:
+
+- the current engine-backed classic-entry set no longer uses `Interpret()` as
+  the execution owner
+- `interp4_dispatch_engine_backed_plan_engine_attempt_count` reflects only
+  intentionally retained host-owned residue, or reaches zero
+- the listed Calc kernels are deleted or reduced to trivial host-only stubs
+  with no evaluator logic
+- targeted parity coverage exists for scalar, matrix, spill, concatenation,
+  and control-flow shapes
+
+### Phase 3: Reference / Lookup / Addressing Ownership Closure
+
+Goal: finish the remaining reference/lookup wave now that `RangeResolver` is
+already available.
+
+Scope:
+
+- route `ExecuteLookupTerminal`, `ExecuteXLookupTerminal`,
+  `ExecuteIndirectTerminal`, `ExecuteAddressTerminal`,
+  `ExecuteIndexTerminal`, `ExecuteMultiAreaTerminal`,
+  `ExecuteExternalTerminal`, `ExecuteMissingTerminal`,
+  `ExecuteRangeReferenceTerminal`, `ExecuteUnionTerminal`,
+  `ExecuteIntersectTerminal`, and `ScMatchOp` through one explicit ownership
   story
-- extend authoritative / default-on tests for external refs
+- delete duplicated evaluator logic from Calc where the upper seam can now be
+  authoritative
+- classify any residual terminal-only behavior that truly must remain on the
+  host side
+- remove hidden reference-only execution from Calc-local stack code
 
-Definition of done:
+Exit criteria:
 
-- external refs used by promoted families succeed upstream under
-  `InterpretTail`
-- no promoted external-ref family requires lower-seam-only special handling
+- formulas that currently reach the listed terminals execute authoritatively
+  through `InterpretTail`, or the remaining behavior is explicitly documented
+  as host-owned
+- `ScMatchOp` no longer hides evaluator logic in Calc
+- no duplicated reference/lookup/address computation remains in Calc stack
+  code
+- parity coverage exists for named ranges, external references, INDIRECT,
+  union/intersection, and mixed matrix/reference shapes
 
-### Slice 3: Matrix-frame parity
+### Phase 4: Query / Criteria / Transform Closure
 
-Status: complete
-
-Goal: finish the remaining Phase 4 matrix-frame work that still forces Calc to
-own broadcast, jump-matrix, or array-context behavior.
-
-Current landing on the tree:
-
-- `InterpretTail` now preserves and projects exact-dimension matrix results
-  for matrix-origin formulas instead of collapsing every admitted matrix-origin
-  path back to a scalar top-left value
-- focused helper coverage now proves that `tryEvaluateFormula()` can preserve
-  selector and spill-family matrices when the caller explicitly requests
-  matrix-origin semantics, while the default helper path still returns the
-  historical top-left scalar
-- focused default-on coverage now proves multi-cell `CHOOSECOLS(...)`,
-  `HSTACK(...)`, and `IF(range;...;...)` matrix formulas can stay
-  authoritative at the upper seam
-- matrix `EXACT(...)` now materializes elementwise upstream, which clears the
-  1x1 matrix-origin `SUM(IF(EXACT(range);range;0))` blocker and lets that
-  classic jump-matrix-style scalar-result shape stay authoritative
-- forced-core audit coverage now proves that lower-seam engine admissions own
-  classic jump-matrix `IF(...)` reference-branch shapes, including the
-  `SUM(IF(EXACT(OFFSET(...):OFFSET(...));OFFSET(...):OFFSET(...);0))` form
-- forced-core audit coverage also now proves array-context `OFFSET(...)`
-  reference execution in matrix formulas
-- the remaining blocker is therefore not those specific lower-seam shapes, but
-  ambient authoritative ownership plus the still-open broadcast / generic
-  jump-matrix close-out
+Goal: finish the remaining query, subtotal, and transform ownership now that
+`RangeIterator` already exists.
 
 Scope:
 
-- broadcast-compatible matrix shapes
-- jump-matrix semantics
-- array-context behavior
-- one canonical range-to-matrix materialization story for local and external
-  ranges
+- retire Calc execution ownership for:
+  `ExecuteSubTotalTerminal`, `ExecuteDBAreaTerminal`,
+  `ExecuteSortByTerminal`, `ExecuteColRowNameAutoTerminal`
+- align `ExecuteSortByTerminal` with the spill-family ownership model instead
+  of leaving it as a Calc-only transform
+- delete Calc-local row walkers and criteria loops that duplicate engine-side
+  iteration and aggregation
+- classify any surviving host-only query behavior explicitly
 
-Definition of done:
+Exit criteria:
 
-- promoted matrix families no longer decline because of broadcast/jump-matrix
-  shape limits
-- the plan can mark Phase 4 complete
+- subtotal, DB-area, column-row-name, and SORTBY execution no longer depend on
+  interpreter-resident query loops
+- the listed terminals are either deleted or reduced to explicit host adapters
+  with no duplicated evaluator logic
+- parity coverage exists for named DB ranges, criteria grids, hidden/filter
+  semantics, and spill-shaped transforms
+- this backlog no longer treats query iteration as an open contract-gap area
 
-### Slice 4: Seam reconciliation, matrix/reference wave
+### Phase 5: Inspection / Metadata Closure
 
-Status: complete
-
-Goal: start closing Phase 6 by deleting overlapping lower-seam admissions for
-the families covered by Slices 1-3.
-
-Current landing on the tree:
-
-- duplicate lower-seam `tryPlanEngine*` overlap is now retired for the
-  matrix/reference wave: `COLUMNS`, `ROWS`, `SHEETS`, `COLUMN`, `ROW`,
-  `SHEET`, `AREAS`, `OFFSET`, `INDEX`, `MUNIT`, `MDETERM`, `MINVERSE`,
-  `MMULT`, `SEQUENCE`, `TRANSPOSE`, and `SORTBY`
-- the seam inventory floor therefore drops from 61 to 45 active
-  `tryPlanEngine*` attempt sites while keeping the residual scope honest
+Goal: remove the remaining inspection and metadata execution ownership from
+Calc now that formula and cell inspection contracts are already real.
 
 Scope:
 
-- remove `tryPlanEngine*` admissions whose only remaining job is duplicate
-  matrix/reference execution
-- update tests and counters so the upper seam is the named owner for those
-  classes
+- retire Calc execution ownership for:
+  `ExecuteTypeTerminal`, `ExecuteCellTerminal`,
+  `ExecuteCellExternalTerminal`, `ExecuteCurrentTerminal`,
+  `ExecuteStyleTerminal`, `ExecuteInfoTerminal`, `ExecuteNTerminal`
+- ensure formula text, type, format, and metadata reads flow only through the
+  explicit inspection/runtime adapters
+- delete interpreter-local policy that still decides inspection semantics in
+  Calc
+- classify any remaining document-property reads that are intentionally
+  host-owned
 
-Definition of done:
+Exit criteria:
 
-- matrix/reference overlap in `Interpret()` trends materially downward
-- Phase 6 open scope narrows to control-flow, spill, criteria/database,
-  regression/forecast, plus the host-sensitive `ADDRESS` / `INDIRECT`
-  reference helpers
+- the listed inspection terminals no longer own evaluator semantics in Calc
+- all remaining inspection behavior is either upper-seam owned or explicitly
+  documented as host-owned
+- parity coverage exists for formula-text reads, external-cell inspection,
+  format-sensitive behavior, and `N()` coercion
+- no new host contract work is needed to close this phase
 
-### Slice 5: Criteria/database tail substrate
+### Phase 6: Matrix Projection And Adapter-Tail Retirement
 
-Status: complete
-
-Current landing on the tree:
-
-- the upper seam and standalone `FormulaEvaluator` now share
-  `runtime/RpnDatabase.hxx` for database-query materialization, field-selector
-  normalization, OR-row criteria matching, and DB aggregation execution
-- COUNTIF/SUMIF/AVERAGEIF-style tails and the DB family (`DSUM`, `DCOUNT`,
-  `DCOUNTA`, `DAVERAGE`, `DGET`, `DMAX`, `DMIN`, `DPRODUCT`, `DSTDEV(P)`,
-  `DVAR(P)`) now consume that shared engine-native substrate instead of
-  bespoke Calc-local loops
-- focused authoritative/default-on tests now prove named-range, missing-field,
-  and count-without-field DB shapes at the upper seam, while the existing
-  shared-interpreter audit tests still cover the lower seam
-
-Goal: finish the remaining host-sensitive criteria/database substrate in a form
-that can later retire the corresponding lower-seam admissions.
+Goal: remove the remaining matrix/reference projection logic and the
+already-engine-backed matrix/statistical tail entrypoints from Calc.
 
 Scope:
 
-- remaining COUNTIF/SUMIF/AVERAGEIF-style tails
-- database-family materialization and criteria matching parity
+- retire Calc execution ownership for `ExecuteMatValueTerminal` and
+  `ExecuteMatRefTerminal`
+- retire Calc entrypoints for:
+  `ExecuteFrequencyTerminal`, `ExecuteForecastEtsTerminal`,
+  `ExecuteFourierTerminal`, `ExecuteSumXMY2Terminal`
+- unify remaining matrix/reference projection through runtime helpers rather
+  than interpreter-local bridges
+- classify any unavoidable host projection behavior explicitly
 
-Definition of done:
+Exit criteria:
 
-- criteria/database families consume shared engine-native substrate rather than
-  bespoke Calc-local loops
+- normal execution of the listed matrix/statistical families no longer enters
+  Calc kernels
+- the only surviving Calc matrix/reference behavior is explicitly documented
+  host projection glue, or the terminals are deleted entirely
+- matrix-state edge cases are owned by engine runtime code rather than ad hoc
+  interpreter helpers
+- parity coverage exists for array-context, forecast-tail, and
+  local-versus-external matrix-reference shapes
 
-### Slice 6: Regression / forecast substrate
+### Phase 7: Random Runtime And Shell Contraction
 
-Status: complete
-
-Current landing on the tree:
-
-- the upper seam now classifies scalar regression statistics
-  (`SLOPE`, `CORREL`, `PEARSON`, `RSQ`, `STEYX`, `COVAR`,
-  `COVARIANCE.P`, `COVARIANCE.S`) as `StatisticalDistribution`, so the
-  existing engine-native regression stats path stays authoritative under
-  `InterpretTail`
-- `LINEST`, `LOGEST`, `TREND`, and `GROWTH` now materialize matrix results
-  upstream through the shared `LinestEngine` substrate instead of relying on
-  interpreter-resident kernels
-- scalar helper paths now read the top-left value from that same shared
-  matrix result, and nested consumers like `INDEX(LOGEST(...))` can consume
-  those matrices authoritatively
-- the remaining regression/forecast work is therefore no longer math-kernel
-  ownership; it is the Slice 7 deletion pass over the overlapping
-  lower-seam admissions
-
-Goal: move the remaining numerical cores that still block end-to-end stack
-machine relocation.
+Goal: finish the already-landed random migration and then collapse the
+remaining `Interpret()` shell around the truly host-owned residue.
 
 Scope:
 
-- forecast / regression engines
-- parity and numerical-stability tests
+- retire Calc execution ownership for:
+  `ExecuteRandomTerminal`, `ExecuteRandbetweenTerminal`,
+  `ExecuteRandArrayTerminal`
+- keep RNG policy exclusively behind
+  `RuntimeEnvironment::sampleUniformReal()`
+- delete dead dispatch arms, adapter-only wrappers, and stack helpers made
+  unnecessary by the earlier phases
+- reduce `ScInterpreter::Interpret()` to explicit host-owned terminals and the
+  utilities that Phase 1 classified as intentionally retained
 
-Definition of done:
+Exit criteria:
 
-- forecast/regression no longer need interpreter-resident execution kernels
+- RAND, RANDBETWEEN.NV, and RANDARRAY no longer need Calc-side execution
+  kernels during normal relocated execution
+- no Calc-local RNG policy remains
+- `ScInterpreter::Interpret()` no longer owns execution for any backlog item
+  above
+- remaining Calc-resident evaluator code is limited to documented host-owned
+  terminals or explicitly retained debug/policy utilities
 
-### Slice 7: Seam reconciliation, residual wave
+## Success Metrics
 
-Status: complete
+The backlog is complete when all of the following are true:
 
-Current landing on the tree:
+- every symbol listed in this file has been migrated, deleted, or explicitly
+  classified as host-owned
+- `ScInterpreter::Interpret()` no longer owns execution for any active
+  relocation item
+- `legacy_interpreter_subroutine_count` reflects only explicit host-owned
+  terminals or intentionally retained utilities
+- no completed item remains in this file
+- the host-contract inventory and the boundary audit agree with the final
+  ownership state
 
-- duplicate lower-seam `tryPlanEngine*` overlap is now retired for the
-  criteria/database wave, the regression/forecast wave, and the remaining
-  promoted legacy-fallback helpers `ADDRESS`, `INDIRECT`, and
-  `ORG.LIBREOFFICE.FOURIER`
-- `interp4_dispatch_plan_engine_attempt_count` now measures only duplicate
-  overlap, and that count is `0`
-- the remaining `21` lower-seam `tryPlanEngine*` sites are now tracked
-  separately as engine-backed residual classic entry points for
-  `IF` / `IFERROR` / `IFNA` / `CHOOSE` / `IFS` / `SWITCH` and the spill
-  family, not as evidence of two owners for the same promoted class
-- Phase 6 can therefore be marked complete; Slice 8 is now a documentation
-  and handoff close-out rather than another authority-transfer code wave
+## Explicitly Out Of Scope
 
-Goal: finish Phase 6 by deleting the remaining overlapping lower-seam
-admissions once Slices 5-6 land.
+These remain outside the backlog unless a new product decision changes their
+status:
 
-Scope:
+- `ScTableOp`
+- `ScTTT`
+- `ScDebugVar`
+- `ScMacro`
+- `ScDde`
+- `ScWebservice`
+- `ScFilterXML`
+- `ScGetPivotData`
+- `ScHyperLink`
 
-- criteria/database lower-seam admissions
-- regression/forecast lower-seam admissions
-- headline dashboard cleanup so lower-seam attempt counts stop standing in for
-  progress on promoted classes
-
-Definition of done:
-
-- the pivot plan can mark Phase 6 complete
-- the project can name a single owner for every promoted family
-
-### Slice 8: Plan closure and relocation handoff
-
-Status: complete
-
-Current landing on the tree:
-
-- the pivot plan now records authority transfer as complete on the current
-  tree and hands active work to the relocation backlog
-- `PROJECT_STATUS.md` now treats live evaluation authority transfer as
-  complete and documents the remaining Calc-owned legacy surface in plain
-  relocation terms
-- the residual classic surface is now named explicitly as:
-  - the `ocBad` / `ocRange` parity-gap wrappers plus the 9 retired-scalar
-    audit sites
-  - the `21` engine-backed spill/control-flow classic-entry sites
-  - the remaining interpreter-resident legacy lambdas, legacy dispatch
-    targets, and host/application-state utilities measured on the dashboard
-- active work is therefore no longer framed as authority transfer; it is the
-  ordinary relocation queue below
-
-Goal: close the pivot plan honestly and turn the remaining work into plain
-module relocation rather than authority-transfer bookkeeping.
-
-Scope:
-
-- update the pivot plan and project status from `partial` to `complete`
-- document the residual legacy surface that still belongs in Calc
-- define the post-pivot relocation queue for any interpreter-state utilities
-  still worth moving into `spreadsheet_engine`
-
-Definition of done:
-
-- the pivot plan is fully closed out
-- remaining work is no longer framed as authority transfer
-
-## Working Order
-
-1. Slice 1
-2. Slice 2
-3. Slice 3
-4. Slice 4
-5. Slice 5
-6. Slice 6
-7. Slice 7
-8. Slice 8
-
-This order is intentional: it finishes the missing substrate first, then uses
-that substrate to delete overlap, then closes docs only after the code path is
-real.
-
-## Post-Pivot Relocation Queue
-
-1. Reduce `interp4_dispatch_legacy_lambda_count` by moving reusable
-   interpreter-resident helpers into `spreadsheet_engine` or deleting them
-   outright once parity is proven elsewhere.
-2. Reduce `legacy_interpreter_subroutine_count` by relocating the remaining
-   engine-worthy interpreter subroutines behind explicit host/module
-   contracts.
-3. Shrink `interp4_dispatch_engine_backed_plan_engine_attempt_count` by
-   deciding which spill/control-flow classic-entry sites should move upstream
-   and which should remain Calc-owned legacy surface.
-4. Retire the two older `tryPushEngine*` wrappers (`ocBad` and `ocRange`) once
-   their parity-gap reference/error handling is covered elsewhere.
-5. Extract interpreter-state utilities that are still generally useful to the
-   engine module, while leaving document/application host policy in Calc.
+If any of these move into scope, add a new phase instead of treating them as
+incidental cleanup.

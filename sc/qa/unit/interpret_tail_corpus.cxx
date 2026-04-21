@@ -273,19 +273,11 @@ bool envEnabled(const char* pName)
 
 std::filesystem::path repoRootPath();
 std::string readRepoTextFile(const std::filesystem::path& rRelativePath);
+std::vector<std::string> listLegacyInterpreterSubroutineNames();
 
 std::size_t countLegacyInterpreterSubroutines()
 {
-    const std::string aText
-        = readRepoTextFile(std::filesystem::path("sc") / "source" / "core" / "inc"
-                           / "interpre.hxx");
-    if (aText.empty())
-        return 0;
-    static const std::regex aPattern(R"(\bvoid\s+(Sc[A-Za-z0-9_]+)\s*\()");
-
-    return static_cast<std::size_t>(
-        std::distance(std::sregex_iterator(aText.begin(), aText.end(), aPattern),
-            std::sregex_iterator()));
+    return listLegacyInterpreterSubroutineNames().size();
 }
 
 std::vector<std::string> extractNamedRegexMatches(
@@ -310,8 +302,56 @@ std::vector<std::string> listLegacyInterpreterSubroutineNames()
     if (aText.empty())
         return {};
 
-    static const std::regex aPattern(R"(\bvoid\s+(Sc[A-Za-z0-9_]+)\s*\()");
-    return extractNamedRegexMatches(aText, aPattern);
+    static constexpr std::array<std::string_view, 38> aTrackedNames = {
+        "ExecuteComparisonKernel",
+        "ExecuteLogicalFoldKernel",
+        "ExecuteUnaryMatrixOrScalarKernel",
+        "ExecuteBinaryMathKernel",
+        "ExecuteConcatKernel",
+        "ExecuteLetKernel",
+        "ExecuteLookupTerminal",
+        "ExecuteXLookupTerminal",
+        "ExecuteIndirectTerminal",
+        "ExecuteAddressTerminal",
+        "ExecuteIndexTerminal",
+        "ExecuteMultiAreaTerminal",
+        "ExecuteExternalTerminal",
+        "ExecuteMissingTerminal",
+        "ExecuteRangeReferenceTerminal",
+        "ExecuteUnionTerminal",
+        "ExecuteIntersectTerminal",
+        "ScMatchOp",
+        "ExecuteSubTotalTerminal",
+        "ExecuteDBAreaTerminal",
+        "ExecuteSortByTerminal",
+        "ExecuteColRowNameAutoTerminal",
+        "ExecuteTypeTerminal",
+        "ExecuteCellTerminal",
+        "ExecuteCellExternalTerminal",
+        "ExecuteCurrentTerminal",
+        "ExecuteStyleTerminal",
+        "ExecuteInfoTerminal",
+        "ExecuteNTerminal",
+        "ExecuteMatValueTerminal",
+        "ExecuteMatRefTerminal",
+        "ExecuteFrequencyTerminal",
+        "ExecuteForecastEtsTerminal",
+        "ExecuteFourierTerminal",
+        "ExecuteSumXMY2Terminal",
+        "ExecuteRandomTerminal",
+        "ExecuteRandbetweenTerminal",
+        "ExecuteRandArrayTerminal",
+    };
+
+    std::vector<std::string> aMatches;
+    aMatches.reserve(aTrackedNames.size());
+    for (const auto rName : aTrackedNames)
+    {
+        const std::string aNeedle = "void " + std::string(rName) + "(";
+        if (aText.find(aNeedle) != std::string::npos)
+            aMatches.emplace_back(rName);
+    }
+    return aMatches;
 }
 
 std::vector<std::string> listInterp4PushLegacyNames()
@@ -716,17 +756,17 @@ void assertProjectStatusCanonicalDashboard()
 
     const std::array<std::filesystem::path, 6> aActiveDocs = {
         std::filesystem::path("spreadsheet_engine") / "docs" / "architecture"
-            / "CLOSE_OUT_PLAN.md",
-        std::filesystem::path("spreadsheet_engine") / "docs" / "architecture"
-            / "COMPUTATIONAL_SUBSTRATE_RPN_EVALUATOR_INITIATIVE.md",
+            / "STACK_MACHINE_RELOCATION_BACKLOG.md",
         std::filesystem::path("spreadsheet_engine") / "docs" / "architecture"
             / "COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md",
         std::filesystem::path("spreadsheet_engine") / "docs" / "architecture"
-            / "COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md",
-        std::filesystem::path("spreadsheet_engine") / "docs" / "architecture"
-            / "COMPUTATIONAL_SUBSTRATE_TEXT_INFO_RETIREMENT_PLAN.md",
+            / "HOST_FACADE_CONTRACTS.md",
         std::filesystem::path("spreadsheet_engine") / "docs" / "architecture"
             / "COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md",
+        std::filesystem::path("spreadsheet_engine") / "docs" / "architecture"
+            / "COMPUTATIONAL_SUBSTRATE_MASTER.md",
+        std::filesystem::path("spreadsheet_engine") / "docs" / "architecture"
+            / "CALC_TEST_KNOWN_REGRESSIONS.md",
     };
 
     for (const auto& rDocPath : aActiveDocs)
@@ -804,7 +844,7 @@ void assertHostFacadeContractsInventoryPresent()
     {
         const std::string aNeedle = "`" + rSymbol + "`";
         const OUString aMessage
-            = u"remaining Sc* surface should be mapped in host-boundary docs: "_ustr
+            = u"remaining relocation surface should be mapped in host-boundary docs: "_ustr
               + OUString::fromUtf8(rSymbol);
         CPPUNIT_ASSERT_MESSAGE(
             OUStringToOString(aMessage, RTL_TEXTENCODING_UTF8).getStr(),

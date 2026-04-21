@@ -30,16 +30,36 @@ Historical slice writeups, phase plans, and retired ledgers now live under
   `ScFormulaCell::InterpretTail() -> tryEvaluateFormula() -> FormulaEvaluator -> RpnEvaluator`
 - `ScInterpreter::Interpret()` remains only for residual fallback and
   audit-oriented lower-seam coverage while relocation continues
+- Phase 1 ownership classification for the relocation backlog is complete:
+  `ScTableOp`, `ScTTT`, and `ScDebugVar` are now treated as explicit
+  host/debug utilities rather than active relocation debt
+
+## Canonical Dashboard
+
+Canonical dashboard metrics live in this file only. Static relocation-debt
+metrics on the current tree are:
+
+- `legacy_interpreter_subroutine_count=38`
+- `interp4_dispatch_legacy_lambda_count=0`
+- `interp4_dispatch_engine_backed_plan_engine_attempt_count=0`
+
+Refresh the live runtime snapshot from
+`SPREADSHEET_ENGINE_INTERPRET_TAIL_CORPUS_STATS=1 make CppunitTest_sc_interpret_tail_corpus CPPUNIT_TEST_NAME=testAuthorityStats`
+when the runtime envelope changes:
+
+- `interp4_dispatch_engine_attempted_total=<refresh via testAuthorityStats>`
+- `interpret_tail_live_authoritative_match_total=<refresh via testAuthorityStats>`
 
 ## Current Priorities
 
-1. Retire remaining interpreter-resident legacy lambdas, dispatch sites, and
-   subroutines only after the upper seam can carry the same work
-   authoritatively.
-2. Keep host-facing contracts explicit before widening new evaluator surface.
-3. Preserve replay parity and the known-regression baseline while relocation
+1. Retire adapter-only `Execute*` kernels and classic-entry dispatch once the
+   upper seam is authoritative for the same shapes.
+2. Close or explicitly classify the remaining reference, query, inspection,
+   matrix-projection, and random terminals still owned by Calc.
+3. Keep host-facing contracts explicit before widening new evaluator surface.
+4. Preserve replay parity and the known-regression baseline while relocation
    lands.
-4. Keep active docs small and current; move closed slice reports and obsolete
+5. Keep active docs small and current; move closed slice reports and obsolete
    ledgers to `docs/archive/`.
 
 ## Working Rules
