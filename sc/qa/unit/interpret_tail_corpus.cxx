@@ -347,6 +347,12 @@ struct Interp4EngineDispatchInventory
     std::size_t mnTryPlanEngineBackedCaseCount = 0;
 };
 
+struct Interp4LegacyStackKernelInventory
+{
+    std::size_t mnLegacyCaseCallCount = 0;
+    std::vector<std::string> maLegacyCallNames;
+};
+
 std::filesystem::path repoRootPath()
 {
     return std::filesystem::path(SPREADSHEETENGINE_TEST_ROOT).parent_path();
@@ -626,6 +632,29 @@ Interp4EngineDispatchInventory countInterp4EngineDispatchAttempts()
                 ++aInventory.mnTryPlanAttemptCaseCount;
         }
     }
+    return aInventory;
+}
+
+Interp4LegacyStackKernelInventory countInterp4LegacyStackKernelCalls()
+{
+    std::ifstream aStream(repoRootPath() / "sc" / "source" / "core" / "tool" / "interpr4.cxx");
+    if (!aStream.is_open())
+        return {};
+
+    Interp4LegacyStackKernelInventory aInventory;
+    static const std::regex aLegacyCallPattern(
+        R"(\b(ScMul|ScDiv|ScAmpersand|ScPow|ScCompareOp|ScLogicalFoldOp|ScUnaryMatrixOrScalarOp|ScSyntheticBinaryOp|ScLet)\s*\()");
+
+    for (std::string aLine; std::getline(aStream, aLine);)
+    {
+        for (std::sregex_iterator aIt(aLine.begin(), aLine.end(), aLegacyCallPattern), aEnd;
+             aIt != aEnd; ++aIt)
+        {
+            ++aInventory.mnLegacyCaseCallCount;
+            aInventory.maLegacyCallNames.push_back((*aIt)[1].str());
+        }
+    }
+
     return aInventory;
 }
 
@@ -5998,6 +6027,14 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testSeamReconciliationTryPushWrapp
               << aInventory.mnTryPlanAttemptCaseCount << '\n';
     std::cout << "interp4_dispatch_engine_backed_plan_engine_attempt_count="
               << aInventory.mnTryPlanEngineBackedCaseCount << '\n';
+}
+
+CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testSeamReconciliationLegacyStackKernelFloor)
+{
+    const Interp4LegacyStackKernelInventory aInventory = countInterp4LegacyStackKernelCalls();
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "Interpret() should no longer dispatch operator/control stack kernels through legacy Sc* entry points",
+        std::size_t(0), aInventory.mnLegacyCaseCallCount);
 }
 
 } // namespace

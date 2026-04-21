@@ -677,6 +677,45 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterOperatorDispatch)
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterLetKernelRetirement)
+{
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    ScopedEnvironmentOverride aMode(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+    ScopedEnvironmentOverride aForceCalculation("SC_FORCE_CALCULATION", "core");
+    ScopedEnvironmentOverride aDisableAuthorityWhileOff(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF", "0");
+
+    m_pDoc->InsertTab(0, u"Let"_ustr);
+    resetScInterpreterDispatchRuntimeStats();
+    resetScInterpreterReachabilityStats();
+    resetScInterpreterClassicOpcodeRuntimeStats();
+
+    m_pDoc->SetValue(ScAddress(0, 0, 0), 10.0);
+    m_pDoc->SetString(ScAddress(1, 0, 0), u"=LET(first;5;second;first+7;second)"_ustr);
+    m_pDoc->SetString(ScAddress(1, 1, 0), u"=LET(ref;A1;IF(ISREF(ref);ref+1;0))"_ustr);
+
+    ASSERT_DOUBLES_EQUAL(12.0, m_pDoc->GetValue(ScAddress(1, 0, 0)));
+    ASSERT_DOUBLES_EQUAL(11.0, m_pDoc->GetValue(ScAddress(1, 1, 0)));
+
+    const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "LET retirement should not introduce lower-seam engine debt",
+        sal_uInt64(0), aDispatchStats.mnEngineAttemptedCount);
+
+    const auto aReachabilityStats = getScInterpreterReachabilityStatsSnapshot();
+    CPPUNIT_ASSERT_MESSAGE(
+        "LET retirement test should still reach classic ScInterpreter::Interpret()",
+        aReachabilityStats.mnClassicInterpretCount > 0);
+
+    const auto aClassicOpcodeStats = getScInterpreterClassicOpcodeRuntimeStatsSnapshot();
+    CPPUNIT_ASSERT_MESSAGE("LET retirement test should record ocLet in the classic opcode census",
+                           aClassicOpcodeStats.maOpcodeCounts[static_cast<std::size_t>(ocLet)]
+                               >= 1);
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterControlFlowIfDispatch)
 {
     sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);

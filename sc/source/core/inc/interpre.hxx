@@ -39,6 +39,7 @@
 #include <spreadsheetengine/compat/libreoffice/LookupExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/ReferenceExecution.hxx>
 #include <spreadsheetengine/runtime/CellInspection.hxx>
+#include <spreadsheetengine/runtime/RpnOperators.hxx>
 #include <spreadsheetengine/runtime/ScalarCoercion.hxx>
 
 #include <unordered_map>
@@ -663,18 +664,20 @@ private:
     void ScLookup();
     void ScXLookup();
     void ScSortBy();
-    void ScLet();
     void ScSubTotal();
 
 private:
-    void ScCompareOp(
+    void ExecuteComparisonKernel(
         spreadsheetengine::compat::libreoffice::interpreterdispatch::ComparisonMode eMode,
         ScQueryOp eOp);
-    void ScLogicalFoldOp(
+    void ExecuteLogicalFoldKernel(
         spreadsheetengine::compat::libreoffice::interpreterdispatch::LogicalFoldMode eMode);
-    void ScUnaryMatrixOrScalarOp(
+    void ExecuteUnaryMatrixOrScalarKernel(
         spreadsheetengine::compat::libreoffice::interpreterdispatch::UnaryMatrixScalarMode eMode);
-    void ScSyntheticBinaryOp(OpCode eOpCode, void (ScInterpreter::*pOperation)());
+    void ExecuteBinaryMathKernel(
+        spreadsheetengine::core::rpn::BinaryScalarOperator eOperator);
+    void ExecuteConcatKernel();
+    void ExecuteLetKernel();
     void ScMatchOp(bool bExtended);
 
 public:
@@ -722,10 +725,6 @@ public:
             ::std::vector<double>& rSortArray, bool bWeekendMask[ 7 ], bool bWorkdayFunction );
     static inline sal_Int16 GetDayOfWeek( sal_Int32 n );
     void RoundNumber( rtl_math_RoundingMode eMode );
-    void ScAmpersand();
-    void ScMul();
-    void ScDiv();
-    void ScPow();
     void ScCurrent();
     void ScStyle();
     void ScDde();

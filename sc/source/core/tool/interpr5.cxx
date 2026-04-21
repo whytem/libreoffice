@@ -785,7 +785,7 @@ void ScInterpreter::CalculateAddSub(bool _bSub)
     }
 }
 
-void ScInterpreter::ScAmpersand()
+void ScInterpreter::ExecuteConcatKernel()
 {
     ScMatrixRef pMat1 = nullptr;
     ScMatrixRef pMat2 = nullptr;
@@ -876,84 +876,8 @@ void ScInterpreter::ScAmpersand()
     }
 }
 
-void ScInterpreter::ScMul()
-{
-    ScMatrixRef pMat1 = nullptr;
-    ScMatrixRef pMat2 = nullptr;
-    double fVal1 = 0.0, fVal2 = 0.0;
-    SvNumFormatType nFmtCurrencyType = nCurFmtType;
-    sal_uLong nFmtCurrencyIndex = nCurFmtIndex;
-    if ( GetStackType() == svMatrix )
-        pMat2 = GetMatrix();
-    else
-    {
-        fVal2 = GetDouble();
-        switch ( nCurFmtType )
-        {
-            case SvNumFormatType::CURRENCY :
-                nFmtCurrencyType = nCurFmtType;
-                nFmtCurrencyIndex = nCurFmtIndex;
-            break;
-            default: break;
-        }
-    }
-    if ( GetStackType() == svMatrix )
-        pMat1 = GetMatrix();
-    else
-    {
-        fVal1 = GetDouble();
-        switch ( nCurFmtType )
-        {
-            case SvNumFormatType::CURRENCY :
-                nFmtCurrencyType = nCurFmtType;
-                nFmtCurrencyIndex = nCurFmtIndex;
-            break;
-            default: break;
-        }
-    }
-    if (pMat1 && pMat2)
-    {
-        ScMatrixRef pResMat = lcl_MatrixCalculation( *pMat1, *pMat2, this, MatrixMul);
-        if (!pResMat)
-            PushNoValue();
-        else
-            PushMatrix(pResMat);
-    }
-    else if (pMat1 || pMat2)
-    {
-        double fVal;
-        ScMatrixRef pMat = std::move(pMat1);
-        if (!pMat)
-        {
-            fVal = fVal1;
-            pMat = std::move(pMat2);
-        }
-        else
-            fVal = fVal2;
-        SCSIZE nC, nR;
-        pMat->GetDimensions(nC, nR);
-        ScMatrixRef pResMat = GetNewMat(nC, nR, /*bEmpty*/true);
-        if (pResMat)
-        {
-            pMat->MulOp( fVal, *pResMat);
-            PushMatrix(pResMat);
-        }
-        else
-            PushIllegalArgument();
-    }
-    else
-    {
-        // Determine nFuncFmtType type before PushDouble().
-        if ( nFmtCurrencyType == SvNumFormatType::CURRENCY )
-        {
-            nFuncFmtType = nFmtCurrencyType;
-            nFuncFmtIndex = nFmtCurrencyIndex;
-        }
-        PushDouble(fVal1 * fVal2);
-    }
-}
-
-void ScInterpreter::ScDiv()
+void ScInterpreter::ExecuteBinaryMathKernel(
+    spreadsheetengine::core::rpn::BinaryScalarOperator eOperator)
 {
     ScMatrixRef pMat1 = nullptr;
     ScMatrixRef pMat2 = nullptr;
@@ -961,92 +885,66 @@ void ScInterpreter::ScDiv()
     SvNumFormatType nFmtCurrencyType = nCurFmtType;
     sal_uLong nFmtCurrencyIndex = nCurFmtIndex;
     SvNumFormatType nFmtCurrencyType2 = SvNumFormatType::UNDEFINED;
-    if ( GetStackType() == svMatrix )
-        pMat2 = GetMatrix();
-    else
-    {
-        fVal2 = GetDouble();
-        // do not take over currency, 123kg/456USD is not USD
-        nFmtCurrencyType2 = nCurFmtType;
-    }
-    if ( GetStackType() == svMatrix )
-        pMat1 = GetMatrix();
-    else
-    {
-        fVal1 = GetDouble();
-        switch ( nCurFmtType )
-        {
-            case SvNumFormatType::CURRENCY :
-                nFmtCurrencyType = nCurFmtType;
-                nFmtCurrencyIndex = nCurFmtIndex;
-            break;
-            default: break;
-        }
-    }
-    if (pMat1 && pMat2)
-    {
-        ScMatrixRef pResMat = lcl_MatrixCalculation( *pMat1, *pMat2, this, MatrixDiv);
-        if (!pResMat)
-            PushNoValue();
-        else
-            PushMatrix(pResMat);
-    }
-    else if (pMat1 || pMat2)
-    {
-        double fVal;
-        bool bFlag;
-        ScMatrixRef pMat = std::move(pMat1);
-        if (!pMat)
-        {
-            fVal = fVal1;
-            pMat = std::move(pMat2);
-            bFlag = true;           // double - Matrix
-        }
-        else
-        {
-            fVal = fVal2;
-            bFlag = false;          // Matrix - double
-        }
-        SCSIZE nC, nR;
-        pMat->GetDimensions(nC, nR);
-        ScMatrixRef pResMat = GetNewMat(nC, nR, /*bEmpty*/true);
-        if (pResMat)
-        {
-            pMat->DivOp( bFlag, fVal, *pResMat);
-            PushMatrix(pResMat);
-        }
-        else
-            PushIllegalArgument();
-    }
-    else
-    {
-        // Determine nFuncFmtType type before PushDouble().
-        if (    nFmtCurrencyType  == SvNumFormatType::CURRENCY &&
-                nFmtCurrencyType2 != SvNumFormatType::CURRENCY)
-        {   // even USD/USD is not USD
-            nFuncFmtType = nFmtCurrencyType;
-            nFuncFmtIndex = nFmtCurrencyIndex;
-        }
-        PushDouble( div( fVal1, fVal2) );
-    }
-}
 
-void ScInterpreter::ScPow()
-{
-    ScMatrixRef pMat1 = nullptr;
-    ScMatrixRef pMat2 = nullptr;
-    double fVal1 = 0.0, fVal2 = 0.0;
+    const auto pMatrixOperation = [&]() -> double (*)(const double&, const double&) {
+        switch (eOperator)
+        {
+            case spreadsheetengine::core::rpn::BinaryScalarOperator::Multiply:
+                return MatrixMul;
+            case spreadsheetengine::core::rpn::BinaryScalarOperator::Divide:
+                return MatrixDiv;
+            case spreadsheetengine::core::rpn::BinaryScalarOperator::Power:
+                return MatrixPow;
+            default:
+                return nullptr;
+        }
+    }();
+
     if ( GetStackType() == svMatrix )
         pMat2 = GetMatrix();
     else
+    {
         fVal2 = GetDouble();
+        if (eOperator == spreadsheetengine::core::rpn::BinaryScalarOperator::Multiply)
+        {
+            switch ( nCurFmtType )
+            {
+                case SvNumFormatType::CURRENCY :
+                    nFmtCurrencyType = nCurFmtType;
+                    nFmtCurrencyIndex = nCurFmtIndex;
+                break;
+                default: break;
+            }
+        }
+        else if (eOperator == spreadsheetengine::core::rpn::BinaryScalarOperator::Divide)
+        {
+            // do not take over currency, 123kg/456USD is not USD
+            nFmtCurrencyType2 = nCurFmtType;
+        }
+    }
     if ( GetStackType() == svMatrix )
         pMat1 = GetMatrix();
     else
+    {
         fVal1 = GetDouble();
+        if (eOperator == spreadsheetengine::core::rpn::BinaryScalarOperator::Multiply
+            || eOperator == spreadsheetengine::core::rpn::BinaryScalarOperator::Divide)
+        {
+            switch ( nCurFmtType )
+            {
+                case SvNumFormatType::CURRENCY :
+                    nFmtCurrencyType = nCurFmtType;
+                    nFmtCurrencyIndex = nCurFmtIndex;
+                break;
+                default: break;
+            }
+        }
+    }
     if (pMat1 && pMat2)
     {
-        ScMatrixRef pResMat = lcl_MatrixCalculation( *pMat1, *pMat2, this, MatrixPow);
+        ScMatrixRef pResMat = pMatrixOperation
+                                  ? lcl_MatrixCalculation(*pMat1, *pMat2, this, pMatrixOperation)
+                                  : nullptr;
         if (!pResMat)
             PushNoValue();
         else
@@ -1054,26 +952,37 @@ void ScInterpreter::ScPow()
     }
     else if (pMat1 || pMat2)
     {
-        double fVal;
-        bool bFlag;
+        double fVal = 0.0;
+        bool bFlag = false;
         ScMatrixRef pMat = std::move(pMat1);
         if (!pMat)
         {
             fVal = fVal1;
             pMat = std::move(pMat2);
-            bFlag = true;           // double - Matrix
+            bFlag = true;           // scalar - Matrix
         }
         else
-        {
             fVal = fVal2;
-            bFlag = false;          // Matrix - double
-        }
         SCSIZE nC, nR;
         pMat->GetDimensions(nC, nR);
         ScMatrixRef pResMat = GetNewMat(nC, nR, /*bEmpty*/true);
         if (pResMat)
         {
-            pMat->PowOp( bFlag, fVal, *pResMat);
+            switch (eOperator)
+            {
+                case spreadsheetengine::core::rpn::BinaryScalarOperator::Multiply:
+                    pMat->MulOp(fVal, *pResMat);
+                    break;
+                case spreadsheetengine::core::rpn::BinaryScalarOperator::Divide:
+                    pMat->DivOp(bFlag, fVal, *pResMat);
+                    break;
+                case spreadsheetengine::core::rpn::BinaryScalarOperator::Power:
+                    pMat->PowOp(bFlag, fVal, *pResMat);
+                    break;
+                default:
+                    PushIllegalArgument();
+                    return;
+            }
             PushMatrix(pResMat);
         }
         else
@@ -1081,7 +990,33 @@ void ScInterpreter::ScPow()
     }
     else
     {
-        PushDouble( sc::power( fVal1, fVal2));
+        switch (eOperator)
+        {
+            case spreadsheetengine::core::rpn::BinaryScalarOperator::Multiply:
+                if ( nFmtCurrencyType == SvNumFormatType::CURRENCY )
+                {
+                    nFuncFmtType = nFmtCurrencyType;
+                    nFuncFmtIndex = nFmtCurrencyIndex;
+                }
+                PushDouble(fVal1 * fVal2);
+                break;
+            case spreadsheetengine::core::rpn::BinaryScalarOperator::Divide:
+                if (    nFmtCurrencyType  == SvNumFormatType::CURRENCY &&
+                        nFmtCurrencyType2 != SvNumFormatType::CURRENCY)
+                {
+                    // even USD/USD is not USD
+                    nFuncFmtType = nFmtCurrencyType;
+                    nFuncFmtIndex = nFmtCurrencyIndex;
+                }
+                PushDouble(div(fVal1, fVal2));
+                break;
+            case spreadsheetengine::core::rpn::BinaryScalarOperator::Power:
+                PushDouble(sc::power(fVal1, fVal2));
+                break;
+            default:
+                PushIllegalArgument();
+                break;
+        }
     }
 }
 

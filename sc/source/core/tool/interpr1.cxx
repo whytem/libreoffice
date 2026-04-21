@@ -1059,7 +1059,7 @@ ScMatrixRef ScInterpreter::QueryMat( const ScMatrixRef& pMat, sc::CompareOptions
     return pResultMatrix;
 }
 
-void ScInterpreter::ScCompareOp(seinterpre::ComparisonMode eMode, ScQueryOp eOp)
+void ScInterpreter::ExecuteComparisonKernel(seinterpre::ComparisonMode eMode, ScQueryOp eOp)
 {
     if (GetStackType(1) == svMatrix || GetStackType(2) == svMatrix)
     {
@@ -1077,7 +1077,7 @@ void ScInterpreter::ScCompareOp(seinterpre::ComparisonMode eMode, ScQueryOp eOp)
     PushInt(int(seinterpre::matchesComparisonResult(Compare(eOp), eMode)));
 }
 
-void ScInterpreter::ScLogicalFoldOp(seinterpre::LogicalFoldMode eMode)
+void ScInterpreter::ExecuteLogicalFoldKernel(seinterpre::LogicalFoldMode eMode)
 {
     nFuncFmtType = SvNumFormatType::LOGICAL;
     short nParamCount = GetByte();
@@ -1186,7 +1186,8 @@ void ScInterpreter::ScLogicalFoldOp(seinterpre::LogicalFoldMode eMode)
         PushNoValue();
 }
 
-void ScInterpreter::ScUnaryMatrixOrScalarOp(seinterpre::UnaryMatrixScalarMode eMode)
+void ScInterpreter::ExecuteUnaryMatrixOrScalarKernel(
+    seinterpre::UnaryMatrixScalarMode eMode)
 {
     switch (GetStackType())
     {
@@ -1219,18 +1220,6 @@ void ScInterpreter::ScUnaryMatrixOrScalarOp(seinterpre::UnaryMatrixScalarMode eM
             else
                 PushInt(int(GetDouble() == 0.0));
     }
-}
-
-void ScInterpreter::ScSyntheticBinaryOp(OpCode eOpCode, void (ScInterpreter::*pOperation)())
-{
-    const FormulaToken* pSaveCur = pCur;
-    const sal_uInt8 nSavePar = cPar;
-    cPar = 2;
-    FormulaByteToken aOperation(eOpCode, cPar);
-    pCur = &aOperation;
-    (this->*pOperation)();
-    pCur = pSaveCur;
-    cPar = nSavePar;
 }
 
 void ScInterpreter::ScMatchOp(bool bExtended)
@@ -4038,7 +4027,7 @@ void ScInterpreter::ScSortBy()
     }
 }
 
-void ScInterpreter::ScLet()
+void ScInterpreter::ExecuteLetKernel()
 {
     const short* pJump = pCur->GetJump();
     short nJumpCount = pJump[0];
