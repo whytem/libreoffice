@@ -11,6 +11,9 @@ The project now has two different kinds of success:
 - shared-engine extraction: materially achieved
 - live authority transfer inside Calc: still incomplete
 
+The active dependency-ordered close-out queue for the remaining work is
+[STACK_MACHINE_RELOCATION_BACKLOG.md](STACK_MACHINE_RELOCATION_BACKLOG.md).
+
 The pivot is to stop treating more below-seam leaf admissions as the main
 product and instead build toward one engine-native execution path that can
 carry real Calc traffic under `ScFormulaCell::InterpretTail()`.

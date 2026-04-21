@@ -174,7 +174,9 @@ now give the project one explicit host-contract inventory for the remaining
 legacy surface. Phase 3 and Phase 5 are now complete; Phases 4 and 6 are
 partially complete (external-reference and broadcast/jump-matrix edges remain
 open for Phase 4, and lower-seam `tryPlanEngine*` admissions remain open for
-Phase 6). Upstream
+Phase 6). The active dependency-ordered close-out queue now lives in
+[STACK_MACHINE_RELOCATION_BACKLOG.md](architecture/STACK_MACHINE_RELOCATION_BACKLOG.md).
+Upstream
 `InterpretTail -> RpnEvaluator` counters are wired and observation is
 default-on in all builds. The FormulaEvaluator (AST walker used by the upper
 seam) now delegates binary/unary operators to
