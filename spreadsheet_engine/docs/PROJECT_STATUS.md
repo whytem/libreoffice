@@ -107,6 +107,7 @@ These are the current retirement and audit counters:
 - `interp4_dispatch_legacy_dispatch_target_count=21`
 - `interp4_dispatch_legacy_call_count=31`
 - `interp4_dispatch_engine_attempt_count=2`
+- `interp4_dispatch_plan_engine_attempt_count=61`
 - `interp4_dispatch_engine_attempted_total=0`
 - `interp4_dispatch_engine_succeeded_total=0`
 - `interp4_dispatch_engine_declined_total=0`
@@ -143,10 +144,14 @@ relocating Calc logic rather than moving authority into the standalone engine.
 Phase 6 (Seam Reconciliation) removed 34 lower-seam `tryPushEngine*` dispatch
 wrappers, their 5 backing lambda definitions, 8 operand-builder helpers, and
 the `mnTextInfoEngine*` stats triad. `interp4_dispatch_engine_attempt_count`
-dropped from 36 to 2: only `ocBad` (retirement template) and `ocRange`
-(parity-gap reference) retain lower-seam engine dispatch. The upper seam
-(`InterpretTail`) is now the single owner for all promoted families; the lower
-seam no longer claims overlapping work.
+now refers specifically to the old `tryPushEngine*` wrapper family, and that
+count dropped from 36 to 2: only `ocBad` (retirement template) and `ocRange`
+(parity-gap reference) retain that older lower-seam wrapper style.
+`interp4_dispatch_plan_engine_attempt_count`, however, is still 61 on the
+current tree: `Interpret()` continues to carry active `tryPlanEngine*`
+admissions for control-flow, spill, reference, database/criteria, matrix, and
+forecast families. So the wrapper-cleanup slice landed, but full seam
+reconciliation is still partial rather than complete.
 `ocBad` remains the reference retirement template: the legacy `ScBadName()`
 path is deleted, and the classic interpreter no longer coexists with an
 alternate Calc implementation for root error literals. Phase 2 of the authority-transfer pivot is now
@@ -154,8 +159,10 @@ also complete: [HOST_FACADE_CONTRACTS.md](architecture/HOST_FACADE_CONTRACTS.md)
 and
 [COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md](architecture/COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md)
 now give the project one explicit host-contract inventory for the remaining
-legacy surface. Phase 3 and Phase 5 are now complete; Phase 4 is partially complete
-(external-reference and broadcast/jump-matrix edges remain open). Upstream
+legacy surface. Phase 3 and Phase 5 are now complete; Phases 4 and 6 are
+partially complete (external-reference and broadcast/jump-matrix edges remain
+open for Phase 4, and lower-seam `tryPlanEngine*` admissions remain open for
+Phase 6). Upstream
 `InterpretTail -> RpnEvaluator` counters are wired and observation is
 default-on in all builds. The FormulaEvaluator (AST walker used by the upper
 seam) now delegates binary/unary operators to
@@ -174,9 +181,10 @@ concentrated in the still-deferred external-reference and
 broadcast-compatible / jump-matrix matrix-frame paths rather than the
 earlier broad control-flow/ref/matrix split. Phase 5 (Ambient Default-On
 Pilot) has proven the existing default-on state with AutoCalc enabled.
-Phase 6 (Seam Reconciliation) is complete: the upper seam is the single
-owner for all promoted families, and `interp4_dispatch_engine_attempt_count`
-has dropped from 36 to 2 (ocBad + ocRange only). Phase 5 detail:
+Phase 6 (Seam Reconciliation) is still partial: the old `tryPushEngine*`
+wrapper family has dropped from 36 sites to 2 (`ocBad` + `ocRange`), but 61
+lower-seam `tryPlanEngine*` admissions remain in `Interpret()`, so the upper
+seam is not yet the single owner for all promoted families. Phase 5 detail:
 promoted families are authoritative when both
 `authoritativeWhileOffEnabled()` (default true) and family promotion
 (`isFamilyLocalDefaultOnFormula()`) are active — this is the real authority
@@ -507,8 +515,10 @@ Immediate consequence:
 
 - the next honest migration metric is reduction in
   `interp4_dispatch_legacy_lambda_count`
-- `interp4_dispatch_engine_attempt_count` is now 2 (ocBad + ocRange only);
-  the upper seam owns all promoted families after Phase 6 seam reconciliation
+- `interp4_dispatch_engine_attempt_count` is now 2, but that now measures
+  only the older `tryPushEngine*` wrapper family
+- `interp4_dispatch_plan_engine_attempt_count=61` is the live reminder that
+  full seam reconciliation is still open in `Interpret()`
 - no new `pushLegacy*` lambdas should be treated as progress unless they are
   temporary compatibility fallbacks for already engine-owned roots
 - the first prerequisite before opcode-by-opcode migration is a fixed
@@ -568,8 +578,9 @@ Next routing policy:
 - keep `unsupported_function=0` as an explicit regression guard
 - steer the next phase off unseen live surface and genuine reduction in
   `interp4_dispatch_legacy_lambda_count`
-- `interp4_dispatch_engine_attempt_count` is at floor (2) after Phase 6;
-  any growth signals new lower-seam dispatch sites that should route upstream
+- `interp4_dispatch_engine_attempt_count` is at floor (2) for the old
+  `tryPushEngine*` wrapper family, but `interp4_dispatch_plan_engine_attempt_count`
+  remains the open lower-seam overlap surface
 - treat wrapper deletion as secondary unless the relocated legacy dispatch
   surface also falls
 - use the host-boundary audit as the design gate for the next subsystem work

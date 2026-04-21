@@ -340,9 +340,10 @@ struct Interp4LegacyLambdaInventory
 
 struct Interp4EngineDispatchInventory
 {
-    std::size_t mnAttemptCaseCount = 0;
-    std::size_t mnPolicyAnnotatedAttemptCount = 0;
-    std::vector<std::size_t> maMissingPolicyLineNumbers;
+    std::size_t mnTryPushAttemptCaseCount = 0;
+    std::size_t mnTryPushPolicyAnnotatedAttemptCount = 0;
+    std::vector<std::size_t> maTryPushMissingPolicyLineNumbers;
+    std::size_t mnTryPlanAttemptCaseCount = 0;
 };
 
 std::filesystem::path repoRootPath()
@@ -575,7 +576,8 @@ Interp4EngineDispatchInventory countInterp4EngineDispatchAttempts()
         return {};
 
     Interp4EngineDispatchInventory aInventory;
-    static const std::regex aAttemptPattern(R"(\bif\s*\(!tryPushEngine[A-Za-z0-9_]*\s*\()");
+    static const std::regex aTryPushAttemptPattern(R"(\bif\s*\(!tryPushEngine[A-Za-z0-9_]*\s*\()");
+    static const std::regex aTryPlanAttemptPattern(R"(\bif\s*\(!tryPlanEngine[A-Za-z0-9_]*\s*\()");
     static constexpr std::string_view aPolicyMarker = "PIVOT_ALLOW_LOWER_SEAM_ADMISSION:";
     std::vector<std::string> aLines;
     for (std::string aLine; std::getline(aStream, aLine);)
@@ -584,9 +586,9 @@ Interp4EngineDispatchInventory countInterp4EngineDispatchAttempts()
     for (std::size_t nLine = 0; nLine < aLines.size(); ++nLine)
     {
         const std::string& aLine = aLines[nLine];
-        if (std::regex_search(aLine, aAttemptPattern))
+        if (std::regex_search(aLine, aTryPushAttemptPattern))
         {
-            ++aInventory.mnAttemptCaseCount;
+            ++aInventory.mnTryPushAttemptCaseCount;
             const std::size_t nStart = (nLine > 3) ? (nLine - 3) : 0;
             bool bAnnotated = false;
             for (std::size_t nLookback = nStart; nLookback <= nLine; ++nLookback)
@@ -598,10 +600,12 @@ Interp4EngineDispatchInventory countInterp4EngineDispatchAttempts()
                 }
             }
             if (bAnnotated)
-                ++aInventory.mnPolicyAnnotatedAttemptCount;
+                ++aInventory.mnTryPushPolicyAnnotatedAttemptCount;
             else
-                aInventory.maMissingPolicyLineNumbers.push_back(nLine + 1);
+                aInventory.maTryPushMissingPolicyLineNumbers.push_back(nLine + 1);
         }
+        if (std::regex_search(aLine, aTryPlanAttemptPattern))
+            ++aInventory.mnTryPlanAttemptCaseCount;
     }
     return aInventory;
 }
@@ -2761,11 +2765,13 @@ void printLiveAuthoritativeSummary(
     std::cout << "interp4_dispatch_legacy_call_count="
               << rLegacyLambdaInventory.mnDispatchCallCount << '\n';
     std::cout << "interp4_dispatch_engine_attempt_count="
-              << rEngineDispatchInventory.mnAttemptCaseCount << '\n';
+              << rEngineDispatchInventory.mnTryPushAttemptCaseCount << '\n';
     std::cout << "interp4_dispatch_engine_policy_annotated_attempt_count="
-              << rEngineDispatchInventory.mnPolicyAnnotatedAttemptCount << '\n';
+              << rEngineDispatchInventory.mnTryPushPolicyAnnotatedAttemptCount << '\n';
     std::cout << "interp4_dispatch_engine_policy_missing_attempt_count="
-              << rEngineDispatchInventory.maMissingPolicyLineNumbers.size() << '\n';
+              << rEngineDispatchInventory.maTryPushMissingPolicyLineNumbers.size() << '\n';
+    std::cout << "interp4_dispatch_plan_engine_attempt_count="
+              << rEngineDispatchInventory.mnTryPlanAttemptCaseCount << '\n';
     std::cout << "interp4_dispatch_engine_attempted_total="
               << rLiveDispatchRuntimeStats.mnEngineAttemptedCount << '\n';
     std::cout << "interp4_dispatch_engine_succeeded_total="
@@ -5256,10 +5262,11 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testHostFacadeContractsInventoryPr
 CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testLowerSeamEngineAttemptsCarryPivotRationale)
 {
     const Interp4EngineDispatchInventory aInventory = countInterp4EngineDispatchAttempts();
-    CPPUNIT_ASSERT_EQUAL(aInventory.mnAttemptCaseCount, aInventory.mnPolicyAnnotatedAttemptCount);
+    CPPUNIT_ASSERT_EQUAL(
+        aInventory.mnTryPushAttemptCaseCount, aInventory.mnTryPushPolicyAnnotatedAttemptCount);
     CPPUNIT_ASSERT_MESSAGE(
-        "all lower-seam engine-attempt sites should carry an explicit pivot rationale",
-        aInventory.maMissingPolicyLineNumbers.empty());
+        "all residual tryPushEngine lower-seam sites should carry an explicit pivot rationale",
+        aInventory.maTryPushMissingPolicyLineNumbers.empty());
 }
 
 CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
@@ -5561,9 +5568,10 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
         aLegacyLambdaInventory.mnQuarantineMissingDispatchLambdaCount);
     const auto aEngineDispatchInventory = countInterp4EngineDispatchAttempts();
     CPPUNIT_ASSERT_MESSAGE("interp4 engine attempt metric should scan interpr4.cxx",
-        aEngineDispatchInventory.mnAttemptCaseCount > 0);
+        aEngineDispatchInventory.mnTryPushAttemptCaseCount > 0
+            || aEngineDispatchInventory.mnTryPlanAttemptCaseCount > 0);
     CPPUNIT_ASSERT_EQUAL(std::size_t(0),
-        aEngineDispatchInventory.maMissingPolicyLineNumbers.size());
+        aEngineDispatchInventory.maTryPushMissingPolicyLineNumbers.size());
     CPPUNIT_ASSERT_EQUAL_MESSAGE(
         "core-forced full-legacy engine dispatch accounting should stay balanced",
         aCoreForcedSeamDisabledDispatchRuntimeStats.mnEngineAttemptedCount,
@@ -5947,17 +5955,22 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAmbientDefaultOnPilotRollbackP
     }
 }
 
-CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testSeamReconciliationNoOverlap)
+CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testSeamReconciliationTryPushWrapperFloor)
 {
     const Interp4EngineDispatchInventory aInventory = countInterp4EngineDispatchAttempts();
     CPPUNIT_ASSERT_EQUAL_MESSAGE(
-        "after seam reconciliation only ocBad and ocRange dispatch sites should remain",
-        std::size_t(2), aInventory.mnAttemptCaseCount);
+        "the old tryPushEngine wrapper family should be reduced to ocBad and ocRange",
+        std::size_t(2), aInventory.mnTryPushAttemptCaseCount);
     CPPUNIT_ASSERT_EQUAL_MESSAGE(
-        "remaining lower-seam sites should carry pivot rationale annotations",
-        std::size_t(0), aInventory.maMissingPolicyLineNumbers.size());
+        "remaining tryPushEngine sites should carry pivot rationale annotations",
+        std::size_t(0), aInventory.maTryPushMissingPolicyLineNumbers.size());
+    CPPUNIT_ASSERT_MESSAGE(
+        "Phase 6 is still partial while lower-seam tryPlanEngine admissions remain",
+        aInventory.mnTryPlanAttemptCaseCount > 0);
     std::cout << "interp4_dispatch_engine_attempt_count="
-              << aInventory.mnAttemptCaseCount << '\n';
+              << aInventory.mnTryPushAttemptCaseCount << '\n';
+    std::cout << "interp4_dispatch_plan_engine_attempt_count="
+              << aInventory.mnTryPlanAttemptCaseCount << '\n';
 }
 
 } // namespace

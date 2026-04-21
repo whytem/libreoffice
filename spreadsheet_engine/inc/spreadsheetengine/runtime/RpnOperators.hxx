@@ -121,6 +121,27 @@ enum class BinaryScalarOperator : std::uint8_t
     }
 }
 
+[[nodiscard]] inline bool evaluateOrderedComparison(int nOrder, BinaryScalarOperator eOperator)
+{
+    switch (eOperator)
+    {
+        case BinaryScalarOperator::Equal:
+            return nOrder == 0;
+        case BinaryScalarOperator::NotEqual:
+            return nOrder != 0;
+        case BinaryScalarOperator::Less:
+            return nOrder < 0;
+        case BinaryScalarOperator::LessEqual:
+            return nOrder <= 0;
+        case BinaryScalarOperator::Greater:
+            return nOrder > 0;
+        case BinaryScalarOperator::GreaterEqual:
+            return nOrder >= 0;
+        default:
+            return false;
+    }
+}
+
 [[nodiscard]] inline RpnCoercionResult<RpnValue> evaluateBinaryScalarOperator(
     BinaryScalarOperator eOperator, const RpnValue& rLeft, const RpnValue& rRight)
 {
@@ -145,10 +166,53 @@ enum class BinaryScalarOperator : std::uint8_t
 
     if (isComparisonOperator(eOperator))
     {
+        if (rLeft.meKind == RpnValueKind::Error)
+            return RpnCoercionResult<RpnValue>::failure(rLeft.maScalar.meError);
+        if (rRight.meKind == RpnValueKind::Error)
+            return RpnCoercionResult<RpnValue>::failure(rRight.maScalar.meError);
+
+        const auto compareWithEmpty = [&](const RpnValue& rOther, bool bEmptyIsLeft)
+            -> RpnCoercionResult<RpnValue> {
+            int nOrder = 0;
+            if (rOther.meKind == RpnValueKind::Empty)
+            {
+                nOrder = 0;
+            }
+            else if (rOther.meKind == RpnValueKind::String)
+            {
+                nOrder = rOther.maScalar.maString.empty() ? 0 : -1;
+            }
+            else
+            {
+                const auto aOtherNumber = coerceToNumber(rOther);
+                if (!aOtherNumber)
+                    return RpnCoercionResult<RpnValue>::failure(aOtherNumber.meError);
+                if (!fp::approxEqual(aOtherNumber.maValue, 0.0))
+                    nOrder = aOtherNumber.maValue < 0.0 ? 1 : -1;
+            }
+
+            if (!bEmptyIsLeft)
+                nOrder = -nOrder;
+            return RpnCoercionResult<RpnValue>::success(
+                RpnValue::boolean(evaluateOrderedComparison(nOrder, eOperator)));
+        };
+
+        if (rLeft.meKind == RpnValueKind::Empty)
+            return compareWithEmpty(rRight, true);
+        if (rRight.meKind == RpnValueKind::Empty)
+            return compareWithEmpty(rLeft, false);
+
         if (rLeft.meKind == RpnValueKind::String && rRight.meKind == RpnValueKind::String)
         {
             return RpnCoercionResult<RpnValue>::success(RpnValue::boolean(
                 evaluateStringComparison(rLeft.maScalar.maString, rRight.maScalar.maString, eOperator)));
+        }
+
+        if (rLeft.meKind == RpnValueKind::String || rRight.meKind == RpnValueKind::String)
+        {
+            const int nOrder = rLeft.meKind == RpnValueKind::String ? 1 : -1;
+            return RpnCoercionResult<RpnValue>::success(
+                RpnValue::boolean(evaluateOrderedComparison(nOrder, eOperator)));
         }
 
         const auto aLeftNumber = coerceToNumber(rLeft);

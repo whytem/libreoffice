@@ -140,6 +140,8 @@ int main()
         BinaryScalarOperator::Less, RpnValue::text(u"apple"), RpnValue::text(u"banana"));
     const auto aNumericEqual = evaluateBinaryScalarOperator(
         BinaryScalarOperator::Equal, RpnValue::number(4.0), RpnValue::text(u"4"));
+    const auto aNumericLessThanText = evaluateBinaryScalarOperator(
+        BinaryScalarOperator::Less, RpnValue::number(4.0), RpnValue::text(u"4"));
     const auto aDivisionByZero = evaluateBinaryScalarOperator(
         BinaryScalarOperator::Divide, RpnValue::number(1.0), RpnValue::number(0.0));
     const auto aDeferredBinary = evaluateBinaryScalarOperator(
@@ -153,7 +155,8 @@ int main()
         || aBinaryAdd.maValue.maScalar.mfNumber != 4.0 || !aConcat
         || aConcat.maValue.maScalar.maString != u"abTRUE" || !aStringLess
         || !aStringLess.maValue.maScalar.mfNumber || !aNumericEqual
-        || !aNumericEqual.maValue.maScalar.mfNumber || aDivisionByZero
+        || aNumericEqual.maValue.maScalar.mfNumber || !aNumericLessThanText
+        || !aNumericLessThanText.maValue.maScalar.mfNumber || aDivisionByZero
         || aDivisionByZero.meError != Error::DivisionByZero || aDeferredBinary
         || aDeferredBinary.meReadiness != RpnCoercionReadiness::NeedsReferenceResolution
         || aDeferredPower

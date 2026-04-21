@@ -4383,6 +4383,7 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorScalarRootAut
         m_pDoc->SetString(12, 7, 0, u"=SQRT(4)=2"_ustr);
         m_pDoc->SetString(13, 7, 0,
             u"=COM.MICROSOFT.POISSON.DIST(1;1;TRUE())>0.73"_ustr);
+        m_pDoc->SetString(14, 7, 0, u"=\"4\"=4"_ustr);
         m_pDoc->SetString(14, 1, 0, u"=TODAY()+7"_ustr);
 
         Date aActDate(Date::SYSTEM);
@@ -4402,15 +4403,16 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorScalarRootAut
         ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(11, 7, 0));
         ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(12, 7, 0));
         ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(13, 7, 0));
+        ASSERT_DOUBLES_EQUAL(0.0, m_pDoc->GetValue(14, 7, 0));
         ASSERT_DOUBLES_EQUAL(static_cast<double>(nTodaySerial) + 7.0, m_pDoc->GetValue(14, 1, 0));
 
         const auto aStats = setaileval::getStatsSnapshot();
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 15);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 16);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::ScalarRoot)]
-            >= 15);
+            >= 16);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
             aStats.maFunctionFallbackCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::ScalarRoot)]);
@@ -4448,6 +4450,7 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorScalarRootDef
         m_pDoc->SetString(8, 7, 0, u"=SQRT(4)=2"_ustr);
         m_pDoc->SetString(9, 7, 0,
             u"=COM.MICROSOFT.POISSON.DIST(1;1;TRUE())>0.73"_ustr);
+        m_pDoc->SetString(10, 7, 0, u"=\"4\"=4"_ustr);
         m_pDoc->SetString(10, 1, 0, u"=TODAY()+7"_ustr);
 
         Date aActDate(Date::SYSTEM);
@@ -4463,15 +4466,16 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorScalarRootDef
         ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(7, 7, 0));
         ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(8, 7, 0));
         ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(9, 7, 0));
+        ASSERT_DOUBLES_EQUAL(0.0, m_pDoc->GetValue(10, 7, 0));
         ASSERT_DOUBLES_EQUAL(static_cast<double>(nTodaySerial) + 7.0, m_pDoc->GetValue(10, 1, 0));
 
         const auto aStats = setaileval::getStatsSnapshot();
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 11);
+        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 12);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
         CPPUNIT_ASSERT(
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::ScalarRoot)]
-            >= 11);
+            >= 12);
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
             aStats.maFunctionFallbackCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::ScalarRoot)]);

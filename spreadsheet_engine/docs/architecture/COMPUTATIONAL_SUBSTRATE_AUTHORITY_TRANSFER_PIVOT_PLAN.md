@@ -448,7 +448,7 @@ Implemented result:
 
 ## Phase 6: Seam Reconciliation
 
-Status: complete on the current tree.
+Status: partial on the current tree.
 
 ### Goal
 
@@ -475,8 +475,8 @@ Stop carrying two partial execution stories for the same classes of work.
 
 Removed 34 lower-seam `if (!tryPushEngine*(...))` dispatch wrappers from
 `interpr4.cxx`. Each wrapper tried engine evaluation before falling back to
-the legacy Calc call; with the upper seam (`InterpretTail`) authoritative
-for all promoted families, this lower-seam scaffolding was redundant overlap.
+the legacy Calc call. That older wrapper family was redundant overlap once the
+upper seam (`InterpretTail`) started owning the promoted scalar/text slices.
 
 Removed code:
 - 5 lambda definitions: `tryPushEngineScalarBinaryOp`,
@@ -491,26 +491,35 @@ Removed code:
 - 2 tests: `testSharedInterpreterTextInfoDispatch`,
   `testSharedInterpreterParsingInspectionDispatch`
 
-Retained lower-seam dispatch (2 sites):
+Retained lower-seam `tryPushEngine*` dispatch (2 sites):
 - `tryPushEngineBadLiteralError` (`ocBad`): retirement template — legacy
   `ScBadName()` is fully deleted
 - `tryPushEngineBadLiteralRangeOpcode` + `tryPushEngineRangeReference`
   (`ocRange`): parity-gap reference handling
 
+Still-active lower-seam `tryPlanEngine*` admissions:
+- 61 sites remain in `Interpret()` on the current tree across control-flow,
+  spill, reference, database/criteria, matrix, and forecast families
+- the shared-interpreter unit tests still exercise those counters directly,
+  so the lower seam is not yet reduced to just `ocBad` / `ocRange`
+
 CI validation:
-- `testSeamReconciliationNoOverlap` asserts
-  `interp4_dispatch_engine_attempt_count == 2` and all remaining sites carry
-  PIVOT_ALLOW annotations
+- `testSeamReconciliationTryPushWrapperFloor` asserts the older
+  `tryPushEngine*` wrapper family is down to 2 sites and that
+  `tryPlanEngine*` admissions still remain, keeping the phase status honest
 - `testLowerSeamEngineAttemptsCarryPivotRationale` now validates 2 sites
 - `testSharedInterpreterOperatorDispatch` updated: scalar binary ops dispatch
   directly to legacy calls, engine dispatch stats are zero in core-forced mode
 
-Exit criteria satisfied:
-1. The two seams no longer overlap — upper seam owns all promoted families,
-   lower seam retained only for ocBad (retirement) and ocRange (parity gap)
-2. Lower-seam engine-first code dropped from 36 dispatch sites to 2
-3. Single cut-over path: `InterpretTail` → `tryEvaluateFormula()` →
-   `FormulaEvaluator` → `RpnEvaluator`, documented in PROJECT_STATUS.md
+Current status against exit criteria:
+1. Lower-seam engine-first wrapper code trended downward: the old
+   `tryPushEngine*` family dropped from 36 dispatch sites to 2
+2. The two seams still overlap for `tryPlanEngine*` admissions, so the phase
+   is not fully closed yet
+3. The project can name the preferred cut-over path
+   (`InterpretTail` → `tryEvaluateFormula()` → `FormulaEvaluator` →
+   `RpnEvaluator`), but that path is not yet the only owner for all promoted
+   families
 
 ## Phase 7: Retirement Wave 2
 

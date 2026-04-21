@@ -3649,6 +3649,69 @@ inline void putScalarIntoMatrix(
     }
 }
 
+[[nodiscard]] inline api::ValueResult<short> compareScalarValuesWithCalcOrdering(
+    const api::CellValue& rLeft, const api::CellValue& rRight, const ScDocument& rDoc,
+    ScInterpreterContext& rContext)
+{
+    if (rLeft.isError())
+        return api::ValueResult<short>::failure(rLeft.meError);
+    if (rRight.isError())
+        return api::ValueResult<short>::failure(rRight.meError);
+
+    const auto compareWithEmpty = [&](const api::CellValue& rOther, bool bEmptyIsLeft)
+        -> api::ValueResult<short> {
+        short nCompare = 0;
+        if (rOther.isEmpty())
+        {
+            nCompare = 0;
+        }
+        else if (rOther.isText())
+        {
+            nCompare = rOther.maString.empty() ? 0 : -1;
+        }
+        else
+        {
+            const auto aOtherNumber = coerceScalarToNumber(rDoc, rContext, rOther);
+            if (!aOtherNumber)
+                return api::ValueResult<short>::failure(aOtherNumber.meError);
+            if (!rtl::math::approxEqual(aOtherNumber.maValue, 0.0))
+                nCompare = aOtherNumber.maValue < 0.0 ? 1 : -1;
+        }
+
+        if (!bEmptyIsLeft)
+            nCompare = -nCompare;
+        return api::ValueResult<short>::success(nCompare);
+    };
+
+    if (rLeft.isEmpty())
+        return compareWithEmpty(rRight, true);
+    if (rRight.isEmpty())
+        return compareWithEmpty(rLeft, false);
+
+    if (rLeft.isText() && rRight.isText())
+    {
+        return api::ValueResult<short>::success(ScGlobal::GetCollator().compareString(
+            toLibreOfficeString(rLeft.maString), toLibreOfficeString(rRight.maString)));
+    }
+
+    if (rLeft.isText())
+        return api::ValueResult<short>::success(1);
+    if (rRight.isText())
+        return api::ValueResult<short>::success(-1);
+
+    const auto aLeftNumber = coerceScalarToNumber(rDoc, rContext, rLeft);
+    if (!aLeftNumber)
+        return api::ValueResult<short>::failure(aLeftNumber.meError);
+    const auto aRightNumber = coerceScalarToNumber(rDoc, rContext, rRight);
+    if (!aRightNumber)
+        return api::ValueResult<short>::failure(aRightNumber.meError);
+
+    short nCompare = 0;
+    if (!rtl::math::approxEqual(aLeftNumber.maValue, aRightNumber.maValue))
+        nCompare = aLeftNumber.maValue < aRightNumber.maValue ? -1 : 1;
+    return api::ValueResult<short>::success(nCompare);
+}
+
 [[nodiscard]] inline Materialization<api::CellValue> materializeScalarNode(
     const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
     const ScAddress& rFormulaPos)
@@ -3853,27 +3916,12 @@ inline void putScalarIntoMatrix(
                 case core::formula::BinaryOperator::Greater:
                 case core::formula::BinaryOperator::GreaterEqual:
                 {
-                    if (aLeft.moValue->isText() && aRight.moValue->isText())
-                    {
-                        const short nCompare = ScGlobal::GetCollator().compareString(
-                            toLibreOfficeString(aLeft.moValue->maString),
-                            toLibreOfficeString(aRight.moValue->maString));
-                        return makeMaterializedValue(api::CellValue::boolean(
-                            matchesComparisonResult(nCompare, rNode.meBinaryOperator)));
-                    }
-
-                    const auto aLeftNumber = coerceScalarToNumber(rDoc, rContext, *aLeft.moValue);
-                    if (!aLeftNumber)
-                        return makeMaterializedError<api::CellValue>(aLeftNumber.meError);
-                    const auto aRightNumber = coerceScalarToNumber(rDoc, rContext, *aRight.moValue);
-                    if (!aRightNumber)
-                        return makeMaterializedError<api::CellValue>(aRightNumber.meError);
-
-                    short nCompare = 0;
-                    if (!rtl::math::approxEqual(aLeftNumber.maValue, aRightNumber.maValue))
-                        nCompare = aLeftNumber.maValue < aRightNumber.maValue ? -1 : 1;
+                    const auto aCompare = compareScalarValuesWithCalcOrdering(
+                        *aLeft.moValue, *aRight.moValue, rDoc, rContext);
+                    if (!aCompare)
+                        return makeMaterializedError<api::CellValue>(aCompare.meError);
                     return makeMaterializedValue(api::CellValue::boolean(
-                        matchesComparisonResult(nCompare, rNode.meBinaryOperator)));
+                        matchesComparisonResult(aCompare.maValue, rNode.meBinaryOperator)));
                 }
                 default:
                     return makeUnsupportedMaterialization<api::CellValue>(
@@ -4215,36 +4263,16 @@ materializeCriteriaAggregateInput(const core::formula::Node& rArgument, const Sc
                 case core::formula::BinaryOperator::Greater:
                 case core::formula::BinaryOperator::GreaterEqual:
                 {
-                    short nCompare = 0;
-                    if (aLeftValue.isText() && aRightValue.isText())
+                    const auto aCompare = compareScalarValuesWithCalcOrdering(
+                        aLeftValue, aRightValue, rDoc, rContext);
+                    if (!aCompare)
                     {
-                        nCompare = ScGlobal::GetCollator().compareString(
-                            toLibreOfficeString(aLeftValue.maString),
-                            toLibreOfficeString(aRightValue.maString));
+                        putScalarIntoMatrix(api::CellValue::error(aCompare.meError), xMatrix,
+                            nColumn, nRow);
+                        continue;
                     }
-                    else
-                    {
-                        const auto aLeftNumber = coerceScalarToNumber(rDoc, rContext, aLeftValue);
-                        if (!aLeftNumber)
-                        {
-                            putScalarIntoMatrix(api::CellValue::error(aLeftNumber.meError), xMatrix,
-                                nColumn, nRow);
-                            continue;
-                        }
-                        const auto aRightNumber = coerceScalarToNumber(rDoc, rContext, aRightValue);
-                        if (!aRightNumber)
-                        {
-                            putScalarIntoMatrix(api::CellValue::error(aRightNumber.meError), xMatrix,
-                                nColumn, nRow);
-                            continue;
-                        }
-
-                        if (!rtl::math::approxEqual(aLeftNumber.maValue, aRightNumber.maValue))
-                            nCompare = aLeftNumber.maValue < aRightNumber.maValue ? -1 : 1;
-                    }
-
                     oResult = api::CellValue::boolean(
-                        matchesComparisonResult(nCompare, rNode.meBinaryOperator));
+                        matchesComparisonResult(aCompare.maValue, rNode.meBinaryOperator));
                     break;
                 }
                 default:

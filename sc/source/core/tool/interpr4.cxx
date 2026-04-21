@@ -4550,11 +4550,24 @@ StackVar ScInterpreter::Interpret()
                 }
 
                 namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+                const auto eLegacyOverlapRolloutMode = setaileval::resolveRolloutMode();
+                const bool bLegacyOverlapAuthoritativeWhileOff
+                    = setaileval::detail::authoritativeWhileOffEnabled();
+                const bool bExpectUpperSeamAuthoritative
+                    = bLegacyOverlapAuthoritativeWhileOff
+                      || eLegacyOverlapRolloutMode
+                             == setaileval::RolloutMode::AuthoritativeWithFallback;
                 const auto warnIfLegacyDispatchReached = [&](const char* pRouteLabel,
                                                             std::u16string_view rFunctionName,
                                                             auto aClassifier,
                                                             const char* pFailureMessage,
                                                             bool bRequireNonArrayContext = false) {
+                    // Explicit rollback / observe-only modes still route into
+                    // classic Interpret() by design. Only flag legacy reach
+                    // when the current rollout expects the upper seam to own
+                    // the result authoritatively.
+                    if (!bExpectUpperSeamAuthoritative)
+                        return;
                     if (!pMyFormulaCell || pMyFormulaCell->IsIterCell()
                         || pMyFormulaCell->GetMatrixFlag() != ScMatrixMode::NONE
                         || pMyFormulaCell->IsHyperLinkCell()
