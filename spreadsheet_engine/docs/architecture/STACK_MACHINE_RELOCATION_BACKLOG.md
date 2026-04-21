@@ -34,9 +34,25 @@ families that are explicitly not yet relocated.
    matrix-frame gaps are gone; Phase 6 closes only when overlapping
    lower-seam admissions are gone.
 
+## Execution Tracking
+
+1. Slice 1: complete
+   Verified with `CppunitTest_sc_ucalc_formula2` covering
+   `testInterpretTailEngineEvaluatorExternalReferenceRoutes` and
+   `testExternalRefFunctions`.
+2. Slice 2: pending
+3. Slice 3: pending
+4. Slice 4: pending
+5. Slice 5: pending
+6. Slice 6: pending
+7. Slice 7: pending
+8. Slice 8: pending
+
 ## Backlog
 
 ### Slice 1: External-reference matrix materialization bridge
+
+Status: complete
 
 Goal: remove the first remaining Phase 4 blocker by letting matrix-consuming
 engine admissions consume external single/double refs instead of declining to
@@ -89,9 +105,16 @@ own broadcast, jump-matrix, or array-context behavior.
 
 Current landing on the tree:
 
-- `InterpretTail` now admits 1x1 matrix-origin formulas at the upper seam,
-  which gives promoted scalar-result array formulas an authoritative path
-  without overstating multi-cell matrix ownership
+- `InterpretTail` now preserves and projects exact-dimension matrix results
+  for matrix-origin formulas instead of collapsing every admitted matrix-origin
+  path back to a scalar top-left value
+- focused helper coverage now proves that `tryEvaluateFormula()` can preserve
+  selector and spill-family matrices when the caller explicitly requests
+  matrix-origin semantics, while the default helper path still returns the
+  historical top-left scalar
+- focused default-on coverage now proves multi-cell `CHOOSECOLS(...)`,
+  `HSTACK(...)`, and `IF(range;...;...)` matrix formulas can stay
+  authoritative at the upper seam
 - matrix `EXACT(...)` now materializes elementwise upstream, which clears the
   1x1 matrix-origin `SUM(IF(EXACT(range);range;0))` blocker and lets that
   classic jump-matrix-style scalar-result shape stay authoritative
