@@ -95,8 +95,11 @@ still evaluates formulas for telemetry but does not apply results.
 
 Full rollback (engine completely off): set both
 `SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR=off` and
-`SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF=false`. No engine
-evaluation occurs; legacy `ScInterpreter::Interpret()` handles all traffic.
+`SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF=false`. No ambient
+or upper-seam engine evaluation occurs; legacy `ScInterpreter::Interpret()`
+handles normal traffic. The explicit `SC_FORCE_CALCULATION=core`
+forced-legacy audit lane is the one intentional exception: it still exercises
+retired lower-seam engine sites to prove deletion parity.
 
 ### Forced-Legacy Audit And Retirement
 
@@ -151,6 +154,9 @@ COMBIN, COMBINA, BITAND, BITOR, BITXOR, BITRSHIFT, and BITLSHIFT. These 9
 sites use the new `tryPushEngineRetiredScalar` lambda which calls
 `tryEvaluateFormula()` directly—the legacy `pushLegacyGcdOrLcm`,
 `pushLegacyCombin`, and `pushLegacyBitwise` lambdas are fully deleted.
+That 2 -> 11 increase is deliberate forced-legacy audit coverage, not an
+ambient-runtime success proxy; we only treat it as healthy because it is
+paired with real lambda deletion and covered by the core-forced audit tests.
 `ocBad` (retirement template) and `ocRange` (parity-gap reference) retain
 the older `tryPushEngineBadLiteralError`/range wrapper style.
 `interp4_dispatch_plan_engine_attempt_count`, however, is still 61 on the

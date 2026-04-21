@@ -433,8 +433,9 @@ Implemented result:
   partial rollback (`ENGINE_EVALUATOR=observe`, `AUTHORITATIVE_WHILE_OFF=false`)
   causes the engine to observe-only while legacy remains authority; full
   rollback (`ENGINE_EVALUATOR=off`, `AUTHORITATIVE_WHILE_OFF=false`) disables
-  all engine evaluation — no authoritative routes, no observations, no RPN
-  attempts
+  ambient engine evaluation — no authoritative routes, no observations, no
+  RPN attempts. The explicit `SC_FORCE_CALCULATION=core` audit lane remains a
+  deliberate exception so retired lower-seam sites can still prove parity
 - the "Ambient Authority" section in
   [PROJECT_STATUS.md](/home/ubuntu/repos/libreoffice/spreadsheet_engine/docs/PROJECT_STATUS.md)
   now publishes authoritative route, shadow parity, and per-mismatch-reason
@@ -573,14 +574,23 @@ Metric movements:
 - `interp4_dispatch_legacy_call_count`: 31 → 22
 - `interp4_dispatch_engine_attempt_count`: 2 → 11
 
+That 2 → 11 increase is deliberate forced-legacy audit coverage for the new
+retired-scalar sites, not an ambient-runtime success proxy. It is acceptable
+here because it is paired with real lambda deletion and non-zero audit-lane
+proof; the anti-metric still applies to unpaired lower-seam growth.
+
 CI validation:
-- `testInterpretTailRetiredMathScalarCoreForcedMode` — verifies all 9
-  retired functions produce correct results via engine evaluation under
-  core-forced full-legacy mode
+- `testInterpretTailRetiredMathScalarCoreForcedAuditLane` — verifies all 9
+  retired functions plus `ReferenceList` and missing-argument edge cases
+  produce correct results via engine evaluation under the explicit
+  core-forced audit lane
+- `testExternalRefFunctions` — verifies GCD/LCM external single- and
+  double-reference shapes still work through the same retired-scalar audit
+  path
 - `testSeamReconciliationTryPushWrapperFloor` — updated to assert
   `mnTryPushAttemptCaseCount == 11`
 
-Exit criteria satisfied:
+Retirement-wave slice exit criteria satisfied:
 1. Three `pushLegacy*` lambdas fully retired ✓
 2. `interp4_dispatch_legacy_lambda_count` dropped from 21 to 18 ✓
 3. Retirement template proven repeatable beyond ocBad prototype ✓

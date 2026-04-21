@@ -1838,7 +1838,7 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterBadLiteralDispatch)
     m_pDoc->DeleteTab(0);
 }
 
-CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailRetiredMathScalarCoreForcedMode)
+CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailRetiredMathScalarCoreForcedAuditLane)
 {
     sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
     ScopedEnvironmentOverride aMode(
@@ -1868,6 +1868,22 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailRetiredMathScalarCoreForcedM
         ScAddress(0, 7, 0), u"=BITRSHIFT(8;2)"_ustr, formula::FormulaGrammar::GRAM_ODFF);
     m_pDoc->SetFormula(
         ScAddress(0, 8, 0), u"=BITLSHIFT(2;3)"_ustr, formula::FormulaGrammar::GRAM_ODFF);
+    m_pDoc->SetValue(2, 0, 0, 6.0); // C1
+    m_pDoc->SetValue(2, 1, 0, 12.0); // C2
+    m_pDoc->SetValue(3, 0, 0, 18.0); // D1
+    m_pDoc->SetValue(3, 1, 0, 24.0); // D2
+    m_pDoc->SetFormula(
+        ScAddress(0, 9, 0), u"=GCD((C1:C2~D1:D2))"_ustr, formula::FormulaGrammar::GRAM_ODFF);
+    m_pDoc->SetFormula(
+        ScAddress(0, 10, 0), u"=LCM((C1:C2~D1:D2))"_ustr, formula::FormulaGrammar::GRAM_ODFF);
+    m_pDoc->SetFormula(
+        ScAddress(0, 11, 0), u"=GCD(6;)"_ustr, formula::FormulaGrammar::GRAM_ODFF);
+    m_pDoc->SetFormula(
+        ScAddress(0, 12, 0), u"=LCM(6;)"_ustr, formula::FormulaGrammar::GRAM_ODFF);
+    m_pDoc->SetFormula(
+        ScAddress(0, 13, 0), u"=COMBIN(12;)"_ustr, formula::FormulaGrammar::GRAM_ODFF);
+    m_pDoc->SetFormula(
+        ScAddress(0, 14, 0), u"=COMBINA(12;)"_ustr, formula::FormulaGrammar::GRAM_ODFF);
 
     CPPUNIT_ASSERT_EQUAL(4.0, m_pDoc->GetValue(ScAddress(0, 0, 0)));
     CPPUNIT_ASSERT_EQUAL(12.0, m_pDoc->GetValue(ScAddress(0, 1, 0)));
@@ -1878,18 +1894,24 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailRetiredMathScalarCoreForcedM
     CPPUNIT_ASSERT_EQUAL(6.0, m_pDoc->GetValue(ScAddress(0, 6, 0)));
     CPPUNIT_ASSERT_EQUAL(2.0, m_pDoc->GetValue(ScAddress(0, 7, 0)));
     CPPUNIT_ASSERT_EQUAL(16.0, m_pDoc->GetValue(ScAddress(0, 8, 0)));
+    CPPUNIT_ASSERT_EQUAL(6.0, m_pDoc->GetValue(ScAddress(0, 9, 0)));
+    CPPUNIT_ASSERT_EQUAL(72.0, m_pDoc->GetValue(ScAddress(0, 10, 0)));
+    CPPUNIT_ASSERT_EQUAL(6.0, m_pDoc->GetValue(ScAddress(0, 11, 0)));
+    CPPUNIT_ASSERT_EQUAL(0.0, m_pDoc->GetValue(ScAddress(0, 12, 0)));
+    CPPUNIT_ASSERT_EQUAL(1.0, m_pDoc->GetValue(ScAddress(0, 13, 0)));
+    CPPUNIT_ASSERT_EQUAL(1.0, m_pDoc->GetValue(ScAddress(0, 14, 0)));
 
     const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
     const std::string aDispatchStatsLabel
         = "attempted=" + std::to_string(aDispatchStats.mnEngineAttemptedCount)
           + " succeeded=" + std::to_string(aDispatchStats.mnEngineSucceededCount)
           + " declined=" + std::to_string(aDispatchStats.mnEngineDeclinedCount);
-    CPPUNIT_ASSERT_MESSAGE("retired scalars should attempt engine evaluation: "
+    CPPUNIT_ASSERT_MESSAGE("retired scalar audit lane should attempt engine evaluation: "
                                + aDispatchStatsLabel,
-                           aDispatchStats.mnEngineAttemptedCount >= 9);
-    CPPUNIT_ASSERT_MESSAGE("retired scalars should succeed through the engine path: "
+                           aDispatchStats.mnEngineAttemptedCount >= 15);
+    CPPUNIT_ASSERT_MESSAGE("retired scalar audit lane should succeed through the engine path: "
                                + aDispatchStatsLabel,
-                           aDispatchStats.mnEngineSucceededCount >= 9);
+                           aDispatchStats.mnEngineSucceededCount >= 15);
     CPPUNIT_ASSERT_EQUAL_MESSAGE("dispatch accounting should stay balanced: "
                                      + aDispatchStatsLabel,
                                  aDispatchStats.mnEngineAttemptedCount,
@@ -7321,6 +7343,52 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testExternalRefFunctions)
         val = m_pDoc->GetValue(0, 0, 0);
         CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE("unexpected result involving external ranges.",
                                              aChecks[i].fResult, val, 1e-15);
+    }
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+        ScopedEnvironmentOverride aForceCalculation("SC_FORCE_CALCULATION", "core");
+        ScopedEnvironmentOverride aDisableAuthorityWhileOff(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF", "0");
+        resetScInterpreterDispatchRuntimeStats();
+
+        static const struct
+        {
+            const char* pFormula;
+            double fResult;
+        } aRetiredScalarChecks[] = {
+            { "=GCD('file:///extdata.fake'#Data.A1)", 1 },
+            { "=LCM('file:///extdata.fake'#Data.B1)", 0 },
+            { "=GCD('file:///extdata.fake'#Data.A1:A4)", 1 },
+            { "=LCM('file:///extdata.fake'#Data.B1:B4)", 12 },
+        };
+
+        for (const auto& rCheck : aRetiredScalarChecks)
+        {
+            m_pDoc->SetString(0, 0, 0, OUString::createFromAscii(rCheck.pFormula));
+            val = m_pDoc->GetValue(0, 0, 0);
+            CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(
+                "unexpected result involving retired scalar external references.",
+                rCheck.fResult, val, 1e-15);
+        }
+
+        const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
+        const std::string aDispatchStatsLabel
+            = "attempted=" + std::to_string(aDispatchStats.mnEngineAttemptedCount)
+              + " succeeded=" + std::to_string(aDispatchStats.mnEngineSucceededCount)
+              + " declined=" + std::to_string(aDispatchStats.mnEngineDeclinedCount);
+        CPPUNIT_ASSERT_MESSAGE("external retired scalar audit lane should attempt engine evaluation: "
+                                   + aDispatchStatsLabel,
+                               aDispatchStats.mnEngineAttemptedCount >= 4);
+        CPPUNIT_ASSERT_MESSAGE("external retired scalar audit lane should succeed through the engine path: "
+                                   + aDispatchStatsLabel,
+                               aDispatchStats.mnEngineSucceededCount >= 4);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE("external retired scalar dispatch accounting should stay balanced: "
+                                         + aDispatchStatsLabel,
+                                     aDispatchStats.mnEngineAttemptedCount,
+                                     aDispatchStats.mnEngineSucceededCount
+                                         + aDispatchStats.mnEngineDeclinedCount);
     }
 
     // A huge external range should not crash, the matrix generated from the

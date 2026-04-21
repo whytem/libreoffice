@@ -35,6 +35,7 @@
 #include <interpretercontext.hxx>
 #include <kahan.hxx>
 #include <rangeutl.hxx>
+#include <refdata.hxx>
 #include <svl/numformat.hxx>
 #include <tokenarray.hxx>
 
@@ -48,6 +49,7 @@
 #include <spreadsheetengine/compat/libreoffice/Address.hxx>
 #include <spreadsheetengine/compat/libreoffice/Error.hxx>
 #include <spreadsheetengine/compat/libreoffice/Date.hxx>
+#include <spreadsheetengine/compat/libreoffice/ExternalReferenceExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/FormulaInspectionExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/Host.hxx>
 #include <spreadsheetengine/compat/libreoffice/LookupExecution.hxx>
@@ -2249,42 +2251,174 @@ template <typename T>
         return makeMaterializedValue(*oWhole);
     };
 
+    struct ExternalSingleRefArgument
+    {
+        sal_uInt16 mnFileId = 0;
+        OUString maTabName;
+        ScSingleRefData maReference;
+    };
+
+    struct ExternalDoubleRefArgument
+    {
+        sal_uInt16 mnFileId = 0;
+        OUString maTabName;
+        ScComplexRefData maReference;
+    };
+
+    const auto parseExternalSingleRefArgument
+        = [&](const core::formula::Node& rArgument) -> std::optional<ExternalSingleRefArgument> {
+        if (rArgument.meKind != core::formula::NodeKind::CellReference)
+            return std::nullopt;
+
+        ScRefAddress aReference;
+        ScAddress::ExternalInfo aExternalInfo;
+        const OUString aText = normalizeReferenceToken(rArgument.maPrimaryText);
+        const ScAddress::Details aDetails(formula::FormulaGrammar::CONV_OOO, rFormulaPos);
+        if (!ConvertSingleRef(rDoc, aText, rFormulaPos.Tab(), aReference, aDetails, &aExternalInfo)
+            || !aExternalInfo.mbExternal)
+        {
+            return std::nullopt;
+        }
+
+        ExternalSingleRefArgument aParsed;
+        aParsed.mnFileId = aExternalInfo.mnFileId;
+        aParsed.maTabName = aExternalInfo.maTabName;
+        aParsed.maReference.InitFromRefAddress(rDoc, aReference, rFormulaPos);
+        return aParsed;
+    };
+
+    const auto parseExternalDoubleRefArgument
+        = [&](const core::formula::Node& rArgument) -> std::optional<ExternalDoubleRefArgument> {
+        if (rArgument.meKind != core::formula::NodeKind::RangeReference)
+            return std::nullopt;
+
+        ScRefAddress aStart;
+        ScRefAddress aEnd;
+        ScAddress::ExternalInfo aExternalInfo;
+        OUString aText = normalizeReferenceToken(rArgument.maPrimaryText);
+        aText += u":"_ustr;
+        aText += normalizeReferenceToken(rArgument.maSecondaryText);
+        const ScAddress::Details aDetails(formula::FormulaGrammar::CONV_OOO, rFormulaPos);
+        if (!ConvertDoubleRef(rDoc, aText, rFormulaPos.Tab(), aStart, aEnd, aDetails, &aExternalInfo)
+            || !aExternalInfo.mbExternal)
+        {
+            return std::nullopt;
+        }
+
+        ExternalDoubleRefArgument aParsed;
+        aParsed.mnFileId = aExternalInfo.mnFileId;
+        aParsed.maTabName = aExternalInfo.maTabName;
+        aParsed.maReference.InitFromRefAddresses(rDoc, aStart, aEnd, rFormulaPos);
+        return aParsed;
+    };
+
+    const auto materializeNumericAggregateMatrixNode
+        = [&](const core::formula::Node& rArgument) -> Materialization<ScMatrixRef> {
+        if (const auto oExternalSingle = parseExternalSingleRefArgument(rArgument))
+        {
+            const auto aFetch = externalreferenceexecution::fetchExternalSingleRef(
+                rDoc, rFormulaPos, oExternalSingle->mnFileId, oExternalSingle->maTabName,
+                oExternalSingle->maReference);
+            if (aFetch.meError != FormulaError::NONE)
+                return makeMaterializedError<ScMatrixRef>(toApiError(aFetch.meError));
+            if (!aFetch.mxToken)
+                return makeMaterializedError<ScMatrixRef>(api::Error::IllegalArgument);
+
+            ScMatrixRef xMatrix(new ScMatrix(1, 1));
+            switch (aFetch.mxToken->GetType())
+            {
+                case formula::svDouble:
+                    xMatrix->PutDouble(aFetch.mxToken->GetDouble(), 0, 0);
+                    break;
+                case formula::svString:
+                    xMatrix->PutString(aFetch.mxToken->GetString(), 0, 0);
+                    break;
+                case formula::svEmptyCell:
+                    xMatrix->PutEmpty(0, 0);
+                    break;
+                case formula::svError:
+                    xMatrix->PutError(aFetch.mxToken->GetError(), 0, 0);
+                    break;
+                default:
+                    return makeMaterializedError<ScMatrixRef>(api::Error::IllegalArgument);
+            }
+            return makeMaterializedValue(xMatrix);
+        }
+
+        if (const auto oExternalDouble = parseExternalDoubleRefArgument(rArgument))
+        {
+            const auto aFetch = externalreferenceexecution::fetchExternalDoubleRef(
+                rDoc, rFormulaPos, oExternalDouble->mnFileId, oExternalDouble->maTabName,
+                oExternalDouble->maReference);
+            if (aFetch.meError != FormulaError::NONE)
+                return makeMaterializedError<ScMatrixRef>(toApiError(aFetch.meError));
+
+            const auto aProjection
+                = externalreferenceexecution::projectExternalDoubleRefMatrix(aFetch.mxArray);
+            if (aProjection.meError != FormulaError::NONE)
+                return makeMaterializedError<ScMatrixRef>(toApiError(aProjection.meError));
+            return makeMaterializedValue(aProjection.mxMatrix);
+        }
+
+        return materializeMatrixNode(rArgument, rDoc, rContext, rFormulaPos);
+    };
+
     const auto collectNumericArguments = [&]() -> Materialization<std::vector<double>> {
         if (rNode.maChildren.empty())
             return makeMaterializedError<std::vector<double>>(api::Error::IllegalArgument);
 
         std::vector<double> aValues;
-        for (const auto& rxChild : rNode.maChildren)
-        {
-            if (!rxChild)
-                return makeMaterializedError<std::vector<double>>(api::Error::IllegalArgument);
+        const auto visitNumericArgument
+            = [&](auto&& rSelf, const core::formula::Node& rArgument) -> Materialization<bool> {
+            if (rArgument.meKind == core::formula::NodeKind::ReferenceList)
+            {
+                for (const auto& rxChild : rArgument.maChildren)
+                {
+                    if (!rxChild)
+                        return makeMaterializedError<bool>(api::Error::IllegalArgument);
+                    const auto aVisited = rSelf(rSelf, *rxChild);
+                    if (!aVisited.mbSupported)
+                        return makeUnsupportedMaterialization<bool>(aVisited.meFallbackReason);
+                    if (!aVisited.moValue)
+                        return makeMaterializedError<bool>(aVisited.meError);
+                }
+                return makeMaterializedValue(true);
+            }
+
+            if (rArgument.meKind == core::formula::NodeKind::EmptyArgument)
+            {
+                // Legacy GetDouble treats a missing scalar like a zero VALUE
+                // for LCM. GCD ignores it because
+                // GCD(0,a) == a, which matches the corpus expectation for
+                // GCD(6;).
+                if (aCanonicalName == u"LCM")
+                    aValues.push_back(0.0);
+                return makeMaterializedValue(true);
+            }
 
             // Legacy GCD / LCM treat the argument shapes differently:
             //   - svDoubleRef / svRefList (multi-cell range): ScValueIterator
             //     SKIPS text and empty cells silently.
             //   - svMatrix (inline array constant): CalcGcdLcm matrix walk
             //     raises Err:502 (IllegalArgument) on text/empty/negative.
-            //   - svSingleRef (single cell ref): GetDouble returns 0 for
-            //     an empty cell and NoValue for text — so empty is treated
-            //     as a zero VALUE, not skipped.
-            //   - svDouble / svString scalar: GetDouble returns the number
-            //     or NoValue (text).
+            //   - svSingleRef / svExternalSingleRef: GetDouble returns 0
+            //     for an empty cell and NoValue for text — so empty is
+            //     treated as a zero VALUE, not skipped.
+            //   - svDouble / svString scalar: GetDouble returns the
+            //     number or NoValue (text).
             const bool bIsRangeReference
-                = rxChild->meKind == core::formula::NodeKind::RangeReference
-                  || rxChild->meKind == core::formula::NodeKind::NamedReference;
+                = rArgument.meKind == core::formula::NodeKind::RangeReference
+                  || rArgument.meKind == core::formula::NodeKind::NamedReference;
             const bool bIsArrayConstant
-                = rxChild->meKind == core::formula::NodeKind::ArrayConstant;
+                = rArgument.meKind == core::formula::NodeKind::ArrayConstant;
             const bool bIsSingleCellReference
-                = rxChild->meKind == core::formula::NodeKind::CellReference;
+                = rArgument.meKind == core::formula::NodeKind::CellReference;
 
-            const auto aMatrix = materializeMatrixNode(*rxChild, rDoc, rContext, rFormulaPos);
+            const auto aMatrix = materializeNumericAggregateMatrixNode(rArgument);
             if (!aMatrix.mbSupported)
-            {
-                return makeUnsupportedMaterialization<std::vector<double>>(
-                    aMatrix.meFallbackReason);
-            }
+                return makeUnsupportedMaterialization<bool>(aMatrix.meFallbackReason);
             if (!aMatrix.moValue)
-                return makeMaterializedError<std::vector<double>>(aMatrix.meError);
+                return makeMaterializedError<bool>(aMatrix.meError);
 
             SCSIZE nColumns = 0;
             SCSIZE nRows = 0;
@@ -2301,7 +2435,7 @@ template <typename T>
                         {
                             // Inline array constants treat empty as
                             // IllegalArgument (matches CalcGcdLcm).
-                            return makeMaterializedError<std::vector<double>>(
+                            return makeMaterializedError<bool>(
                                 api::Error::IllegalArgument);
                         }
                         if (bIsSingleCellReference)
@@ -2321,22 +2455,40 @@ template <typename T>
                             continue;
                         if (bIsArrayConstant)
                         {
-                            return makeMaterializedError<std::vector<double>>(
+                            return makeMaterializedError<bool>(
                                 api::Error::IllegalArgument);
                         }
                         // Fall through to coerceScalarToNumber which will
-                        // report NoValue for scalar svSingleRef / svString.
+                        // report NoValue for scalar svSingleRef /
+                        // svExternalSingleRef / svString.
                     }
 
                     const auto aNumber = coerceScalarToNumber(rDoc, rContext, aValue);
                     if (!aNumber)
                     {
-                        return makeMaterializedError<std::vector<double>>(
+                        return makeMaterializedError<bool>(
                             aNumber.meError);
                     }
                     aValues.push_back(aNumber.maValue);
                 }
             }
+
+            return makeMaterializedValue(true);
+        };
+
+        for (const auto& rxChild : rNode.maChildren)
+        {
+            if (!rxChild)
+                return makeMaterializedError<std::vector<double>>(api::Error::IllegalArgument);
+
+            const auto aVisited = visitNumericArgument(visitNumericArgument, *rxChild);
+            if (!aVisited.mbSupported)
+            {
+                return makeUnsupportedMaterialization<std::vector<double>>(
+                    aVisited.meFallbackReason);
+            }
+            if (!aVisited.moValue)
+                return makeMaterializedError<std::vector<double>>(aVisited.meError);
         }
 
         return makeMaterializedValue(std::move(aValues));
@@ -2891,7 +3043,7 @@ template <typename T>
             return makeUnsupported(eFunction, aN.meFallbackReason);
         if (!aN.moValue)
             return makeErrorAttempt(aN.meError);
-        const auto aK = materializeNumericArgument(*rNode.maChildren[1], std::nullopt);
+        const auto aK = materializeNumericArgument(*rNode.maChildren[1], 0.0);
         if (!aK.mbSupported)
             return makeUnsupported(eFunction, aK.meFallbackReason);
         if (!aK.moValue)
