@@ -1,10 +1,11 @@
 # InterpretTail Engine Migration
 
-Status: active migration ledger for `ScFormulaCell::InterpretTail -> engine evaluator`
+Status: archived migration ledger from the authority-transfer phase
 
 ## Purpose
 
-This is the active current-state document for the live evaluator migration.
+This document is retained as the historical live-evaluator migration ledger
+from before the pivot was closed and handed off to the relocation backlog.
 
 Use it for:
 
@@ -17,7 +18,7 @@ Use it for:
 - the active next subsystem initiative
 
 The older per-pass plan, decision, and evidence documents are retained in
-[../archive/interpret_tail/](../archive/interpret_tail/) for history only.
+[../interpret_tail/](../interpret_tail/) for history only.
 
 ## Current State
 
@@ -249,7 +250,7 @@ The admitted live input surface includes:
 ## Live Metrics
 
 Canonical current metrics now live in
-[../PROJECT_STATUS.md](../PROJECT_STATUS.md). This document keeps the migration
+[../../PROJECT_STATUS.md](../../PROJECT_STATUS.md). This document keeps the migration
 story and diagnostic interpretation, not the moving dashboard snapshot.
 
 Everything below is still diagnostic context for improving that number.
@@ -758,4 +759,4 @@ Guardrails:
 
 The retired pass-by-pass ledger lives in:
 
-- [../archive/interpret_tail/](../archive/interpret_tail/)
+- [../interpret_tail/](../interpret_tail/)

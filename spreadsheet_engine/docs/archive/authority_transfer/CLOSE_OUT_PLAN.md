@@ -1,11 +1,12 @@
 # RPN Evaluator Close-Out Plan
 
-Status: active working plan extending
-[COMPUTATIONAL_SUBSTRATE_RPN_BATCH_EXECUTION_PLAN.md](COMPUTATIONAL_SUBSTRATE_RPN_BATCH_EXECUTION_PLAN.md)
-toward its Success Criteria.
+Status: archived working plan from the pre-relocation closeout phase,
+superseded by
+[../../architecture/STACK_MACHINE_RELOCATION_BACKLOG.md](../../architecture/STACK_MACHINE_RELOCATION_BACKLOG.md)
+for current implementation order
 
 Execution of the current strategic pivot is tracked in
-[COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md](COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md).
+[../../architecture/COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md](../../architecture/COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md).
 
 ## Goal
 
@@ -13,15 +14,15 @@ Close out the five-batch RPN Evaluator plan against its explicit Success
 Criteria:
 
 - `legacy_interpreter_subroutine_count` ≤ `40` (see current value in
-  [../PROJECT_STATUS.md](../PROJECT_STATUS.md))
+  [../../PROJECT_STATUS.md](../../PROJECT_STATUS.md))
 - `interp4_dispatch_legacy_lambda_count` ≤ `10` (see current value in
-  [../PROJECT_STATUS.md](../PROJECT_STATUS.md))
+  [../../PROJECT_STATUS.md](../../PROJECT_STATUS.md))
 - every retired opcode shows non-zero exercised engine-first runtime on a
   focused or corpus audit lane before fallback deletion
 - acceptance rate ≥ `0.95` across the exercised retirement lane for each
   retired opcode family
 - Live authoritative-match rate ≥ `99.5%` (see current value in
-  [../PROJECT_STATUS.md](../PROJECT_STATUS.md))
+  [../../PROJECT_STATUS.md](../../PROJECT_STATUS.md))
 - Host facade has stable explicit contracts for every resolution /
   iteration / materialization primitive the batches depend on
 - Every retirement commit follows the `ocBad` template
@@ -33,7 +34,7 @@ Criteria:
 Retirement — not admission — remains the main lever that reduces the two
 headline counters, but the recent Batch-5 sweep changed the local optimum.
 With the honest baseline tracked canonically in
-[../PROJECT_STATUS.md](../PROJECT_STATUS.md), the
+[../../PROJECT_STATUS.md](../../PROJECT_STATUS.md), the
 highest-leverage remaining surface is no longer the pure text/info and
 parsing/inspection cluster inside `Interpret()` because that focused wave is
 now complete. The next leverage point is the remaining host-sensitive text

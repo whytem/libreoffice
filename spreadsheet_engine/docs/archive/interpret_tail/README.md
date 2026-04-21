@@ -5,10 +5,11 @@ documents that used to live under `docs/architecture/`.
 
 The active replacements are:
 
-- [../../architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md](../../architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md)
-- [../../architecture/COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md](../../architecture/COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md)
 - [../../PROJECT_STATUS.md](../../PROJECT_STATUS.md)
+- [../../architecture/STACK_MACHINE_RELOCATION_BACKLOG.md](../../architecture/STACK_MACHINE_RELOCATION_BACKLOG.md)
+- [../../architecture/COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md](../../architecture/COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md)
 - [../../architecture/COMPUTATIONAL_SUBSTRATE_MASTER.md](../../architecture/COMPUTATIONAL_SUBSTRATE_MASTER.md)
+- [../authority_transfer/](../authority_transfer/)
 
 The broader pre-pivot substrate archive now lives alongside this one in:
 

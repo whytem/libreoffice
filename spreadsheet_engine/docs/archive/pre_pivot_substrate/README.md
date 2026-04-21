@@ -15,11 +15,11 @@ They are retained for historical and implementation archaeology only.
 
 The active replacements are:
 
-- [../../architecture/COMPUTATIONAL_SUBSTRATE_MASTER.md](../../architecture/COMPUTATIONAL_SUBSTRATE_MASTER.md)
-- [../../architecture/COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md](../../architecture/COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md)
-- [../../architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md](../../architecture/COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md)
 - [../../PROJECT_STATUS.md](../../PROJECT_STATUS.md)
+- [../../architecture/STACK_MACHINE_RELOCATION_BACKLOG.md](../../architecture/STACK_MACHINE_RELOCATION_BACKLOG.md)
+- [../../architecture/COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md](../../architecture/COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md)
+- [../../architecture/COMPUTATIONAL_SUBSTRATE_MASTER.md](../../architecture/COMPUTATIONAL_SUBSTRATE_MASTER.md)
+- [../authority_transfer/](../authority_transfer/)
 
 Use the files here only when you need original boundary context or detailed
 historical proof material from the pre-pivot program.
-

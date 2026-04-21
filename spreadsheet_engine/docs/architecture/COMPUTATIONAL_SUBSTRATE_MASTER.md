@@ -1,99 +1,45 @@
 # Computational Substrate Master
 
-Status: narrative current-state, scope, and roadmap reference
+Status: broader narrative, scope, and relocation-context reference
 
-Canonical current metrics now live in
-[../PROJECT_STATUS.md](../PROJECT_STATUS.md). This document is the broader
-program narrative and may intentionally lag the dashboard when work is being
-rebased or regrouped.
+Canonical current state now lives in
+[../PROJECT_STATUS.md](../PROJECT_STATUS.md) and
+[STACK_MACHINE_RELOCATION_BACKLOG.md](STACK_MACHINE_RELOCATION_BACKLOG.md).
+This document is the broader program narrative and may intentionally lag the
+status snapshot when work is being regrouped.
 
 ## Executive Summary
 
 The first-stage extraction objective is materially achieved.
-The live authority-transfer objective is still in progress.
+The authority-transfer pivot is closed on the current tree.
+Active work is now the stack-machine relocation backlog.
 
 Today:
 
 - `spreadsheet_engine/` is a real shared computation layer used by both
   standalone evaluation and Calc-backed execution paths
-- the promoted FODS replay baseline remains exact at zero cached fallback
-- the old computational-substrate widening program proved a bounded admitted
-  slice
-- the live migration program now runs through a real `InterpretTail` seam in
-  production Calc code
-- debug and CI-style builds default that seam to `observe`
-- an eighty-three-slice env-independent hard-route cluster is still
-  engine-first even with rollout explicitly `off`, and logical constants,
-  logical folds, `NOT`, conditionals, scalar-root formulas, text utility,
-  formula text, conversion, information predicates, round-family roots,
-  significant rounding, broad bounded math-scalar roots, bitwise, aggregate,
-  matrix determinant, and `PROB` now also have family-local default-on
-  rollout paths
-- wrapper retirement is now materially underway rather than limited to a few
-  showcase milestones: beyond the earlier logical-constant, date/time-value,
-  formula-text, conversion, numeral-conversion, `ROUNDSIG`, bitwise,
-  `MDETERM`, `AGGREGATE`, `PROB`, text-utility, information-predicate, and
-  logical/conditional retirements, the latest push also retires the
-  scalar-root, `ERROR.TYPE`, round-family, and broad math-scalar wrapper
-  clusters, the latest safe scalar statistical relocation now also retires the
-  dedicated standard-normal, exponential, gamma-inverse, permutation,
-  Weibull, and `STANDARDIZE` wrappers, and the latest compat-heavy
-  statistical-distribution relocation now also retires the dedicated
-  chi-square, chi, gamma-distribution, Student-t, F-distribution,
-  chi-square inverse, Student-t inverse, F inverse, and chi inverse
-  wrappers, the supported-unknown-root promotion pass now re-homes `NA`,
-  `IMREAL`, `IMAGINARY`, `BESSEL*`, `PRICE`, and `SUMPRODUCT` into real
-  evaluator families, and the latest mechanical relocation wave now
-  collapses the statistical/test, forecasting, byte-text, and web
-  wrapper declarations into internal helper paths, while the latest
-  date/time, financial, and text mechanical relocation wave briefly brought the blunt
-  retirement metric down to `legacy_interpreter_subroutine_count=50`, and the
-  latest genuine standalone statistical-distribution relocation retires the
-  legacy `ScB`, `ScNormDist`, `ScHypGeomDist`, `ScLogNormDist`,
-  `ScLogNormInv`, `ScBetaDist_MS`, `ScBetaInv`, `ScCritBinom`,
-  `ScNegBinomDist`, and `ScNegBinomDist_MS` wrappers; after restoring earlier
-  rename-only wrapper name changes, the honest blunt metric now sits at
-  `legacy_interpreter_subroutine_count=235`; the latest genuine date/time
-  retirement pass then removed the dedicated `TODAY`/`NOW`, date-part,
-  week-number, workday/networkdays, and `DATE`/`TIME`/date-difference wrappers,
-  bringing the honest blunt metric down again to `legacy_interpreter_subroutine_count=185`;
-  the latest genuine financial scalar retirement pass then removes the
-  dedicated `ISPMT`, `PV`, `SYD`, `DDB`, `DB`, `VDB`, `PDURATION`, `SLN`,
-  `PMT`, `RRI`, `FV`, `NPER`, `RATE`, `IPMT`, `PPMT`, `CUMIPMT`,
-  `CUMPRINC`, `EFFECT`, and `NOMINAL` wrappers, bringing the honest blunt
-  metric down further to `legacy_interpreter_subroutine_count=166`; the latest
-  genuine text-utility retirement pass then removes the dedicated `SEARCH`,
-  `REGEX`, `TEXTJOIN`, `BAHTTEXT`, the `*B` byte-text wrappers, and
-  `ENCODEURL`, bringing the honest blunt metric to
-  `legacy_interpreter_subroutine_count=99`
-- hard-route widening is now frozen unless it removes a live fallback reason
-  or live mismatch bucket
-- the deletion-gating live authoritative-match north-star has now moved to
-  `50382 / 50,661` (`99.4493%`) on the standing replay corpus, with the broad
-  corpus lane stable again after fixing the intermittent `CONVERT(...)`
-  runtime crash in the shared BFS conversion path, aligning imported root
-  host truth for token-backed `VariableExpected` cells, promoting the
-  supported unknown-root band into real evaluator families, then promoting
-  the remaining high-volume imported unknown roots into real probe families,
-  then genuinely retiring the dedicated date/time wrapper surface to `185`,
-  and now genuinely retiring the dedicated text-utility wrapper surface
-  to `100`, with the next engine-first retirement deleting the dedicated
-  `ScBadName()` fallback so `ocBad` now leaves Calc through engine authority
-- the broad corpus lane now completes again with `BusinessDay` admitted on the
-  default ambient surface after rejecting zero-workday `WORKDAY` weekend masks
-  before they enter the shared runtime, and the next `BusinessDay` slice has
-  now admitted cheap local reference, holiday-range, weekend-range,
-  weekend-code-ref, and named-ref shapes, with the latest bounded ambient wall
-  move now also admitting `CONVERT`, the numeral-conversion roots
-  `BASE` / `DECIMAL` / `ROMAN` / `ARABIC`, and `AGGREGATE`, and now
-  `matrix_math` / `MDETERM` and `PROB` while pinning focused
-  `ROUNDSIG` / `ORG.LIBREOFFICE.ROUNDSIG` coverage
+- the intended long-term production path is
+  `ScFormulaCell::InterpretTail() -> tryEvaluateFormula() -> FormulaEvaluator -> RpnEvaluator`
+- the authority-transfer question is now settled for the current tree; the
+  remaining work is ordinary relocation of residual Calc-owned execution
+  surface
+- the active implementation order lives in
+  [STACK_MACHINE_RELOCATION_BACKLOG.md](STACK_MACHINE_RELOCATION_BACKLOG.md)
+- the current host-boundary inventory lives in
+  [HOST_FACADE_CONTRACTS.md](HOST_FACADE_CONTRACTS.md)
+- closed migration-era plans, ledgers, and slice reports now live under
+  [../archive/authority_transfer/](../archive/authority_transfer/)
 
 The active program is no longer “prove more substrate slices.”
-The active program is “use the substrate to underwrite live evaluator
-delegation.”
+The active program is “relocate the remaining stack-machine ownership into the
+engine while preserving parity.”
 
-## Live Migration Dashboard
+## Historical Transition Dashboard
+
+The detailed metrics below are retained as transition-era diagnostic context.
+For the current operating view, use
+[../PROJECT_STATUS.md](../PROJECT_STATUS.md) and
+[STACK_MACHINE_RELOCATION_BACKLOG.md](STACK_MACHINE_RELOCATION_BACKLOG.md).
 
 ### Replay Guardrail
 
@@ -340,11 +286,12 @@ That means:
 - substrate widening is now secondary and conditional
 - live evaluator delegation is the primary measure of progress
 
-The strategy reset is recorded in
-[COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md](COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md).
-The active current-state ledger is
-[COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md).
-The latest replay eligibility closeout is now folded into that migration ledger.
+The strategy reset that produced the pivot is recorded in
+[../archive/authority_transfer/COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md](../archive/authority_transfer/COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md).
+The completed authority-transfer handoff is recorded in
+[COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md](COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md).
+The active implementation queue now lives in
+[STACK_MACHINE_RELOCATION_BACKLOG.md](STACK_MACHINE_RELOCATION_BACKLOG.md).
 
 ## Next Initiative: Engine RPN Evaluator
 
@@ -611,8 +558,10 @@ The next pass is now the `RpnEvaluator` subsystem initiative:
 
 Use these documents in order:
 
-1. [COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md](COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md)
-2. [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md)
-3. [../PROJECT_STATUS.md](../PROJECT_STATUS.md)
-4. [../archive/interpret_tail/](../archive/interpret_tail/)
-5. [../archive/pre_pivot_substrate/](../archive/pre_pivot_substrate/)
+1. [../PROJECT_STATUS.md](../PROJECT_STATUS.md)
+2. [STACK_MACHINE_RELOCATION_BACKLOG.md](STACK_MACHINE_RELOCATION_BACKLOG.md)
+3. [COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md](COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md)
+4. [HOST_FACADE_CONTRACTS.md](HOST_FACADE_CONTRACTS.md)
+5. [../archive/authority_transfer/](../archive/authority_transfer/)
+6. [../archive/interpret_tail/](../archive/interpret_tail/)
+7. [../archive/pre_pivot_substrate/](../archive/pre_pivot_substrate/)

@@ -13,7 +13,7 @@ highest-leverage non-batch cluster left in
 
 This is the next practical step after the recent Batch-5 sweep. Canonical
 current metrics live in
-[../PROJECT_STATUS.md](../PROJECT_STATUS.md).
+[../../PROJECT_STATUS.md](../../PROJECT_STATUS.md).
 
 The key point is that this wave is attractive because much of the engine-side
 logic already exists; what remains is mostly dispatch cleanup, scoped

@@ -1,7 +1,6 @@
 # Computational Substrate Authority Transfer Strategy Memo
 
-Status: active strategy memo for the next phase of the computational-substrate
-program
+Status: archived strategy memo that set up the authority-transfer pivot
 
 ## Purpose
 

@@ -5,35 +5,36 @@ This directory holds the active architecture references for
 
 ## Start Here
 
-- [COMPUTATIONAL_SUBSTRATE_MASTER.md](COMPUTATIONAL_SUBSTRATE_MASTER.md):
-  canonical current-state, scope, metrics, and blocker reference
-- [COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md](COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md):
-  strategy reset from substrate-first widening to migration-underwriter
-  execution
-- [COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md](COMPUTATIONAL_SUBSTRATE_INTERPRET_TAIL_MIGRATION.md):
-  rolling live evaluator migration ledger with the active family, current
-  metrics, and current next target
 - [../PROJECT_STATUS.md](../PROJECT_STATUS.md):
-  concise project-wide status snapshot
+  current-state snapshot and top-level handoff
+- [STACK_MACHINE_RELOCATION_BACKLOG.md](STACK_MACHINE_RELOCATION_BACKLOG.md):
+  active implementation queue
+- [COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md](COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md):
+  completion record for the authority-transfer pivot
+- [HOST_FACADE_CONTRACTS.md](HOST_FACADE_CONTRACTS.md):
+  current host-contract inventory for remaining Calc-owned surface
+- [COMPUTATIONAL_SUBSTRATE_MASTER.md](COMPUTATIONAL_SUBSTRATE_MASTER.md):
+  broader program context and narrative reference
+- [CALC_TEST_KNOWN_REGRESSIONS.md](CALC_TEST_KNOWN_REGRESSIONS.md):
+  active parity exceptions and guardrails
 
 ## Current Model
 
 The active roadmap is now simple:
 
-1. keep the replay guardrail exact
-2. expand real `InterpretTail -> engine` delegation
-3. use substrate work only when it removes a live evaluator blocker
-4. prioritize promoted-family parity cleanup, with smaller replay-imported
-   formula-shape cleanup secondary, before any new reach-expansion slice
+1. keep the replay and regression guardrails exact
+2. continue relocation through the upper seam
+3. delete Calc-owned overlap only after the engine can own the same work
+4. archive closed slice reports instead of carrying them as active docs
 
-## Historical Material
+## Archive
 
-Older pass-by-pass migration documents now live in:
+Closed or superseded material now lives in:
 
+- [../archive/authority_transfer/](../archive/authority_transfer/)
 - [../archive/interpret_tail/](../archive/interpret_tail/)
 - [../archive/pre_pivot_substrate/](../archive/pre_pivot_substrate/)
-- [../archive/](../archive/)
-- [../extraction-history/](../extraction-history/)
+- [../archive/extraction-history/](../archive/extraction-history/)
 
 Use the archive only for implementation archaeology or original decision
 context.

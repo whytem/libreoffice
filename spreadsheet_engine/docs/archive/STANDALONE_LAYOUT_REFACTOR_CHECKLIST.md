@@ -5,7 +5,7 @@ instead of an extraction staging area.
 
 Completed items:
 
-- move extraction-history documents under `docs/extraction-history/`
+- move extraction-history documents under `docs/archive/extraction-history/`
 - add this architecture/checklist note under `docs/archive/`
 - move LibreOffice validation tooling under `integration/libreoffice/`
 - move the combined maintenance runner under `tools/`

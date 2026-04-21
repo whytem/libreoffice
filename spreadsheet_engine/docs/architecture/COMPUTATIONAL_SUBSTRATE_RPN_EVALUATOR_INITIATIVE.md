@@ -94,7 +94,7 @@ For this initiative, the project should use the following working rules:
 - the next retirement wave should preferentially target the densest remaining
   interpreter clusters that already lean on engine/shared helpers; the pure
   text/info and parsing/inspection subset tracked in
-  [COMPUTATIONAL_SUBSTRATE_TEXT_INFO_RETIREMENT_PLAN.md](COMPUTATIONAL_SUBSTRATE_TEXT_INFO_RETIREMENT_PLAN.md)
+  [../archive/authority_transfer/COMPUTATIONAL_SUBSTRATE_TEXT_INFO_RETIREMENT_PLAN.md](../archive/authority_transfer/COMPUTATIONAL_SUBSTRATE_TEXT_INFO_RETIREMENT_PLAN.md)
   is now complete on the current tree, so the remaining follow-on target is
   the host-sensitive text tail rather than another broad pure-text sweep
 

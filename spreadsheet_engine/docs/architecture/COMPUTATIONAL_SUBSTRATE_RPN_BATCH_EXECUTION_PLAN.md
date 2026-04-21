@@ -297,6 +297,6 @@ as non-migration scope in a future initiative closeout.
 - Batch 5 substrate and simple-shape / shape-reshaping admissions: **landed**
 - Parallel wrapper-cleanup: the focused pure text/info and
   parsing/inspection wave tracked in
-  [COMPUTATIONAL_SUBSTRATE_TEXT_INFO_RETIREMENT_PLAN.md](COMPUTATIONAL_SUBSTRATE_TEXT_INFO_RETIREMENT_PLAN.md)
+  [../archive/authority_transfer/COMPUTATIONAL_SUBSTRATE_TEXT_INFO_RETIREMENT_PLAN.md](../archive/authority_transfer/COMPUTATIONAL_SUBSTRATE_TEXT_INFO_RETIREMENT_PLAN.md)
   is complete; the next remaining interpreter-resident cleanup target is the
   host-sensitive text tail

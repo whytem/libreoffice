@@ -137,7 +137,7 @@ the seam.
    acceptance are already proven.
 3. Record this policy in:
    - [COMPUTATIONAL_SUBSTRATE_RPN_EVALUATOR_INITIATIVE.md](COMPUTATIONAL_SUBSTRATE_RPN_EVALUATOR_INITIATIVE.md)
-   - [CLOSE_OUT_PLAN.md](CLOSE_OUT_PLAN.md)
+   - [../archive/authority_transfer/CLOSE_OUT_PLAN.md](../archive/authority_transfer/CLOSE_OUT_PLAN.md)
 
 ### Exit Criteria
 
@@ -150,7 +150,7 @@ Implemented result:
 
 - the freeze rule is now recorded in
   [COMPUTATIONAL_SUBSTRATE_RPN_EVALUATOR_INITIATIVE.md](COMPUTATIONAL_SUBSTRATE_RPN_EVALUATOR_INITIATIVE.md)
-  and [CLOSE_OUT_PLAN.md](CLOSE_OUT_PLAN.md)
+  and [../archive/authority_transfer/CLOSE_OUT_PLAN.md](../archive/authority_transfer/CLOSE_OUT_PLAN.md)
 - every surviving lower-seam `tryPushEngine*` site in
   [interpr4.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr4.cxx)
   now carries an explicit `PIVOT_ALLOW_LOWER_SEAM_ADMISSION:` rationale marker
@@ -669,8 +669,8 @@ Active migration work is now plain relocation:
   active relocation queue
 - [COMPUTATIONAL_SUBSTRATE_RPN_EVALUATOR_INITIATIVE.md](COMPUTATIONAL_SUBSTRATE_RPN_EVALUATOR_INITIATIVE.md):
   architectural rationale and working rules
-- [CLOSE_OUT_PLAN.md](CLOSE_OUT_PLAN.md): closeout framing for the current
-  batch program
+- [../archive/authority_transfer/CLOSE_OUT_PLAN.md](../archive/authority_transfer/CLOSE_OUT_PLAN.md):
+  archived closeout framing for the five-batch program
 - [COMPUTATIONAL_SUBSTRATE_RPN_BATCH_EXECUTION_PLAN.md](COMPUTATIONAL_SUBSTRATE_RPN_BATCH_EXECUTION_PLAN.md):
   per-batch substrate/admission sequencing
 - [HOST_FACADE_CONTRACTS.md](HOST_FACADE_CONTRACTS.md): definitive host contract
