@@ -523,15 +523,23 @@ Retained lower-seam `tryPushEngine*` dispatch (2 sites):
   (`ocRange`): parity-gap reference handling
 
 Still-active lower-seam `tryPlanEngine*` admissions:
-- 61 sites remain in `Interpret()` on the current tree across control-flow,
+- 45 sites remain in `Interpret()` on the current tree across control-flow,
   spill, reference, database/criteria, matrix, and forecast families
+- Slice 4 retired the duplicate matrix/reference overlap for `COLUMNS`,
+  `ROWS`, `SHEETS`, `COLUMN`, `ROW`, `SHEET`, `AREAS`, `OFFSET`, `INDEX`,
+  `MUNIT`, `MDETERM`, `MINVERSE`, `MMULT`, `SEQUENCE`, `TRANSPOSE`, and
+  `SORTBY`
+- the remaining reference-sensitive `tryPlanEngine*` sites are the
+  host-sensitive `ADDRESS` / `INDIRECT` helpers rather than the broader
+  matrix/reference wave covered by Slices 1-3
 - the shared-interpreter unit tests still exercise those counters directly,
   so the lower seam is not yet reduced to just `ocBad` / `ocRange`
 
 CI validation:
 - `testSeamReconciliationTryPushWrapperFloor` asserts the older
   `tryPushEngine*` wrapper family is down to 2 sites and that
-  `tryPlanEngine*` admissions still remain, keeping the phase status honest
+  `tryPlanEngine*` admissions still remain while the active inventory drops
+  to 45 sites, keeping the phase status honest
 - `testLowerSeamEngineAttemptsCarryPivotRationale` now validates 2 sites
 - `testSharedInterpreterOperatorDispatch` updated: scalar binary ops dispatch
   directly to legacy calls, engine dispatch stats are zero in core-forced mode
@@ -539,8 +547,11 @@ CI validation:
 Current status against exit criteria:
 1. Lower-seam engine-first wrapper code trended downward: the old
    `tryPushEngine*` family dropped from 36 dispatch sites to 2
-2. The two seams still overlap for `tryPlanEngine*` admissions, so the phase
-   is not fully closed yet
+2. The duplicate matrix/reference overlap trended downward as Slice 4 retired
+   the matrix/reference wave (`COLUMNS`/`ROWS`/`SHEETS`, `COLUMN`/`ROW`/`SHEET`,
+   `AREAS`, `OFFSET`, `INDEX`, `MUNIT`, `MDETERM`, `MINVERSE`, `MMULT`,
+   `SEQUENCE`, `TRANSPOSE`, `SORTBY`), but the two seams still overlap for
+   other `tryPlanEngine*` admissions, so the phase is not fully closed yet
 3. The project can name the preferred cut-over path
    (`InterpretTail` → `tryEvaluateFormula()` → `FormulaEvaluator` →
    `RpnEvaluator`), but that path is not yet the only owner for all promoted

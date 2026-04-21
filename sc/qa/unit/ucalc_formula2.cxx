@@ -852,16 +852,17 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterReferenceSpanCountDispat
           + " declined="
           + std::to_string(aDispatchStats.mnReferenceEngineDeclinedCount);
     CPPUNIT_ASSERT_MESSAGE(
-        "COLUMNS/ROWS/SHEETS should attempt engine dispatch: " + aLabel,
-        aDispatchStats.mnReferenceEngineAttemptedCount > 0);
-    CPPUNIT_ASSERT_MESSAGE(
-        "single-reference span count should succeed through engine: " + aLabel,
-        aDispatchStats.mnReferenceEngineSucceededCount > 0);
+        "span-count lower-seam pilot should be retired once the upper seam owns the family: "
+            + aLabel,
+        aDispatchStats.mnReferenceEngineAttemptedCount == 0);
     CPPUNIT_ASSERT_EQUAL_MESSAGE(
-        "reference dispatch accounting should stay balanced: " + aLabel,
-        aDispatchStats.mnReferenceEngineAttemptedCount,
-        aDispatchStats.mnReferenceEngineSucceededCount
-            + aDispatchStats.mnReferenceEngineDeclinedCount);
+        "retired span-count lower-seam pilot should not report synthetic successes: "
+            + aLabel,
+        sal_uInt64(0), aDispatchStats.mnReferenceEngineSucceededCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "retired span-count lower-seam pilot should not report synthetic declines: "
+            + aLabel,
+        sal_uInt64(0), aDispatchStats.mnReferenceEngineDeclinedCount);
 
     m_pDoc->DeleteTab(0);
 }
@@ -894,11 +895,15 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterReferenceAreaCountDispat
           + " declined="
           + std::to_string(aDispatchStats.mnReferenceEngineDeclinedCount);
     CPPUNIT_ASSERT_MESSAGE(
-        "AREAS should attempt engine dispatch: " + aLabel,
-        aDispatchStats.mnReferenceEngineAttemptedCount > 0);
-    CPPUNIT_ASSERT_MESSAGE(
-        "single-ref AREAS should succeed through engine: " + aLabel,
-        aDispatchStats.mnReferenceEngineSucceededCount > 0);
+        "AREAS lower-seam pilot should be retired once the upper seam owns the family: "
+            + aLabel,
+        aDispatchStats.mnReferenceEngineAttemptedCount == 0);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "retired AREAS lower-seam pilot should not report synthetic successes: " + aLabel,
+        sal_uInt64(0), aDispatchStats.mnReferenceEngineSucceededCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "retired AREAS lower-seam pilot should not report synthetic declines: " + aLabel,
+        sal_uInt64(0), aDispatchStats.mnReferenceEngineDeclinedCount);
 
     m_pDoc->DeleteTab(0);
 }
@@ -1424,14 +1429,15 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterReferenceIndexDispatch)
           + " declined="
           + std::to_string(aDispatchStats.mnReferenceEngineDeclinedCount);
     CPPUNIT_ASSERT_MESSAGE(
-        "INDEX should attempt engine dispatch: " + aLabel,
-        aDispatchStats.mnReferenceEngineAttemptedCount > 0);
-    CPPUNIT_ASSERT_MESSAGE(
-        "scalar INDEX should succeed through engine: " + aLabel,
-        aDispatchStats.mnReferenceEngineSucceededCount > 0);
-    CPPUNIT_ASSERT_MESSAGE(
-        "zero-axis INDEX should produce an engine decline: " + aLabel,
-        aDispatchStats.mnReferenceEngineDeclinedCount > 0);
+        "INDEX lower-seam engine pilot should be retired once the upper seam owns the family: "
+            + aLabel,
+        aDispatchStats.mnReferenceEngineAttemptedCount == 0);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "retired INDEX lower-seam pilot should not report synthetic successes: " + aLabel,
+        sal_uInt64(0), aDispatchStats.mnReferenceEngineSucceededCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "retired INDEX lower-seam pilot should not report synthetic declines: " + aLabel,
+        sal_uInt64(0), aDispatchStats.mnReferenceEngineDeclinedCount);
 
     m_pDoc->DeleteTab(0);
 }
@@ -1497,11 +1503,15 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterReferenceOffsetDispatch)
           + " declined="
           + std::to_string(aDispatchStats.mnReferenceEngineDeclinedCount);
     CPPUNIT_ASSERT_MESSAGE(
-        "OFFSET should attempt engine dispatch: " + aLabel,
-        aDispatchStats.mnReferenceEngineAttemptedCount > 0);
-    CPPUNIT_ASSERT_MESSAGE(
-        "3-arg OFFSET with single-ref base should succeed through engine: " + aLabel,
-        aDispatchStats.mnReferenceEngineSucceededCount > 0);
+        "OFFSET lower-seam pilot should be retired once the upper seam owns the family: "
+            + aLabel,
+        aDispatchStats.mnReferenceEngineAttemptedCount == 0);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "retired OFFSET lower-seam pilot should not report synthetic successes: " + aLabel,
+        sal_uInt64(0), aDispatchStats.mnReferenceEngineSucceededCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "retired OFFSET lower-seam pilot should not report synthetic declines: " + aLabel,
+        sal_uInt64(0), aDispatchStats.mnReferenceEngineDeclinedCount);
 
     m_pDoc->DeleteTab(0);
 }
@@ -1551,16 +1561,17 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterReferenceAxisOrdinalDisp
           + " declined="
           + std::to_string(aDispatchStats.mnReferenceEngineDeclinedCount);
     CPPUNIT_ASSERT_MESSAGE(
-        "COLUMN/ROW/SHEET should attempt engine dispatch: " + aLabel,
-        aDispatchStats.mnReferenceEngineAttemptedCount > 0);
-    CPPUNIT_ASSERT_MESSAGE(
-        "COLUMN/ROW/SHEET should succeed through engine: " + aLabel,
-        aDispatchStats.mnReferenceEngineSucceededCount > 0);
+        "axis-ordinal lower-seam pilot should be retired once the upper seam owns the family: "
+            + aLabel,
+        aDispatchStats.mnReferenceEngineAttemptedCount == 0);
     CPPUNIT_ASSERT_EQUAL_MESSAGE(
-        "reference dispatch accounting should stay balanced: " + aLabel,
-        aDispatchStats.mnReferenceEngineAttemptedCount,
-        aDispatchStats.mnReferenceEngineSucceededCount
-            + aDispatchStats.mnReferenceEngineDeclinedCount);
+        "retired axis-ordinal lower-seam pilot should not report synthetic successes: "
+            + aLabel,
+        sal_uInt64(0), aDispatchStats.mnReferenceEngineSucceededCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "retired axis-ordinal lower-seam pilot should not report synthetic declines: "
+            + aLabel,
+        sal_uInt64(0), aDispatchStats.mnReferenceEngineDeclinedCount);
 
     m_pDoc->DeleteTab(0);
 }
@@ -1711,17 +1722,69 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterMatrixEngineDispatch)
           + " declined="
           + std::to_string(aDispatchStats.mnMatrixEngineDeclinedCount);
     CPPUNIT_ASSERT_MESSAGE(
-        "MUNIT/SEQUENCE/TRANSPOSE/MMULT/MINVERSE should attempt engine dispatch: "
+        "matrix lower-seam pilot should be retired once the upper seam owns matrix math: "
             + aLabel,
-        aDispatchStats.mnMatrixEngineAttemptedCount > 0);
-    CPPUNIT_ASSERT_MESSAGE(
-        "pure-scalar and svMatrix inputs should succeed through engine: " + aLabel,
-        aDispatchStats.mnMatrixEngineSucceededCount > 0);
+        aDispatchStats.mnMatrixEngineAttemptedCount == 0);
     CPPUNIT_ASSERT_EQUAL_MESSAGE(
-        "matrix dispatch accounting should stay balanced: " + aLabel,
-        aDispatchStats.mnMatrixEngineAttemptedCount,
-        aDispatchStats.mnMatrixEngineSucceededCount
-            + aDispatchStats.mnMatrixEngineDeclinedCount);
+        "retired matrix lower-seam pilot should not report synthetic successes: " + aLabel,
+        sal_uInt64(0), aDispatchStats.mnMatrixEngineSucceededCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "retired matrix lower-seam pilot should not report synthetic declines: " + aLabel,
+        sal_uInt64(0), aDispatchStats.mnMatrixEngineDeclinedCount);
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterRetiredMatrixReferenceWave)
+{
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    ScopedEnvironmentOverride aMode(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+    ScopedEnvironmentOverride aForceCalculation("SC_FORCE_CALCULATION", "core");
+    ScopedEnvironmentOverride aDisableAuthorityWhileOff(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF", "0");
+
+    m_pDoc->InsertTab(0, u"RetiredWave"_ustr);
+    resetScInterpreterDispatchRuntimeStats();
+
+    m_pDoc->SetValue(ScAddress(0, 0, 0), 1.0);
+    m_pDoc->SetValue(ScAddress(1, 0, 0), 2.0);
+    m_pDoc->SetValue(ScAddress(0, 1, 0), 3.0);
+    m_pDoc->SetValue(ScAddress(1, 1, 0), 4.0);
+    m_pDoc->SetString(ScAddress(3, 0, 0), u"=MDETERM(A1:B2)"_ustr);
+    ASSERT_DOUBLES_EQUAL(-2.0, m_pDoc->GetValue(ScAddress(3, 0, 0)));
+
+    ScMarkData aMark(m_pDoc->GetSheetLimits());
+    aMark.SelectOneTable(0);
+    m_pDoc->SetValue(ScAddress(4, 0, 0), 3.0);
+    m_pDoc->SetValue(ScAddress(4, 1, 0), 1.0);
+    m_pDoc->SetValue(4, 2, 0, 2.0);
+    m_pDoc->SetValue(5, 0, 0, 3.0);
+    m_pDoc->SetValue(5, 1, 0, 1.0);
+    m_pDoc->SetValue(5, 2, 0, 2.0);
+    m_pDoc->InsertMatrixFormula(6, 0, 6, 2, aMark, u"=SORTBY(E1:E3;F1:F3)"_ustr);
+    ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(6, 0, 0)));
+    ASSERT_DOUBLES_EQUAL(2.0, m_pDoc->GetValue(ScAddress(6, 1, 0)));
+    ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(ScAddress(6, 2, 0)));
+
+    const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
+    const std::string aLabel
+        = "matrix_attempted="
+          + std::to_string(aDispatchStats.mnMatrixEngineAttemptedCount)
+          + " spill_attempted="
+          + std::to_string(aDispatchStats.mnSpillEngineAttemptedCount)
+          + " matrix_succeeded="
+          + std::to_string(aDispatchStats.mnMatrixEngineSucceededCount)
+          + " spill_succeeded="
+          + std::to_string(aDispatchStats.mnSpillEngineSucceededCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "MDETERM lower-seam pilot should be retired once the upper seam owns matrix math: "
+            + aLabel,
+        sal_uInt64(0), aDispatchStats.mnMatrixEngineAttemptedCount);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE(
+        "SORTBY lower-seam pilot should stay retired while the broader spill wave remains open: "
+            + aLabel,
+        sal_uInt64(0), aDispatchStats.mnSpillEngineAttemptedCount);
 
     m_pDoc->DeleteTab(0);
 }

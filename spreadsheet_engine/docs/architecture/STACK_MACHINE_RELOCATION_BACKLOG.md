@@ -60,7 +60,12 @@ families that are explicitly not yet relocated.
    `testInterpretTailEngineEvaluatorMultiCellSpillMatrixDefaultOn`,
    `testInterpretTailEngineEvaluatorMultiCellConditionalMatrixDefaultOn`, and
    `testInterpretTailEngineEvaluatorMixedLocalExternalConditionalMatrixDefaultOn`.
-4. Slice 4: pending
+4. Slice 4: complete
+   Verified with `CppunitTest_sc_ucalc_formula2` covering
+   `testSharedInterpreterReferenceIndexDispatch` and
+   `testSharedInterpreterRetiredMatrixReferenceWave`, plus
+   `CppunitTest_sc_interpret_tail_corpus` covering
+   `testSeamReconciliationTryPushWrapperFloor`.
 5. Slice 5: pending
 6. Slice 6: pending
 7. Slice 7: pending
@@ -165,8 +170,19 @@ Definition of done:
 
 ### Slice 4: Seam reconciliation, matrix/reference wave
 
+Status: complete
+
 Goal: start closing Phase 6 by deleting overlapping lower-seam admissions for
 the families covered by Slices 1-3.
+
+Current landing on the tree:
+
+- duplicate lower-seam `tryPlanEngine*` overlap is now retired for the
+  matrix/reference wave: `COLUMNS`, `ROWS`, `SHEETS`, `COLUMN`, `ROW`,
+  `SHEET`, `AREAS`, `OFFSET`, `INDEX`, `MUNIT`, `MDETERM`, `MINVERSE`,
+  `MMULT`, `SEQUENCE`, `TRANSPOSE`, and `SORTBY`
+- the seam inventory floor therefore drops from 61 to 45 active
+  `tryPlanEngine*` attempt sites while keeping the residual scope honest
 
 Scope:
 
@@ -178,7 +194,9 @@ Scope:
 Definition of done:
 
 - matrix/reference overlap in `Interpret()` trends materially downward
-- Phase 6 open scope narrows to non-matrix residual families
+- Phase 6 open scope narrows to control-flow, spill, criteria/database,
+  regression/forecast, plus the host-sensitive `ADDRESS` / `INDIRECT`
+  reference helpers
 
 ### Slice 5: Criteria/database tail substrate
 

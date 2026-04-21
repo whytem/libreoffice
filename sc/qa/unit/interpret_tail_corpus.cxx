@@ -5967,6 +5967,9 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testSeamReconciliationTryPushWrapp
     CPPUNIT_ASSERT_MESSAGE(
         "Phase 6 is still partial while lower-seam tryPlanEngine admissions remain",
         aInventory.mnTryPlanAttemptCaseCount > 0);
+    CPPUNIT_ASSERT_MESSAGE(
+        "Slice 4 should materially reduce duplicate matrix/reference tryPlanEngine admissions",
+        aInventory.mnTryPlanAttemptCaseCount <= 45);
     std::cout << "interp4_dispatch_engine_attempt_count="
               << aInventory.mnTryPushAttemptCaseCount << '\n';
     std::cout << "interp4_dispatch_plan_engine_attempt_count="

@@ -6190,12 +6190,8 @@ StackVar ScInterpreter::Interpret()
                 //   - svMatrix (matrix dimensions — COLUMNS/ROWS only;
                 //     legacy ScSheets did not accept svMatrix so we raise
                 //     IllegalParameter there to match)
-                const auto tryPlanEngineSpanCount
+                const auto dispatchSpanCount
                     = [&](serpn::SpanCountKind eKind) -> bool {
-                    addDispatchRuntimeStat(
-                        interpreterDispatchRuntimeStatsStore()
-                            .mnReferenceEngineAttemptedCount);
-
                     const sal_uInt8 nParamCount = pCur->GetByte();
 
                     // SHEETS with no argument returns the workbook's
@@ -6206,24 +6202,17 @@ StackVar ScInterpreter::Interpret()
                     {
                         if (eKind != serpn::SpanCountKind::Sheets)
                         {
-                            addDispatchRuntimeStat(
-                                interpreterDispatchRuntimeStatsStore()
-                                    .mnReferenceEngineDeclinedCount);
+                            PushIllegalParameter();
                             return false;
                         }
                         const auto aCount = serefexec::workbookSheetCount(mrDoc);
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnReferenceEngineSucceededCount);
                         PushDouble(aCount.maValue);
                         return true;
                     }
 
                     if (sp < nParamCount)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnReferenceEngineDeclinedCount);
+                        PushIllegalParameter();
                         return false;
                     }
 
@@ -6356,9 +6345,6 @@ StackVar ScInterpreter::Interpret()
                         PopError();
                     }
 
-                    addDispatchRuntimeStat(
-                        interpreterDispatchRuntimeStatsStore()
-                            .mnReferenceEngineSucceededCount);
                     PushDouble(fValue);
                     return true;
                 };
@@ -7270,33 +7256,23 @@ StackVar ScInterpreter::Interpret()
                         aAbs, mrDoc, mrContext);
                 };
 
-                const auto tryPlanEngineIdentityMatrix = [&]() -> bool {
-                    addDispatchRuntimeStat(
-                        interpreterDispatchRuntimeStatsStore()
-                            .mnMatrixEngineAttemptedCount);
-
+                const auto dispatchIdentityMatrix = [&]() -> bool {
                     const sal_uInt8 nParamCount = pCur->GetByte();
                     if (nParamCount != 1 || !sp)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
+                        PushIllegalArgument();
                         return false;
                     }
                     const FormulaToken* pDimTok = pStack[sp - 1];
                     if (!pDimTok || pDimTok->GetType() != svDouble)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
+                        PushIllegalArgument();
                         return false;
                     }
                     const double fDim = pDimTok->GetDouble();
                     if (fDim < 1.0 || fDim > 65535.0)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
+                        PushIllegalArgument();
                         return false;
                     }
                     const auto aPlan
@@ -7304,39 +7280,26 @@ StackVar ScInterpreter::Interpret()
                     if (!aPlan
                         || aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
+                        PushIllegalArgument();
                         return false;
                     }
                     ScMatrixRef pMat = convertMatrixOperandToMatrixRef(aPlan.maValue);
                     if (!pMat)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
+                        PushIllegalArgument();
                         return false;
                     }
                     sp -= 1;
                     nGlobalError = FormulaError::NONE;
-                    addDispatchRuntimeStat(
-                        interpreterDispatchRuntimeStatsStore()
-                            .mnMatrixEngineSucceededCount);
                     PushMatrix(pMat);
                     return true;
                 };
 
-                const auto tryPlanEngineSequenceMatrix = [&]() -> bool {
-                    addDispatchRuntimeStat(
-                        interpreterDispatchRuntimeStatsStore()
-                            .mnMatrixEngineAttemptedCount);
-
+                const auto dispatchSequenceMatrix = [&]() -> bool {
                     const sal_uInt8 nParamCount = pCur->GetByte();
                     if (nParamCount < 1 || nParamCount > 4 || sp < nParamCount)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
+                        PushIllegalArgument();
                         return false;
                     }
 
@@ -7349,9 +7312,7 @@ StackVar ScInterpreter::Interpret()
                         const FormulaToken* pTok = pStack[sp - i];
                         if (!pTok || pTok->GetType() != svDouble)
                         {
-                            addDispatchRuntimeStat(
-                                interpreterDispatchRuntimeStatsStore()
-                                    .mnMatrixEngineDeclinedCount);
+                            PushIllegalArgument();
                             return false;
                         }
                     }
@@ -7373,18 +7334,14 @@ StackVar ScInterpreter::Interpret()
                             = static_cast<sal_Int32>(pStack[sp - (++nIdx)]->GetDouble());
                         if (nColumns < 1)
                         {
-                            addDispatchRuntimeStat(
-                                interpreterDispatchRuntimeStatsStore()
-                                    .mnMatrixEngineDeclinedCount);
+                            PushIllegalArgument();
                             return false;
                         }
                     }
                     nRows = static_cast<sal_Int32>(pStack[sp - (++nIdx)]->GetDouble());
                     if (nRows < 1)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
+                        PushIllegalArgument();
                         return false;
                     }
 
@@ -7394,39 +7351,26 @@ StackVar ScInterpreter::Interpret()
                     if (!aPlan
                         || aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
+                        PushIllegalArgument();
                         return false;
                     }
                     ScMatrixRef pMat = convertMatrixOperandToMatrixRef(aPlan.maValue);
                     if (!pMat)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
+                        PushIllegalArgument();
                         return false;
                     }
                     sp -= nParamCount;
                     nGlobalError = FormulaError::NONE;
-                    addDispatchRuntimeStat(
-                        interpreterDispatchRuntimeStatsStore()
-                            .mnMatrixEngineSucceededCount);
                     PushMatrix(pMat);
                     return true;
                 };
 
-                const auto tryPlanEngineTranspose = [&]() -> bool {
-                    addDispatchRuntimeStat(
-                        interpreterDispatchRuntimeStatsStore()
-                            .mnMatrixEngineAttemptedCount);
-
+                const auto dispatchTranspose = [&]() -> bool {
                     const sal_uInt8 nParamCount = pCur->GetByte();
                     if (nParamCount != 1 || !sp)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
+                        PushIllegalParameter();
                         return false;
                     }
                     // Scope fence: admit in-memory matrix operands and
@@ -7442,9 +7386,7 @@ StackVar ScInterpreter::Interpret()
                             && pTok->GetType() != svExternalSingleRef
                             && pTok->GetType() != svExternalDoubleRef))
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
+                        PushIllegalParameter();
                         return false;
                     }
                     std::optional<serpn::MatrixOperand> oOperand;
@@ -7454,9 +7396,7 @@ StackVar ScInterpreter::Interpret()
                             = const_cast<FormulaToken*>(pTok)->GetMatrix();
                         if (!pSourceMat)
                         {
-                            addDispatchRuntimeStat(
-                                interpreterDispatchRuntimeStatsStore()
-                                    .mnMatrixEngineDeclinedCount);
+                            PushIllegalParameter();
                             return false;
                         }
                         oOperand = convertMatrixRefToMatrixOperand(*pSourceMat);
@@ -7467,38 +7407,29 @@ StackVar ScInterpreter::Interpret()
                     }
                     if (!oOperand)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
+                        PushIllegalParameter();
                         return false;
                     }
                     const auto aPlan = serpn::planTranspose(*oOperand);
                     if (!aPlan
                         || aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
+                        PushIllegalParameter();
                         return false;
                     }
                     ScMatrixRef pResult = convertMatrixOperandToMatrixRef(aPlan.maValue);
                     if (!pResult)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
+                        PushIllegalParameter();
                         return false;
                     }
                     sp -= 1;
                     nGlobalError = FormulaError::NONE;
-                    addDispatchRuntimeStat(
-                        interpreterDispatchRuntimeStatsStore()
-                            .mnMatrixEngineSucceededCount);
                     PushMatrix(pResult);
                     return true;
                 };
 
-                const auto tryPlanEngineMatrixDeterminant = [&]() -> bool {
+                [[maybe_unused]] const auto tryPlanEngineMatrixDeterminant = [&]() -> bool {
                     addDispatchRuntimeStat(
                         interpreterDispatchRuntimeStatsStore()
                             .mnMatrixEngineAttemptedCount);
@@ -7577,17 +7508,11 @@ StackVar ScInterpreter::Interpret()
                     return true;
                 };
 
-                const auto tryPlanEngineMatrixMultiply = [&]() -> bool {
-                    addDispatchRuntimeStat(
-                        interpreterDispatchRuntimeStatsStore()
-                            .mnMatrixEngineAttemptedCount);
-
+                const auto dispatchMatrixMultiply = [&]() -> bool {
                     const sal_uInt8 nParamCount = pCur->GetByte();
                     if (nParamCount != 2 || sp < 2)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
+                        PushIllegalParameter();
                         return false;
                     }
                     // Scope fence: both arguments may be in-memory
@@ -7607,9 +7532,7 @@ StackVar ScInterpreter::Interpret()
                     };
                     if (!isAccepted(pRightTok) || !isAccepted(pLeftTok))
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
+                        PushIllegalParameter();
                         return false;
                     }
                     auto fetchOperand = [&](const FormulaToken* pTok)
@@ -7628,9 +7551,7 @@ StackVar ScInterpreter::Interpret()
                     auto oRightOperand = fetchOperand(pRightTok);
                     if (!oLeftOperand || !oRightOperand)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
+                        PushIllegalParameter();
                         return false;
                     }
                     // Legacy ScMatMult pushes NoValue (#N/A) when either
@@ -7652,9 +7573,6 @@ StackVar ScInterpreter::Interpret()
                     {
                         sp -= 2;
                         nGlobalError = FormulaError::NONE;
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineSucceededCount);
                         PushNoValue();
                         return true;
                     }
@@ -7662,16 +7580,11 @@ StackVar ScInterpreter::Interpret()
                         = serpn::planMatrixMultiply(*oLeftOperand, *oRightOperand);
                     if (aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
+                        PushIllegalParameter();
                         return false;
                     }
                     sp -= 2;
                     nGlobalError = FormulaError::NONE;
-                    addDispatchRuntimeStat(
-                        interpreterDispatchRuntimeStatsStore()
-                            .mnMatrixEngineSucceededCount);
                     if (!aPlan)
                     {
                         PushError(selibreoffice::toFormulaError(aPlan.meError));
@@ -7687,17 +7600,11 @@ StackVar ScInterpreter::Interpret()
                     return true;
                 };
 
-                const auto tryPlanEngineMatrixInverse = [&]() -> bool {
-                    addDispatchRuntimeStat(
-                        interpreterDispatchRuntimeStatsStore()
-                            .mnMatrixEngineAttemptedCount);
-
+                const auto dispatchMatrixInverse = [&]() -> bool {
                     const sal_uInt8 nParamCount = pCur->GetByte();
                     if (nParamCount != 1 || !sp)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
+                        PushIllegalParameter();
                         return false;
                     }
                     // Scope fence: admit in-memory svMatrix tokens
@@ -7712,9 +7619,7 @@ StackVar ScInterpreter::Interpret()
                             && pTok->GetType() != svExternalSingleRef
                             && pTok->GetType() != svExternalDoubleRef))
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
+                        PushIllegalParameter();
                         return false;
                     }
                     std::optional<serpn::MatrixOperand> oOperand;
@@ -7724,9 +7629,7 @@ StackVar ScInterpreter::Interpret()
                             = const_cast<FormulaToken*>(pTok)->GetMatrix();
                         if (!pSourceMat)
                         {
-                            addDispatchRuntimeStat(
-                                interpreterDispatchRuntimeStatsStore()
-                                    .mnMatrixEngineDeclinedCount);
+                            PushIllegalParameter();
                             return false;
                         }
                         oOperand = convertMatrixRefToMatrixOperand(*pSourceMat);
@@ -7737,9 +7640,7 @@ StackVar ScInterpreter::Interpret()
                     }
                     if (!oOperand)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
+                        PushIllegalParameter();
                         return false;
                     }
                     // Legacy ScMatInv pushes NoValue (#N/A) when the
@@ -7762,25 +7663,17 @@ StackVar ScInterpreter::Interpret()
                     {
                         sp -= 1;
                         nGlobalError = FormulaError::NONE;
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineSucceededCount);
                         PushNoValue();
                         return true;
                     }
                     const auto aPlan = serpn::planMatrixInverse(*oOperand);
                     if (aPlan.meReadiness != serpn::RpnCoercionReadiness::Ready)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnMatrixEngineDeclinedCount);
+                        PushIllegalParameter();
                         return false;
                     }
                     sp -= 1;
                     nGlobalError = FormulaError::NONE;
-                    addDispatchRuntimeStat(
-                        interpreterDispatchRuntimeStatsStore()
-                            .mnMatrixEngineSucceededCount);
                     if (!aPlan)
                     {
                         // Singular / dim-mismatch matrix surfaces as
@@ -8417,7 +8310,7 @@ StackVar ScInterpreter::Interpret()
                     return true;
                 };
 
-                const auto tryPlanEngineSpillSortBy = [&]() -> bool {
+                [[maybe_unused]] const auto tryPlanEngineSpillSortBy = [&]() -> bool {
                     addDispatchRuntimeStat(
                         interpreterDispatchRuntimeStatsStore()
                             .mnSpillEngineAttemptedCount);
@@ -11129,7 +11022,7 @@ StackVar ScInterpreter::Interpret()
                 //   - col is a positive scalar double (if present)
                 // Matrix-returning forms (row=0 or col=0) and external /
                 // matrix / RefList bases defer to legacy.
-                const auto tryPlanEngineIndex = [&]() -> bool {
+                [[maybe_unused]] const auto tryPlanEngineIndex = [&]() -> bool {
                     addDispatchRuntimeStat(
                         interpreterDispatchRuntimeStatsStore()
                             .mnReferenceEngineAttemptedCount);
@@ -11294,17 +11187,11 @@ StackVar ScInterpreter::Interpret()
                 // External refs preserve the document / sheet token through
                 // PushExternalSingleRef / PushExternalDoubleRef so the output
                 // stays within the same external scope as the input.
-                const auto tryPlanEngineOffset = [&]() -> bool {
-                    addDispatchRuntimeStat(
-                        interpreterDispatchRuntimeStatsStore()
-                            .mnReferenceEngineAttemptedCount);
-
+                const auto dispatchOffset = [&]() -> bool {
                     const sal_uInt8 nParamCount = pCur->GetByte();
                     if (nParamCount < 3 || nParamCount > 5 || sp < nParamCount)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnReferenceEngineDeclinedCount);
+                        PushIllegalParameter();
                         return false;
                     }
 
@@ -11312,9 +11199,7 @@ StackVar ScInterpreter::Interpret()
                     const FormulaToken* pBaseTok = pStack[sp - nParamCount];
                     if (!pBaseTok)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnReferenceEngineDeclinedCount);
+                        PushIllegalParameter();
                         return false;
                     }
                     const StackVar eBaseType = pBaseTok->GetType();
@@ -11322,9 +11207,7 @@ StackVar ScInterpreter::Interpret()
                         && eBaseType != svExternalSingleRef
                         && eBaseType != svExternalDoubleRef)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnReferenceEngineDeclinedCount);
+                        PushIllegalParameter();
                         return false;
                     }
 
@@ -11361,18 +11244,12 @@ StackVar ScInterpreter::Interpret()
                     {
                         // Drop the base token and emit the error.
                         Pop();
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnReferenceEngineSucceededCount);
                         PushError(nGlobalError);
                         return true;
                     }
                     if (nColNew <= 0 || nRowNew <= 0)
                     {
                         Pop();
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnReferenceEngineSucceededCount);
                         PushIllegalArgument();
                         return true;
                     }
@@ -11468,9 +11345,6 @@ StackVar ScInterpreter::Interpret()
                         serpn::RpnValue::reference(aBase), aParams);
                     if (!aPlan)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnReferenceEngineSucceededCount);
                         PushIllegalArgument();
                         return true;
                     }
@@ -11480,17 +11354,11 @@ StackVar ScInterpreter::Interpret()
                         // in the current implementation; treat any other
                         // readiness as an illegal argument, matching legacy
                         // PushIllegalArgument on planOffsetRange failure.
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnReferenceEngineSucceededCount);
                         PushIllegalArgument();
                         return true;
                     }
 
                     const spreadsheetengine::api::CellRange& rRange = aPlan.maValue;
-                    addDispatchRuntimeStat(
-                        interpreterDispatchRuntimeStatsStore()
-                            .mnReferenceEngineSucceededCount);
                     if (bIsExternal)
                     {
                         if (rRange.isSingleCell())
@@ -11538,33 +11406,22 @@ StackVar ScInterpreter::Interpret()
                 // svSingleRef / svDoubleRef (count 1) and svRefList (count
                 // = list size). Non-reference shapes set IllegalParameter
                 // and push 0.0 to match the legacy default branch.
-                const auto tryPlanEngineAreaCount = [&]() -> bool {
-                    addDispatchRuntimeStat(
-                        interpreterDispatchRuntimeStatsStore()
-                            .mnReferenceEngineAttemptedCount);
-
+                const auto dispatchAreaCount = [&]() -> bool {
                     const sal_uInt8 nParamCount = pCur->GetByte();
                     if (nParamCount != 1 || !sp)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnReferenceEngineDeclinedCount);
+                        PushIllegalParameter();
                         return false;
                     }
                     const FormulaToken* pTop = pStack[sp - 1];
                     if (!pTop)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnReferenceEngineDeclinedCount);
+                        PushIllegalParameter();
                         return false;
                     }
                     FormulaConstTokenRef xToken = PopToken();
                     if (!xToken || !serefexec::isReferenceOperandToken(*xToken))
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnReferenceEngineSucceededCount);
                         SetError(FormulaError::IllegalParameter);
                         PushDouble(0.0);
                         return true;
@@ -11590,9 +11447,6 @@ StackVar ScInterpreter::Interpret()
                     }
 
                     const auto aCount = serefexec::referenceOperandAreaCount(*xToken);
-                    addDispatchRuntimeStat(
-                        interpreterDispatchRuntimeStatsStore()
-                            .mnReferenceEngineSucceededCount);
                     if (!aCount)
                     {
                         SetError(selibreoffice::toFormulaError(aCount.meError));
@@ -11617,18 +11471,12 @@ StackVar ScInterpreter::Interpret()
                 //   - svString (SHEET only): sheet-name lookup
                 //   - default: IllegalParameter (ownership moved into
                 //     the engine path so ocBad retirement is safe)
-                const auto tryPlanEngineAxisOrdinal
+                const auto dispatchAxisOrdinal
                     = [&](serpn::AxisOrdinalKind eKind) -> bool {
-                    addDispatchRuntimeStat(
-                        interpreterDispatchRuntimeStatsStore()
-                            .mnReferenceEngineAttemptedCount);
-
                     const sal_uInt8 nParamCount = pCur->GetByte();
                     if (nParamCount > 1)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnReferenceEngineDeclinedCount);
+                        PushIllegalParameter();
                         return false;
                     }
 
@@ -11706,9 +11554,6 @@ StackVar ScInterpreter::Interpret()
                                 aPlan.mfStart
                                     = bTargetRows ? aPos.Row() + 1 : aPos.Col() + 1;
                                 aPlan.mnLength = bTargetRows ? nRows : nCols;
-                                addDispatchRuntimeStat(
-                                    interpreterDispatchRuntimeStatsStore()
-                                        .mnReferenceEngineSucceededCount);
                                 PushReferenceAxisPlan(aPlan);
                                 return true;
                             }
@@ -11720,18 +11565,13 @@ StackVar ScInterpreter::Interpret()
                             static_cast<spreadsheetengine::api::RowIndex>(aPos.Row())
                         };
                         aRange.maEnd = aRange.maStart;
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnReferenceEngineSucceededCount);
                         pushAxisResult(aRange);
                         return true;
                     }
 
                     if (!sp || !pStack[sp - 1])
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnReferenceEngineDeclinedCount);
+                        PushIllegalParameter();
                         return false;
                     }
 
@@ -11758,9 +11598,6 @@ StackVar ScInterpreter::Interpret()
                                 // Legacy ScSheet has no svExternalSingleRef
                                 // branch; mirror its default IllegalParameter.
                                 Pop();
-                                addDispatchRuntimeStat(
-                                    interpreterDispatchRuntimeStatsStore()
-                                        .mnReferenceEngineSucceededCount);
                                 SetError(FormulaError::IllegalParameter);
                                 PushDouble(0.0);
                                 return true;
@@ -11820,9 +11657,6 @@ StackVar ScInterpreter::Interpret()
                                 // Legacy ScSheet has no svExternalDoubleRef
                                 // branch.
                                 Pop();
-                                addDispatchRuntimeStat(
-                                    interpreterDispatchRuntimeStatsStore()
-                                        .mnReferenceEngineSucceededCount);
                                 SetError(FormulaError::IllegalParameter);
                                 PushDouble(0.0);
                                 return true;
@@ -11854,9 +11688,6 @@ StackVar ScInterpreter::Interpret()
                                 // Legacy COLUMN / ROW decline svString at
                                 // the default branch.
                                 Pop();
-                                addDispatchRuntimeStat(
-                                    interpreterDispatchRuntimeStatsStore()
-                                        .mnReferenceEngineSucceededCount);
                                 SetError(FormulaError::IllegalParameter);
                                 PushDouble(0.0);
                                 return true;
@@ -11864,9 +11695,6 @@ StackVar ScInterpreter::Interpret()
                             const svl::SharedString aStr = PopString();
                             const auto aOrdinal
                                 = serefexec::sheetOrdinal(mrDoc, aStr.getString());
-                            addDispatchRuntimeStat(
-                                interpreterDispatchRuntimeStatsStore()
-                                    .mnReferenceEngineSucceededCount);
                             double fValue = 0.0;
                             if (!aOrdinal)
                                 SetError(selibreoffice::toFormulaError(aOrdinal.meError));
@@ -11881,9 +11709,6 @@ StackVar ScInterpreter::Interpret()
                             // Unknown shape: legacy default is
                             // IllegalParameter via SetError + PushDouble.
                             Pop();
-                            addDispatchRuntimeStat(
-                                interpreterDispatchRuntimeStatsStore()
-                                    .mnReferenceEngineSucceededCount);
                             SetError(FormulaError::IllegalParameter);
                             PushDouble(0.0);
                             return true;
@@ -11891,16 +11716,10 @@ StackVar ScInterpreter::Interpret()
 
                     if (nGlobalError != FormulaError::NONE)
                     {
-                        addDispatchRuntimeStat(
-                            interpreterDispatchRuntimeStatsStore()
-                                .mnReferenceEngineSucceededCount);
                         PushDouble(0.0);
                         return true;
                     }
 
-                    addDispatchRuntimeStat(
-                        interpreterDispatchRuntimeStatsStore()
-                            .mnReferenceEngineSucceededCount);
                     pushAxisResult(aRange);
                     return true;
                 };
@@ -12850,8 +12669,13 @@ StackVar ScInterpreter::Interpret()
                         }
                         break;
                     case ocSortBy           :
-                        if (!tryPlanEngineSpillSortBy())
-                            ScSortBy();
+                        warnIfLegacyDispatchReached(
+                            "family-local default-on", u"SORTBY",
+                            [](std::u16string_view rFormula) {
+                                return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
+                            },
+                            "family-local default-on SORTBY reached ScInterpreter");
+                        ScSortBy();
                         break;
                     case ocDrop             :
                         if (!tryPlanEngineSpillTakeOrDrop(/*bTake*/ false))
@@ -14565,46 +14389,22 @@ StackVar ScInterpreter::Interpret()
                     }
                     break;
                     case ocColumns          :
-                        if (!tryPlanEngineSpanCount(serpn::SpanCountKind::Columns))
-                        {
-                            OSL_FAIL("engine-backed COLUMNS declined ocColumns");
-                            PushIllegalParameter();
-                        }
+                        dispatchSpanCount(serpn::SpanCountKind::Columns);
                         break;
                     case ocRows             :
-                        if (!tryPlanEngineSpanCount(serpn::SpanCountKind::Rows))
-                        {
-                            OSL_FAIL("engine-backed ROWS declined ocRows");
-                            PushIllegalParameter();
-                        }
+                        dispatchSpanCount(serpn::SpanCountKind::Rows);
                         break;
                     case ocSheets           :
-                        if (!tryPlanEngineSpanCount(serpn::SpanCountKind::Sheets))
-                        {
-                            OSL_FAIL("engine-backed SHEETS declined ocSheets");
-                            PushIllegalParameter();
-                        }
+                        dispatchSpanCount(serpn::SpanCountKind::Sheets);
                         break;
                     case ocColumn           :
-                        if (!tryPlanEngineAxisOrdinal(serpn::AxisOrdinalKind::Column))
-                        {
-                            OSL_FAIL("engine-backed COLUMN declined ocColumn");
-                            PushIllegalParameter();
-                        }
+                        dispatchAxisOrdinal(serpn::AxisOrdinalKind::Column);
                         break;
                     case ocRow              :
-                        if (!tryPlanEngineAxisOrdinal(serpn::AxisOrdinalKind::Row))
-                        {
-                            OSL_FAIL("engine-backed ROW declined ocRow");
-                            PushIllegalParameter();
-                        }
+                        dispatchAxisOrdinal(serpn::AxisOrdinalKind::Row);
                         break;
                     case ocSheet            :
-                        if (!tryPlanEngineAxisOrdinal(serpn::AxisOrdinalKind::Sheet))
-                        {
-                            OSL_FAIL("engine-backed SHEET declined ocSheet");
-                            PushIllegalParameter();
-                        }
+                        dispatchAxisOrdinal(serpn::AxisOrdinalKind::Sheet);
                         break;
                     case ocRRI              :
                     {
@@ -15000,23 +14800,20 @@ StackVar ScInterpreter::Interpret()
                         CalculateLookup(true);
                         break;
                     case ocIndex            :
-                        if (!tryPlanEngineIndex())
-                            ScIndex();
+                        warnIfLegacyDispatchReached(
+                            "family-local default-on", u"INDEX",
+                            [](std::u16string_view rFormula) {
+                                return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
+                            },
+                            "family-local default-on INDEX reached ScInterpreter");
+                        ScIndex();
                         break;
                     case ocMultiArea        : ScMultiArea();                break;
                     case ocOffset           :
-                        if (!tryPlanEngineOffset())
-                        {
-                            OSL_FAIL("engine-backed OFFSET declined ocOffset");
-                            PushIllegalParameter();
-                        }
+                        dispatchOffset();
                         break;
                     case ocAreas            :
-                        if (!tryPlanEngineAreaCount())
-                        {
-                            OSL_FAIL("engine-backed AREAS declined ocAreas");
-                            PushIllegalParameter();
-                        }
+                        dispatchAreaCount();
                         break;
                     case ocCurrency         : pushLegacyCurrency();     break;
                     case ocReplace          : pushLegacyReplace();      break;
@@ -15284,51 +15081,28 @@ StackVar ScInterpreter::Interpret()
                     break;
                     case ocMatValue         : ScMatValue();                 break;
                     case ocMatrixUnit       :
-                        if (!tryPlanEngineIdentityMatrix())
-                        {
-                            OSL_FAIL("engine-backed MUNIT declined ocMatrixUnit");
-                            PushIllegalArgument();
-                        }
+                        dispatchIdentityMatrix();
                         break;
                     case ocMatDet:
-                        if (!tryPlanEngineMatrixDeterminant())
-                        {
-                            warnIfLegacyDispatchReached(
-                                "family-local default-on", u"MDETERM",
-                                [](std::u16string_view rFormula) {
-                                    return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
-                                },
-                                "family-local default-on MDETERM reached ScInterpreter");
-                            seinterpcompatdispatch::Dispatcher::matrixDeterminant(*this);
-                        }
+                        warnIfLegacyDispatchReached(
+                            "family-local default-on", u"MDETERM",
+                            [](std::u16string_view rFormula) {
+                                return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
+                            },
+                            "family-local default-on MDETERM reached ScInterpreter");
+                        seinterpcompatdispatch::Dispatcher::matrixDeterminant(*this);
                         break;
                     case ocMatInv:
-                        if (!tryPlanEngineMatrixInverse())
-                        {
-                            OSL_FAIL("engine-backed MINVERSE declined ocMatInv");
-                            PushIllegalParameter();
-                        }
+                        dispatchMatrixInverse();
                         break;
                     case ocMatMult:
-                        if (!tryPlanEngineMatrixMultiply())
-                        {
-                            OSL_FAIL("engine-backed MMULT declined ocMatMult");
-                            PushIllegalParameter();
-                        }
+                        dispatchMatrixMultiply();
                         break;
                     case ocMatSequence      :
-                        if (!tryPlanEngineSequenceMatrix())
-                        {
-                            OSL_FAIL("engine-backed SEQUENCE declined ocMatSequence");
-                            PushIllegalArgument();
-                        }
+                        dispatchSequenceMatrix();
                         break;
                     case ocMatTrans         :
-                        if (!tryPlanEngineTranspose())
-                        {
-                            OSL_FAIL("engine-backed TRANSPOSE declined ocMatTrans");
-                            PushIllegalParameter();
-                        }
+                        dispatchTranspose();
                         break;
                     case ocMatRef           : ScMatRef();                   break;
                     case ocB:
