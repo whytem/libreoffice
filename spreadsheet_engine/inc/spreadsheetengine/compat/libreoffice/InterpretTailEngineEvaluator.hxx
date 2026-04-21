@@ -14,7 +14,6 @@
 #include <array>
 #include <atomic>
 #include <cmath>
-#include <cstdio>
 #include <cstdlib>
 #include <limits>
 #include <map>
@@ -549,6 +548,28 @@ inline void markObservedFormulaCell(const ScAddress& rFormulaPos, bool bSupporte
     OUString aText = toLibreOfficeString(api::String(rValue));
     if (!aText.isEmpty() && aText[0] == '.')
         aText = aText.copy(1);
+
+    // GetFormula(GRAM_ODFF) serializes external named ranges in ODF spelling
+    // like ['file'#$$'Name']. parseFormula() tokenizes that as a generic
+    // bracket/cell reference, but the compiler-facing evaluator expects the
+    // raw external-name form ('file'#Name), so normalize the host-authored
+    // spelling back into that shape before reparsing.
+    OUString aExternalNameCandidate = aText;
+    if (aExternalNameCandidate.getLength() >= 2 && aExternalNameCandidate.startsWith(u"[")
+        && aExternalNameCandidate.endsWith(u"]"))
+    {
+        aExternalNameCandidate
+            = aExternalNameCandidate.copy(1, aExternalNameCandidate.getLength() - 2);
+    }
+    const sal_Int32 nNameMarker = aExternalNameCandidate.indexOf(u"#$$'"_ustr);
+    if (nNameMarker >= 0 && aExternalNameCandidate.endsWith(u"'"))
+    {
+        OUString aName = aExternalNameCandidate.copy(
+            nNameMarker + 4, aExternalNameCandidate.getLength() - (nNameMarker + 5));
+        aName = aName.replaceAll(u"''"_ustr, u"'"_ustr);
+        return aExternalNameCandidate.copy(0, nNameMarker + 1) + aName;
+    }
+
     return aText;
 }
 
@@ -2021,10 +2042,18 @@ struct ParsedExternalDoubleRefNode
     ScComplexRefData maReference;
 };
 
+struct ParsedExternalNamedRefNode
+{
+    OUString maSymbol;
+};
+
 [[nodiscard]] inline std::optional<ParsedExternalSingleRefNode> tryParseExternalSingleRefNode(
     const core::formula::Node& rNode, const ScDocument& rDoc, const ScAddress& rFormulaPos);
 
 [[nodiscard]] inline std::optional<ParsedExternalDoubleRefNode> tryParseExternalDoubleRefNode(
+    const core::formula::Node& rNode, const ScDocument& rDoc, const ScAddress& rFormulaPos);
+
+[[nodiscard]] inline std::optional<ParsedExternalNamedRefNode> tryParseExternalNamedRefNode(
     const core::formula::Node& rNode, const ScDocument& rDoc, const ScAddress& rFormulaPos);
 
 [[nodiscard]] inline Materialization<api::CellValue> materializeExternalSingleRefValue(
@@ -2037,6 +2066,14 @@ struct ParsedExternalDoubleRefNode
 
 [[nodiscard]] inline Materialization<ScMatrixRef> materializeExternalDoubleRefMatrix(
     const ParsedExternalDoubleRefNode& rReference, const ScDocument& rDoc,
+    const ScAddress& rFormulaPos);
+
+[[nodiscard]] inline Materialization<api::CellValue> materializeExternalNamedRefValue(
+    const ParsedExternalNamedRefNode& rReference, const ScDocument& rDoc,
+    ScInterpreterContext& rContext, const ScAddress& rFormulaPos);
+
+[[nodiscard]] inline Materialization<ScMatrixRef> materializeExternalNamedRefMatrix(
+    const ParsedExternalNamedRefNode& rReference, const ScDocument& rDoc,
     const ScAddress& rFormulaPos);
 
 [[nodiscard]] inline EvaluationAttempt evaluateGrowthFunction(
@@ -3759,6 +3796,32 @@ inline void putScalarIntoMatrix(
     return aParsed;
 }
 
+[[nodiscard]] inline std::optional<ParsedExternalNamedRefNode> tryParseExternalNamedRefNode(
+    const core::formula::Node& rNode, const ScDocument& rDoc, const ScAddress& rFormulaPos)
+{
+    if (rNode.meKind != core::formula::NodeKind::CellReference
+        && rNode.meKind != core::formula::NodeKind::NamedReference)
+    {
+        return std::nullopt;
+    }
+
+    const OUString aSymbol = normalizeReferenceToken(rNode.maPrimaryText);
+    if (aSymbol.isEmpty() || aSymbol.indexOf('#') < 0)
+        return std::nullopt;
+
+    ScCompiler aCompiler(const_cast<ScDocument&>(rDoc), rFormulaPos,
+        formula::FormulaGrammar::GRAM_ODFF);
+    std::unique_ptr<ScTokenArray> pCode = aCompiler.CompileString(aSymbol);
+    if (!pCode || pCode->GetCodeError() != FormulaError::NONE || pCode->GetLen() != 1)
+        return std::nullopt;
+
+    const formula::FormulaToken* pToken = pCode->FirstToken();
+    if (!pToken || pToken->GetType() != formula::svExternalName)
+        return std::nullopt;
+
+    return ParsedExternalNamedRefNode { aSymbol };
+}
+
 [[nodiscard]] inline Materialization<api::CellValue> materializeExternalSingleRefValue(
     const ParsedExternalSingleRefNode& rReference, const ScDocument& rDoc,
     const ScAddress& rFormulaPos)
@@ -3816,6 +3879,149 @@ inline void putScalarIntoMatrix(
     if (aProjection.meError != FormulaError::NONE)
         return makeMaterializedError<ScMatrixRef>(toApiError(aProjection.meError));
     return makeMaterializedValue(aProjection.mxMatrix);
+}
+
+[[nodiscard]] inline Materialization<formula::FormulaTokenRef> materializeExternalNamedRefToken(
+    const ParsedExternalNamedRefNode& rReference, const ScDocument& rDoc,
+    const ScAddress& rFormulaPos)
+{
+    ScCompiler aCompiler(const_cast<ScDocument&>(rDoc), rFormulaPos,
+        formula::FormulaGrammar::GRAM_ODFF);
+    std::unique_ptr<ScTokenArray> pCode = aCompiler.CompileString(rReference.maSymbol);
+    if (!pCode || pCode->GetCodeError() != FormulaError::NONE || pCode->GetLen() != 1)
+        return makeUnsupportedMaterialization<formula::FormulaTokenRef>(
+            FallbackReason::UnsupportedHostSurface);
+
+    const formula::FormulaToken* pToken = pCode->FirstToken();
+    if (!pToken || pToken->GetType() != formula::svExternalName)
+    {
+        return makeUnsupportedMaterialization<formula::FormulaTokenRef>(
+            FallbackReason::UnsupportedHostSurface);
+    }
+
+    ScCompiler aRpnCompiler(const_cast<ScDocument&>(rDoc), rFormulaPos, *pCode,
+        formula::FormulaGrammar::GRAM_ODFF);
+    aRpnCompiler.CompileTokenArray();
+    if (pCode->GetCodeError() != FormulaError::NONE)
+        return makeMaterializedError<formula::FormulaTokenRef>(toApiError(pCode->GetCodeError()));
+    if (pCode->GetCodeLen() != 1)
+    {
+        return makeUnsupportedMaterialization<formula::FormulaTokenRef>(
+            FallbackReason::UnsupportedHostSurface);
+    }
+
+    formula::FormulaTokenRef xToken(pCode->FirstRPNToken());
+    if (!xToken)
+        return makeMaterializedError<formula::FormulaTokenRef>(api::Error::IllegalArgument);
+
+    switch (xToken->GetType())
+    {
+        case formula::svExternalSingleRef:
+        case formula::svExternalDoubleRef:
+        case formula::svError:
+            return makeMaterializedValue(xToken);
+        default:
+            return makeUnsupportedMaterialization<formula::FormulaTokenRef>(
+                FallbackReason::UnsupportedHostSurface);
+    }
+}
+
+[[nodiscard]] inline std::optional<ParsedExternalSingleRefNode> tryExtractExternalSingleRefToken(
+    const formula::FormulaToken& rToken)
+{
+    if (rToken.GetType() != formula::svExternalSingleRef)
+        return std::nullopt;
+
+    ParsedExternalSingleRefNode aParsed;
+    aParsed.mnFileId = rToken.GetIndex();
+    aParsed.maTabName = rToken.GetString().getString();
+    aParsed.maReference = *rToken.GetSingleRef();
+    return aParsed;
+}
+
+[[nodiscard]] inline std::optional<ParsedExternalDoubleRefNode> tryExtractExternalDoubleRefToken(
+    const formula::FormulaToken& rToken)
+{
+    if (rToken.GetType() != formula::svExternalDoubleRef)
+        return std::nullopt;
+
+    ParsedExternalDoubleRefNode aParsed;
+    aParsed.mnFileId = rToken.GetIndex();
+    aParsed.maTabName = rToken.GetString().getString();
+    aParsed.maReference = *rToken.GetDoubleRef();
+    return aParsed;
+}
+
+[[nodiscard]] inline Materialization<api::CellValue> materializeExternalNamedRefValue(
+    const ParsedExternalNamedRefNode& rReference, const ScDocument& rDoc,
+    ScInterpreterContext&, const ScAddress& rFormulaPos)
+{
+    const auto aToken = materializeExternalNamedRefToken(rReference, rDoc, rFormulaPos);
+    if (!aToken.mbSupported)
+        return makeUnsupportedMaterialization<api::CellValue>(aToken.meFallbackReason);
+    if (!aToken.moValue)
+        return makeMaterializedError<api::CellValue>(aToken.meError);
+
+    const formula::FormulaTokenRef& xToken = *aToken.moValue;
+    if (xToken->GetType() == formula::svError)
+        return makeMaterializedValue(api::CellValue::error(toApiError(xToken->GetError())));
+
+    if (const auto oSingle = tryExtractExternalSingleRefToken(*xToken))
+        return materializeExternalSingleRefValue(*oSingle, rDoc, rFormulaPos);
+
+    const auto oDouble = tryExtractExternalDoubleRefToken(*xToken);
+    if (!oDouble)
+    {
+        return makeUnsupportedMaterialization<api::CellValue>(
+            FallbackReason::UnsupportedHostSurface);
+    }
+
+    ScComplexRefData aReference(oDouble->maReference);
+    const ScRange aRange = aReference.toAbs(rDoc, rFormulaPos);
+    const auto oScalarAddress = tryImplicitIntersectionAddress(aRange, rFormulaPos);
+    if (!oScalarAddress || *oScalarAddress == rFormulaPos)
+    {
+        return makeUnsupportedMaterialization<api::CellValue>(
+            FallbackReason::UnsupportedHostSurface);
+    }
+
+    const auto aFetch = externalreferenceexecution::fetchExternalDoubleRef(
+        rDoc, rFormulaPos, oDouble->mnFileId, oDouble->maTabName, oDouble->maReference);
+    if (aFetch.meError != FormulaError::NONE)
+        return makeMaterializedError<api::CellValue>(toApiError(aFetch.meError));
+
+    const auto aProjection
+        = externalreferenceexecution::projectExternalDoubleRefMatrix(aFetch.mxArray);
+    if (aProjection.meError != FormulaError::NONE)
+        return makeMaterializedError<api::CellValue>(toApiError(aProjection.meError));
+    if (!aProjection.mxMatrix)
+        return makeMaterializedError<api::CellValue>(api::Error::IllegalArgument);
+
+    const SCSIZE nColumn = static_cast<SCSIZE>(oScalarAddress->Col() - aRange.aStart.Col());
+    const SCSIZE nRow = static_cast<SCSIZE>(oScalarAddress->Row() - aRange.aStart.Row());
+    return makeMaterializedValue(
+        lookupexecution::detail::toApiCellValue(aProjection.mxMatrix->Get(nColumn, nRow)));
+}
+
+[[nodiscard]] inline Materialization<ScMatrixRef> materializeExternalNamedRefMatrix(
+    const ParsedExternalNamedRefNode& rReference, const ScDocument& rDoc,
+    const ScAddress& rFormulaPos)
+{
+    const auto aToken = materializeExternalNamedRefToken(rReference, rDoc, rFormulaPos);
+    if (!aToken.mbSupported)
+        return makeUnsupportedMaterialization<ScMatrixRef>(aToken.meFallbackReason);
+    if (!aToken.moValue)
+        return makeMaterializedError<ScMatrixRef>(aToken.meError);
+
+    const formula::FormulaTokenRef& xToken = *aToken.moValue;
+    if (xToken->GetType() == formula::svError)
+        return makeMaterializedError<ScMatrixRef>(toApiError(xToken->GetError()));
+
+    if (const auto oSingle = tryExtractExternalSingleRefToken(*xToken))
+        return materializeExternalSingleRefMatrix(*oSingle, rDoc, rFormulaPos);
+    if (const auto oDouble = tryExtractExternalDoubleRefToken(*xToken))
+        return materializeExternalDoubleRefMatrix(*oDouble, rDoc, rFormulaPos);
+    return makeUnsupportedMaterialization<ScMatrixRef>(FallbackReason::UnsupportedHostSurface);
 }
 
 [[nodiscard]] inline bool matchesComparisonResult(
@@ -3965,6 +4171,9 @@ inline void putScalarIntoMatrix(
         case core::formula::NodeKind::CellReference:
         case core::formula::NodeKind::NamedReference:
         {
+            if (const auto oExternal = tryParseExternalNamedRefNode(rNode, rDoc, rFormulaPos))
+                return materializeExternalNamedRefValue(*oExternal, rDoc, rContext, rFormulaPos);
+
             if (rNode.meKind == core::formula::NodeKind::CellReference)
             {
                 if (const auto oExternal = tryParseExternalSingleRefNode(rNode, rDoc, rFormulaPos))
@@ -5915,6 +6124,8 @@ materializeCriteriaAggregateInput(const core::formula::Node& rArgument, const Sc
     const core::formula::Node& rNode, const ScDocument& rDoc, ScInterpreterContext& rContext,
     const ScAddress& rFormulaPos)
 {
+    if (const auto oExternalNamed = tryParseExternalNamedRefNode(rNode, rDoc, rFormulaPos))
+        return materializeExternalNamedRefMatrix(*oExternalNamed, rDoc, rFormulaPos);
     if (const auto oExternalSingle = tryParseExternalSingleRefNode(rNode, rDoc, rFormulaPos))
         return materializeExternalSingleRefMatrix(*oExternalSingle, rDoc, rFormulaPos);
 

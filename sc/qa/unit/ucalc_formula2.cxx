@@ -34,6 +34,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <iostream>
 #include <optional>
 #include <vector>
 
@@ -4330,29 +4331,108 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorExternalRefer
     rExtDoc.SetValue(1, 0, 1, 2.0); // Matrix.B1
     rExtDoc.SetValue(0, 1, 1, 3.0); // Matrix.A2
     rExtDoc.SetValue(1, 1, 1, 4.0); // Matrix.B2
+    ScRangeName* pRangeNames = rExtDoc.GetRangeName();
+    CPPUNIT_ASSERT(pRangeNames);
+    CPPUNIT_ASSERT(
+        pRangeNames->insert(new ScRangeData(rExtDoc, u"ExtValue"_ustr, u"$Data.$A$1"_ustr)));
+    CPPUNIT_ASSERT(pRangeNames->insert(
+        new ScRangeData(rExtDoc, u"ExtMatrix"_ustr, u"$Matrix.$A$1:$B$2"_ustr)));
 
     const auto verifyResultsAndStats = [&]() {
+        ScInterpreterContext& rContext = m_pDoc->GetNonThreadedContext();
+        ScFormulaCell* pExtValueCell = m_pDoc->GetFormulaCell(ScAddress(5, 7, 0));
+        ScFormulaCell* pExtMatrixCell = m_pDoc->GetFormulaCell(ScAddress(6, 7, 0));
+        CPPUNIT_ASSERT(pExtValueCell);
+        CPPUNIT_ASSERT(pExtMatrixCell);
+        const OUString aStoredExtValueFormula
+            = pExtValueCell->GetFormula(formula::FormulaGrammar::GRAM_ODFF, &rContext);
+        const OUString aStoredExtMatrixFormula
+            = pExtMatrixCell->GetFormula(formula::FormulaGrammar::GRAM_ODFF, &rContext);
+        const bool bStoredExtValueDefaultOn = setaileval::isFamilyLocalDefaultOnFormula(
+            std::u16string_view(aStoredExtValueFormula.getStr(), aStoredExtValueFormula.getLength()));
+        const bool bStoredExtMatrixDefaultOn = setaileval::isFamilyLocalDefaultOnFormula(
+            std::u16string_view(aStoredExtMatrixFormula.getStr(), aStoredExtMatrixFormula.getLength()));
+        const auto aStoredExtValue = setaileval::tryEvaluateFormula(
+            *m_pDoc, rContext, ScAddress(5, 7, 0),
+            std::u16string_view(aStoredExtValueFormula.getStr(), aStoredExtValueFormula.getLength()),
+            false, pExtValueCell->GetCode());
+        const auto aStoredExtMatrix = setaileval::tryEvaluateFormula(
+            *m_pDoc, rContext, ScAddress(6, 7, 0),
+            std::u16string_view(aStoredExtMatrixFormula.getStr(), aStoredExtMatrixFormula.getLength()),
+            false, pExtMatrixCell->GetCode());
+        const std::string aStoredExtValueLabel
+            = "stored_value_default_on=" + std::to_string(bStoredExtValueDefaultOn)
+              + " stored_value_supported=" + std::to_string(aStoredExtValue.mbSupported)
+              + " stored_value_reason="
+              + std::to_string(static_cast<int>(aStoredExtValue.meFallbackReason))
+              + " stored_value_type="
+              + std::to_string(static_cast<int>(aStoredExtValue.maResult.meType))
+              + " stored_value_len=" + std::to_string(aStoredExtValueFormula.getLength())
+              + " stored_value_formula=" + std::string(aStoredExtValueFormula.toUtf8().getStr());
+        const std::string aStoredExtMatrixLabel
+            = "stored_matrix_default_on=" + std::to_string(bStoredExtMatrixDefaultOn)
+              + " stored_matrix_supported=" + std::to_string(aStoredExtMatrix.mbSupported)
+              + " stored_matrix_reason="
+              + std::to_string(static_cast<int>(aStoredExtMatrix.meFallbackReason))
+              + " stored_matrix_type="
+              + std::to_string(static_cast<int>(aStoredExtMatrix.maResult.meType))
+              + " stored_matrix_len=" + std::to_string(aStoredExtMatrixFormula.getLength())
+              + " stored_matrix_formula="
+              + std::string(aStoredExtMatrixFormula.toUtf8().getStr());
+        CPPUNIT_ASSERT_MESSAGE(aStoredExtValueLabel, bStoredExtValueDefaultOn);
+        CPPUNIT_ASSERT_MESSAGE(aStoredExtMatrixLabel, bStoredExtMatrixDefaultOn);
+        CPPUNIT_ASSERT_MESSAGE(aStoredExtValueLabel, aStoredExtValue.mbSupported);
+        CPPUNIT_ASSERT_MESSAGE(aStoredExtMatrixLabel, aStoredExtMatrix.mbSupported);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(aStoredExtValueLabel,
+            spreadsheetengine::api::formulavalue::ValueType::Value,
+            aStoredExtValue.maResult.meType);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(aStoredExtMatrixLabel,
+            spreadsheetengine::api::formulavalue::ValueType::Value,
+            aStoredExtMatrix.maResult.meType);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(aStoredExtValueLabel, 1.0,
+            aStoredExtValue.maResult.mfValue, 1.0E-12);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL_MESSAGE(aStoredExtMatrixLabel, -2.0,
+            aStoredExtMatrix.maResult.mfValue, 1.0E-12);
+
         ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(0, 7, 0)));
         ASSERT_DOUBLES_EQUAL(3.0, m_pDoc->GetValue(ScAddress(1, 7, 0)));
         CPPUNIT_ASSERT_EQUAL(u"Value=2"_ustr, m_pDoc->GetString(ScAddress(2, 7, 0)));
         ASSERT_DOUBLES_EQUAL(0.0, m_pDoc->GetValue(ScAddress(3, 7, 0)));
         CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(4, 7, 0)), 1.0E-12);
+        ASSERT_DOUBLES_EQUAL(1.0, m_pDoc->GetValue(ScAddress(5, 7, 0)));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(-2.0, m_pDoc->GetValue(ScAddress(6, 7, 0)), 1.0E-12);
 
         const auto aStats = setaileval::getStatsSnapshot();
-        CPPUNIT_ASSERT(aStats.mnAuthoritativeCount >= 5);
-        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
-        CPPUNIT_ASSERT(
+        const std::string aStatsLabel
+            = "auth=" + std::to_string(aStats.mnAuthoritativeCount)
+              + " auth_fallback=" + std::to_string(aStats.mnAuthoritativeFallbackCount)
+              + " scalar_auth="
+              + std::to_string(aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                    setaileval::FunctionKind::ScalarRoot)])
+              + " matrix_auth="
+              + std::to_string(aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                    setaileval::FunctionKind::MatrixMath)])
+              + " scalar_fallback="
+              + std::to_string(aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                    setaileval::FunctionKind::ScalarRoot)])
+              + " matrix_fallback="
+              + std::to_string(aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                    setaileval::FunctionKind::MatrixMath)]);
+        CPPUNIT_ASSERT_MESSAGE(aStatsLabel, aStats.mnAuthoritativeCount >= 7);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(aStatsLabel, static_cast<sal_uInt64>(0),
+            aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT_MESSAGE(aStatsLabel,
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::ScalarRoot)]
-            >= 4);
-        CPPUNIT_ASSERT(
+                >= 5);
+        CPPUNIT_ASSERT_MESSAGE(aStatsLabel,
             aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::MatrixMath)]
-            >= 1);
-        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
+                >= 2);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(aStatsLabel, static_cast<sal_uInt64>(0),
             aStats.maFunctionFallbackCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::ScalarRoot)]);
-        CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(aStatsLabel, static_cast<sal_uInt64>(0),
             aStats.maFunctionFallbackCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::MatrixMath)]);
     };
@@ -4372,6 +4452,8 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorExternalRefer
         m_pDoc->SetString(3, 7, 0,
                           u"='file:///extdata.fake'#Data.A1='file:///extdata.fake'#Data.A2"_ustr);
         m_pDoc->SetString(4, 7, 0, u"=MDETERM('file:///extdata.fake'#Matrix.A1)"_ustr);
+        m_pDoc->SetString(5, 7, 0, u"='file:///extdata.fake'#ExtValue"_ustr);
+        m_pDoc->SetString(6, 7, 0, u"=MDETERM('file:///extdata.fake'#ExtMatrix)"_ustr);
 
         verifyResultsAndStats();
     }
@@ -4391,6 +4473,8 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorExternalRefer
         m_pDoc->SetString(3, 7, 0,
                           u"='file:///extdata.fake'#Data.A1='file:///extdata.fake'#Data.A2"_ustr);
         m_pDoc->SetString(4, 7, 0, u"=MDETERM('file:///extdata.fake'#Matrix.A1)"_ustr);
+        m_pDoc->SetString(5, 7, 0, u"='file:///extdata.fake'#ExtValue"_ustr);
+        m_pDoc->SetString(6, 7, 0, u"=MDETERM('file:///extdata.fake'#ExtMatrix)"_ustr);
 
         verifyResultsAndStats();
     }
