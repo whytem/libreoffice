@@ -9,8 +9,9 @@ dependency-ordered execution backlog that can be worked commit-by-commit.
 
 This backlog starts from the current tree state:
 
-- Phase 4 is still partial because external-reference execution and
-  broadcast/jump-matrix matrix-frame semantics are not fully engine-native
+- Phase 4 is now complete: external-reference execution and
+  broadcast/jump-matrix matrix-frame semantics have both landed at the upper
+  seam through Slices 1-3
 - Phase 6 is still partial because `ScInterpreter::Interpret()` still carries
   lower-seam `tryPlanEngine*` admissions for classes that have already started
   moving upstream
@@ -30,8 +31,8 @@ families that are explicitly not yet relocated.
    carry the same class of work authoritatively.
 3. Count lower-seam audit coverage as useful validation, but not as ambient
    authority transfer.
-4. Keep docs honest: Phase 4 closes only when external-reference and
-   matrix-frame gaps are gone; Phase 6 closes only when overlapping
+4. Keep docs honest: Phase 4 is closed only because the external-reference and
+   matrix-frame gaps are now covered; Phase 6 closes only when overlapping
    lower-seam admissions are gone.
 
 ## Execution Tracking
@@ -47,7 +48,18 @@ families that are explicitly not yet relocated.
    `testInterpretTailEngineEvaluatorExternalReferenceRoutes`,
    `testExternalRefFunctions`, and
    `testSharedInterpreterReferenceOffsetDispatch`.
-3. Slice 3: pending
+3. Slice 3: complete
+   Verified with `CppunitTest_sc_ucalc_formula2` covering
+   `testInterpretTailEngineEvaluatorMatrixMathDefaultOn`,
+   `testInterpretTailEngineEvaluatorExternalReferenceRoutes`,
+   `testInterpretTailEngineEvaluatorSingleCellMatrixExactDefaultOn`,
+   `testInterpretTailEngineEvaluatorSingleCellMatrixOffsetExactDefaultOn`,
+   `testInterpretTailEngineEvaluatorArrayContextIfDefaultOn`,
+   `testInterpretTailEngineEvaluatorBroadcastMatrixDefaultOn`,
+   `testInterpretTailEngineEvaluatorMultiCellSelectorMatrixDefaultOn`,
+   `testInterpretTailEngineEvaluatorMultiCellSpillMatrixDefaultOn`,
+   `testInterpretTailEngineEvaluatorMultiCellConditionalMatrixDefaultOn`, and
+   `testInterpretTailEngineEvaluatorMixedLocalExternalConditionalMatrixDefaultOn`.
 4. Slice 4: pending
 5. Slice 5: pending
 6. Slice 6: pending
@@ -107,6 +119,8 @@ Definition of done:
 - no promoted external-ref family requires lower-seam-only special handling
 
 ### Slice 3: Matrix-frame parity
+
+Status: complete
 
 Goal: finish the remaining Phase 4 matrix-frame work that still forces Calc to
 own broadcast, jump-matrix, or array-context behavior.

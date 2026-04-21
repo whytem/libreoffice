@@ -171,10 +171,9 @@ also complete: [HOST_FACADE_CONTRACTS.md](architecture/HOST_FACADE_CONTRACTS.md)
 and
 [COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md](architecture/COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md)
 now give the project one explicit host-contract inventory for the remaining
-legacy surface. Phase 3 and Phase 5 are now complete; Phases 4 and 6 are
-partially complete (external-reference and broadcast/jump-matrix edges remain
-open for Phase 4, and lower-seam `tryPlanEngine*` admissions remain open for
-Phase 6). The active dependency-ordered close-out queue now lives in
+legacy surface. Phases 3, 4, and 5 are now complete; Phase 6 is still
+partial because lower-seam `tryPlanEngine*` admissions remain open in
+`Interpret()`. The active dependency-ordered close-out queue now lives in
 [STACK_MACHINE_RELOCATION_BACKLOG.md](architecture/STACK_MACHINE_RELOCATION_BACKLOG.md).
 Upstream
 `InterpretTail -> RpnEvaluator` counters are wired and observation is
@@ -189,12 +188,12 @@ duplicated local branching logic. Reference execution is also more unified:
 the AST walker now centralizes direct cell/range/named reference resolution,
 `OFFSET` and information predicates consume those helpers, compat-side
 `ISREF` / `ISFORMULA` now resolve `OFFSET(...)` and LET-bound reference
-names authoritatively, and spreadsheet/statistical matrix consumers share
-one range-to-matrix materialization helper. Remaining Phase 4 work is now
-concentrated in the still-deferred external-reference and
-broadcast-compatible / jump-matrix matrix-frame paths rather than the
-earlier broad control-flow/ref/matrix split. Phase 5 (Ambient Default-On
-Pilot) has proven the existing default-on state with AutoCalc enabled.
+names authoritatively, spreadsheet/statistical matrix consumers share one
+range-to-matrix materialization helper, and the upper seam now carries the
+remaining promoted external-range / external-name plus broadcast /
+jump-matrix matrix-frame shapes authoritatively. Phase 4 is therefore
+complete rather than partial. Phase 5 (Ambient Default-On Pilot) has proven
+the existing default-on state with AutoCalc enabled.
 Phase 6 (Seam Reconciliation) is still partial: the old `tryPushEngine*`
 wrapper family has dropped from 36 sites to 2 (`ocBad` + `ocRange`), but 61
 lower-seam `tryPlanEngine*` admissions remain in `Interpret()`, so the upper
@@ -411,12 +410,12 @@ MatrixOperand bridge now also accepts `svExternalSingleRef` /
 external-reference cache helpers before rejoining the same
 MatrixOperand path, so forced-core audit coverage now proves
 external TRANSPOSE / MDETERM / MMULT / MINVERSE parity as well.
-The upper seam now also materializes direct external single-cell refs for
-authoritative/default-on scalar roots and single-cell `MDETERM`, so promoted
-single-cell external formulas no longer have to drop to legacy first.
-svRefList and multi-sheet surfaces still decline, and the remaining Phase 4
-external-reference work is now the broader authoritative upper-seam
-external-range / external-name story rather than this lower-seam matrix bridge.
+The upper seam now also materializes the promoted external-reference frontier
+authoritatively: direct external single-cell refs, external ranges, and
+external names now feed scalar roots, lookup/reference inspection, and matrix
+consumers without dropping to legacy first. `svRefList` and multi-sheet
+surfaces still decline where they are intentionally outside the admitted
+scope, but they no longer keep the Phase 4 marker open.
 The contract for this primitive is tracked in
 [architecture/HOST_FACADE_CONTRACTS.md](architecture/HOST_FACADE_CONTRACTS.md);
 Phase I will extend that document with the remaining address /

@@ -278,11 +278,12 @@ Implemented result:
 
 ## Phase 4: Implement the RPN Subsystem in Dependency Order
 
-Status: partial on the current tree
+Status: complete on the current tree
 
-The control-flow slice is now closed out at both seams and the reference /
-matrix substrate is substantially more unified, but external-reference and
-deferred broadcast / jump-matrix cases still keep the full phase marker open.
+The control-flow, reference, and matrix-frame slices are now closed out at the
+upper seam: external-reference execution is authoritative for the promoted
+families, and the remaining broadcast / jump-matrix matrix-frame shapes now
+stay upstream instead of requiring Calc-owned fallbacks.
 
 ### Goal
 
@@ -371,6 +372,17 @@ Implemented result:
   refs through shared helpers in `materializeScalarNode` /
   `materializeMatrixNode`, so scalar-root formulas and single-cell `MDETERM`
   can run under `InterpretTail` authority/default-on without falling back
+- the compat evaluator now covers the remaining promoted external-reference
+  frontier too: external ranges and external names feed lookup,
+  reference-inspection, and matrix consumers through the same shared
+  materialization helpers instead of needing lower-seam-only special cases
+- matrix-origin execution now stays authoritative across the remaining Phase 4
+  shape frontier: broadcast-compatible binary matrices, array-context
+  `IF(...)`, selector / spill matrices, classic
+  `SUM(IF(EXACT(...);...;0))` formulas, the
+  `OFFSET(...):OFFSET(...)` jump-matrix variant of that pattern, and mixed
+  local/external range branches in multi-cell `IF(...)` formulas all run
+  through `InterpretTail` without legacy fallback
 - `testRpnSubstrateExercisedThroughUpperSeam` in
   [interpret_tail_corpus.cxx](/home/ubuntu/repos/libreoffice/sc/qa/unit/interpret_tail_corpus.cxx)
   enforces that both the Operator and ControlFlow RPN categories show
@@ -380,11 +392,10 @@ Implemented result:
   upstream under ambient load through the FormulaEvaluator; the upper seam
   now consumes engine-native RPN contracts for binary/unary operators and IF
   branch planning rather than only lower-seam pilots doing so
-- remaining Phase 4 work stays explicitly open only for the still-deferred
-  edges: broader authoritative upper-seam external-reference execution
-  (notably external ranges and external names) plus broadcast-compatible /
-  jump-matrix matrix-frame semantics that are still intentionally left on the
-  Calc side
+- exit criteria satisfied for the full phase: the remaining
+  external-reference and matrix-frame gaps are now closed, so new leaf
+  migrations can build on one engine-native substrate instead of reopening
+  Calc-local execution seams
 
 ## Phase 5: Ambient Default-On Pilot
 

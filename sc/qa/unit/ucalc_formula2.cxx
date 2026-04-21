@@ -3869,6 +3869,83 @@ CPPUNIT_TEST_FIXTURE(TestFormula2,
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2,
+    testInterpretTailEngineEvaluatorSingleCellMatrixOffsetExactDefaultOn)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+        m_pDoc->InsertTab(0, u"EngineSingleCellMatrixOffsetExactDefaultOn"_ustr));
+
+    m_pDoc->SetString(0, 0, 0, u"a"_ustr); // A1
+    std::vector<std::vector<const char*>> aData
+        = { { "a", "1" }, { "b", "2" }, { "a", "4" } }; // A7:B9
+    insertRangeData(m_pDoc, ScAddress(0, 6, 0), aData);
+
+    ScMarkData aMark(m_pDoc->GetSheetLimits());
+    aMark.SelectOneTable(0);
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+        setaileval::resetStats();
+
+        m_pDoc->InsertMatrixFormula(
+            2, 10, 2, 10, aMark,
+            u"=SUM(IF(EXACT(OFFSET(A7;0;0):OFFSET(A7;2;0);A$1);OFFSET(A7;0;1):OFFSET(A7;2;1);0))"_ustr);
+
+        ASSERT_DOUBLES_EQUAL(5.0, m_pDoc->GetValue(ScAddress(2, 10, 0)));
+
+        ScFormulaCell* pCell = m_pDoc->GetFormulaCell(ScAddress(2, 10, 0));
+        CPPUNIT_ASSERT(pCell);
+        CPPUNIT_ASSERT_EQUAL(ScMatrixMode::Formula, pCell->GetMatrixFlag());
+        SCCOL nCols = 0;
+        SCROW nRows = 0;
+        pCell->GetMatColsRows(nCols, nRows);
+        CPPUNIT_ASSERT_EQUAL(static_cast<SCCOL>(1), nCols);
+        CPPUNIT_ASSERT_EQUAL(static_cast<SCROW>(1), nRows);
+
+        const OUString aFormulaSource = pCell->GetFormula(FormulaGrammar::GRAM_ODFF);
+        CPPUNIT_ASSERT_MESSAGE(
+            "single-cell matrix OFFSET+EXACT formula should remain family-local default-on",
+            setaileval::isFamilyLocalDefaultOnFormula(
+                std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength())));
+        const OUString aCanonicalFormulaSource = pCell->GetHybridFormula();
+        const auto aAttempt = setaileval::tryEvaluateFormula(
+            *m_pDoc, m_pDoc->GetNonThreadedContext(), ScAddress(2, 10, 0),
+            std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
+            m_pDoc->GetCalcConfig().mbEmptyStringAsZero, pCell->GetCode(),
+            std::u16string_view(aCanonicalFormulaSource.getStr(),
+                aCanonicalFormulaSource.getLength()));
+        const std::string aAttemptLabel
+            = "single-cell matrix OFFSET+EXACT formula should be supported by tryEvaluateFormula"
+              " fallback_reason="
+              + std::to_string(static_cast<int>(aAttempt.meFallbackReason));
+        CPPUNIT_ASSERT_MESSAGE(aAttemptLabel, aAttempt.mbSupported);
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT_MESSAGE(
+            "single-cell matrix OFFSET+EXACT formulas should stay authoritative in default-on mode",
+            aStats.mnAuthoritativeCount >= 1);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(
+            "single-cell matrix OFFSET+EXACT formulas should not need legacy fallback",
+            static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT_MESSAGE(
+            "numeric aggregate roots should own single-cell matrix OFFSET+EXACT formulas upstream",
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::NumericAggregate)]
+                >= 1);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(
+            "numeric aggregate roots should not fall back for single-cell matrix OFFSET+EXACT formulas",
+            static_cast<sal_uInt64>(0),
+            aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::NumericAggregate)]);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorArrayContextIfDefaultOn)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
@@ -3923,6 +4000,112 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorArrayContextI
     }
 
     m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestFormula2,
+    testInterpretTailEngineEvaluatorMixedLocalExternalConditionalMatrixDefaultOn)
+{
+#ifndef DISABLE_NAN_TESTS
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    ScDocShellRef xExtDocSh = new ScDocShell;
+    OUString aExtDocName(u"file:///matrixslice3.fake"_ustr);
+    SfxMedium* pMed = new SfxMedium(aExtDocName, StreamMode::STD_READWRITE);
+    xExtDocSh->DoLoad(pMed);
+    CPPUNIT_ASSERT_MESSAGE("external document instance not loaded.",
+        findLoadedDocShellByName(aExtDocName) != nullptr);
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+        m_pDoc->InsertTab(0, u"EngineMixedLocalExternalConditionalMatrixDefaultOn"_ustr));
+
+    m_pDoc->SetValue(0, 0, 0, 100.0); // A1
+    m_pDoc->SetValue(0, 1, 0, 200.0); // A2
+    m_pDoc->SetValue(2, 0, 0, 1.0); // C1
+    m_pDoc->SetValue(2, 1, 0, 0.0); // C2
+
+    ScDocument& rExtDoc = xExtDocSh->GetDocument();
+    rExtDoc.InsertTab(0, u"Matrix"_ustr);
+    rExtDoc.SetValue(1, 0, 0, 10.0); // Matrix.B1
+    rExtDoc.SetValue(1, 1, 0, 20.0); // Matrix.B2
+
+    ScMarkData aMark(m_pDoc->GetSheetLimits());
+    aMark.SelectOneTable(0);
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+        setaileval::resetStats();
+
+        m_pDoc->InsertMatrixFormula(
+            4, 7, 4, 8, aMark,
+            u"=IF(C1:C2;A1:A2;'file:///matrixslice3.fake'#Matrix.B1:B2)"_ustr);
+
+        ScFormulaCell* pCell = m_pDoc->GetFormulaCell(ScAddress(4, 7, 0));
+        CPPUNIT_ASSERT(pCell);
+        CPPUNIT_ASSERT_EQUAL(ScMatrixMode::Formula, pCell->GetMatrixFlag());
+        SCCOL nCols = 0;
+        SCROW nRows = 0;
+        pCell->GetMatColsRows(nCols, nRows);
+        CPPUNIT_ASSERT_EQUAL(static_cast<SCCOL>(1), nCols);
+        CPPUNIT_ASSERT_EQUAL(static_cast<SCROW>(2), nRows);
+        CPPUNIT_ASSERT(pCell->GetMatrix());
+
+        const OUString aFormulaSource = pCell->GetFormula(FormulaGrammar::GRAM_ODFF);
+        const OUString aCanonicalFormulaSource = pCell->GetHybridFormula();
+        const auto aAttempt = setaileval::tryEvaluateFormula(
+            *m_pDoc, m_pDoc->GetNonThreadedContext(), ScAddress(4, 7, 0),
+            std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
+            m_pDoc->GetCalcConfig().mbEmptyStringAsZero, pCell->GetCode(),
+            std::u16string_view(aCanonicalFormulaSource.getStr(),
+                aCanonicalFormulaSource.getLength()),
+            true);
+        const std::string aAttemptLabel
+            = "doc_top=" + std::to_string(m_pDoc->GetValue(4, 7, 0))
+              + " doc_bottom=" + std::to_string(m_pDoc->GetValue(4, 8, 0))
+              + " supported=" + std::to_string(aAttempt.mbSupported)
+              + " fallback_reason="
+              + std::to_string(static_cast<int>(aAttempt.meFallbackReason))
+              + " has_matrix=" + std::to_string(aAttempt.hasMatrixResult())
+              + " matrix_cols=" + std::to_string(aAttempt.mnMatrixColumns)
+              + " matrix_rows=" + std::to_string(aAttempt.mnMatrixRows)
+              + " matrix_top="
+              + std::to_string(aAttempt.hasMatrixResult() ? aAttempt.mpMatrixResult->GetDouble(0, 0)
+                                                          : -1.0)
+              + " matrix_bottom="
+              + std::to_string(aAttempt.hasMatrixResult() ? aAttempt.mpMatrixResult->GetDouble(0, 1)
+                                                          : -1.0);
+        CPPUNIT_ASSERT_MESSAGE(aAttemptLabel, aAttempt.mbSupported);
+        CPPUNIT_ASSERT_MESSAGE(aAttemptLabel, aAttempt.hasMatrixResult());
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(aAttemptLabel, static_cast<SCSIZE>(1), aAttempt.mnMatrixColumns);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(aAttemptLabel, static_cast<SCSIZE>(2), aAttempt.mnMatrixRows);
+        ASSERT_DOUBLES_EQUAL_MESSAGE(aAttemptLabel, 100.0, aAttempt.mpMatrixResult->GetDouble(0, 0));
+        ASSERT_DOUBLES_EQUAL_MESSAGE(aAttemptLabel, 20.0, aAttempt.mpMatrixResult->GetDouble(0, 1));
+
+        ASSERT_DOUBLES_EQUAL_MESSAGE(aAttemptLabel, 100.0, m_pDoc->GetValue(4, 7, 0));
+        ASSERT_DOUBLES_EQUAL_MESSAGE(aAttemptLabel, 20.0, m_pDoc->GetValue(4, 8, 0));
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT_MESSAGE(
+            "mixed local/external IF matrix formulas should stay authoritative in default-on mode",
+            aStats.mnAuthoritativeCount >= 1);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(
+            "mixed local/external IF matrix formulas should not need legacy fallback",
+            static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT_MESSAGE(
+            "conditional roots should own mixed local/external IF matrix formulas upstream",
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::Conditional)]
+                >= 1);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(
+            "conditional roots should not fall back for mixed local/external IF matrix formulas",
+            static_cast<sal_uInt64>(0),
+            aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::Conditional)]);
+    }
+
+    m_pDoc->DeleteTab(0);
+#endif
 }
 
 CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorBroadcastMatrixDefaultOn)
