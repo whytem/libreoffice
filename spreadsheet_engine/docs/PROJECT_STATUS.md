@@ -103,10 +103,10 @@ evaluation occurs; legacy `ScInterpreter::Interpret()` handles all traffic.
 These are the current retirement and audit counters:
 
 - `legacy_interpreter_subroutine_count=51`
-- `interp4_dispatch_legacy_lambda_count=21`
-- `interp4_dispatch_legacy_dispatch_target_count=21`
-- `interp4_dispatch_legacy_call_count=31`
-- `interp4_dispatch_engine_attempt_count=2`
+- `interp4_dispatch_legacy_lambda_count=18`
+- `interp4_dispatch_legacy_dispatch_target_count=18`
+- `interp4_dispatch_legacy_call_count=22`
+- `interp4_dispatch_engine_attempt_count=11`
 - `interp4_dispatch_plan_engine_attempt_count=61`
 - `interp4_dispatch_engine_attempted_total=0`
 - `interp4_dispatch_engine_succeeded_total=0`
@@ -145,8 +145,14 @@ Phase 6 (Seam Reconciliation) removed 34 lower-seam `tryPushEngine*` dispatch
 wrappers, their 5 backing lambda definitions, 8 operand-builder helpers, and
 the `mnTextInfoEngine*` stats triad. `interp4_dispatch_engine_attempt_count`
 now refers specifically to the old `tryPushEngine*` wrapper family, and that
-count dropped from 36 to 2: only `ocBad` (retirement template) and `ocRange`
-(parity-gap reference) retain that older lower-seam wrapper style.
+count dropped from 36 to 2 after Phase 6, then rose to 11 after Phase 7
+(Retirement Wave 2) added 9 retired-scalar dispatch sites for GCD, LCM,
+COMBIN, COMBINA, BITAND, BITOR, BITXOR, BITRSHIFT, and BITLSHIFT. These 9
+sites use the new `tryPushEngineRetiredScalar` lambda which calls
+`tryEvaluateFormula()` directly—the legacy `pushLegacyGcdOrLcm`,
+`pushLegacyCombin`, and `pushLegacyBitwise` lambdas are fully deleted.
+`ocBad` (retirement template) and `ocRange` (parity-gap reference) retain
+the older `tryPushEngineBadLiteralError`/range wrapper style.
 `interp4_dispatch_plan_engine_attempt_count`, however, is still 61 on the
 current tree: `Interpret()` continues to carry active `tryPlanEngine*`
 admissions for control-flow, spill, reference, database/criteria, matrix, and
@@ -515,8 +521,8 @@ Immediate consequence:
 
 - the next honest migration metric is reduction in
   `interp4_dispatch_legacy_lambda_count`
-- `interp4_dispatch_engine_attempt_count` is now 2, but that now measures
-  only the older `tryPushEngine*` wrapper family
+- `interp4_dispatch_engine_attempt_count` is now 11: 2 older `tryPushEngine*`
+  wrappers (ocBad + ocRange) plus 9 Phase 7 retired-scalar sites
 - `interp4_dispatch_plan_engine_attempt_count=61` is the live reminder that
   full seam reconciliation is still open in `Interpret()`
 - no new `pushLegacy*` lambdas should be treated as progress unless they are
@@ -578,9 +584,9 @@ Next routing policy:
 - keep `unsupported_function=0` as an explicit regression guard
 - steer the next phase off unseen live surface and genuine reduction in
   `interp4_dispatch_legacy_lambda_count`
-- `interp4_dispatch_engine_attempt_count` is at floor (2) for the old
-  `tryPushEngine*` wrapper family, but `interp4_dispatch_plan_engine_attempt_count`
-  remains the open lower-seam overlap surface
+- `interp4_dispatch_engine_attempt_count` is 11 (2 older wrappers + 9 Phase 7
+  retired scalars); `interp4_dispatch_plan_engine_attempt_count` remains the
+  open lower-seam overlap surface
 - treat wrapper deletion as secondary unless the relocated legacy dispatch
   surface also falls
 - use the host-boundary audit as the design gate for the next subsystem work

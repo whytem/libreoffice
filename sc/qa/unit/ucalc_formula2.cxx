@@ -1838,6 +1838,67 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterBadLiteralDispatch)
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailRetiredMathScalarCoreForcedMode)
+{
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    ScopedEnvironmentOverride aMode(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+    ScopedEnvironmentOverride aForceCalculation("SC_FORCE_CALCULATION", "core");
+    ScopedEnvironmentOverride aDisableAuthorityWhileOff(
+        "SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF", "0");
+
+    m_pDoc->InsertTab(0, u"RetiredScalar"_ustr);
+    resetScInterpreterDispatchRuntimeStats();
+
+    m_pDoc->SetFormula(
+        ScAddress(0, 0, 0), u"=GCD(12;8)"_ustr, formula::FormulaGrammar::GRAM_ODFF);
+    m_pDoc->SetFormula(
+        ScAddress(0, 1, 0), u"=LCM(4;6)"_ustr, formula::FormulaGrammar::GRAM_ODFF);
+    m_pDoc->SetFormula(
+        ScAddress(0, 2, 0), u"=COMBIN(5;2)"_ustr, formula::FormulaGrammar::GRAM_ODFF);
+    m_pDoc->SetFormula(
+        ScAddress(0, 3, 0), u"=COMBINA(5;2)"_ustr, formula::FormulaGrammar::GRAM_ODFF);
+    m_pDoc->SetFormula(
+        ScAddress(0, 4, 0), u"=BITAND(5;3)"_ustr, formula::FormulaGrammar::GRAM_ODFF);
+    m_pDoc->SetFormula(
+        ScAddress(0, 5, 0), u"=BITOR(5;3)"_ustr, formula::FormulaGrammar::GRAM_ODFF);
+    m_pDoc->SetFormula(
+        ScAddress(0, 6, 0), u"=BITXOR(5;3)"_ustr, formula::FormulaGrammar::GRAM_ODFF);
+    m_pDoc->SetFormula(
+        ScAddress(0, 7, 0), u"=BITRSHIFT(8;2)"_ustr, formula::FormulaGrammar::GRAM_ODFF);
+    m_pDoc->SetFormula(
+        ScAddress(0, 8, 0), u"=BITLSHIFT(2;3)"_ustr, formula::FormulaGrammar::GRAM_ODFF);
+
+    CPPUNIT_ASSERT_EQUAL(4.0, m_pDoc->GetValue(ScAddress(0, 0, 0)));
+    CPPUNIT_ASSERT_EQUAL(12.0, m_pDoc->GetValue(ScAddress(0, 1, 0)));
+    CPPUNIT_ASSERT_EQUAL(10.0, m_pDoc->GetValue(ScAddress(0, 2, 0)));
+    CPPUNIT_ASSERT_EQUAL(15.0, m_pDoc->GetValue(ScAddress(0, 3, 0)));
+    CPPUNIT_ASSERT_EQUAL(1.0, m_pDoc->GetValue(ScAddress(0, 4, 0)));
+    CPPUNIT_ASSERT_EQUAL(7.0, m_pDoc->GetValue(ScAddress(0, 5, 0)));
+    CPPUNIT_ASSERT_EQUAL(6.0, m_pDoc->GetValue(ScAddress(0, 6, 0)));
+    CPPUNIT_ASSERT_EQUAL(2.0, m_pDoc->GetValue(ScAddress(0, 7, 0)));
+    CPPUNIT_ASSERT_EQUAL(16.0, m_pDoc->GetValue(ScAddress(0, 8, 0)));
+
+    const auto aDispatchStats = getScInterpreterDispatchRuntimeStatsSnapshot();
+    const std::string aDispatchStatsLabel
+        = "attempted=" + std::to_string(aDispatchStats.mnEngineAttemptedCount)
+          + " succeeded=" + std::to_string(aDispatchStats.mnEngineSucceededCount)
+          + " declined=" + std::to_string(aDispatchStats.mnEngineDeclinedCount);
+    CPPUNIT_ASSERT_MESSAGE("retired scalars should attempt engine evaluation: "
+                               + aDispatchStatsLabel,
+                           aDispatchStats.mnEngineAttemptedCount >= 9);
+    CPPUNIT_ASSERT_MESSAGE("retired scalars should succeed through the engine path: "
+                               + aDispatchStatsLabel,
+                           aDispatchStats.mnEngineSucceededCount >= 9);
+    CPPUNIT_ASSERT_EQUAL_MESSAGE("dispatch accounting should stay balanced: "
+                                     + aDispatchStatsLabel,
+                                 aDispatchStats.mnEngineAttemptedCount,
+                                 aDispatchStats.mnEngineSucceededCount
+                                     + aDispatchStats.mnEngineDeclinedCount);
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testSharedInterpreterSpillEngineDispatch)
 {
     sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);

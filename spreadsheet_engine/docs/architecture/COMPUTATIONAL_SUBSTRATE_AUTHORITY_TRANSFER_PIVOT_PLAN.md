@@ -523,6 +523,8 @@ Current status against exit criteria:
 
 ## Phase 7: Retirement Wave 2
 
+**Status: complete on the current tree.**
+
 ### Goal
 
 Use the completed subsystem to delete remaining Calc execution clusters rather
@@ -546,6 +548,42 @@ than continuing to reshuffle them.
 - Calc-resident evaluator code demonstrably leaves the codebase
 - upstream ambient runtime grows while Calc legacy surface shrinks
 - wrapper deletion and lambda deletion both continue to move
+
+### Implemented result
+
+Retired 3 `pushLegacy*` lambdas covering 9 opcodes via a new shared
+`tryPushEngineRetiredScalar` lambda that calls `tryEvaluateFormula()` directly
+from the lower seam, extending the `ocBad` retirement template to handle
+Value, String, and Error results:
+
+- **`pushLegacyGcdOrLcm` deleted** — ocGCD, ocLCM (2 opcodes)
+- **`pushLegacyCombin` deleted** — ocCombin, ocCombinA (2 opcodes)
+- **`pushLegacyBitwise` deleted** — ocBitAnd, ocBitOr, ocBitXor,
+  ocBitRshift, ocBitLshift (5 opcodes)
+
+Each dispatch site now uses the retirement pattern:
+`if (!tryPushEngineRetiredScalar("...")) { PushError(FormulaError::UnknownState); }`
+
+The retirement lambda consumes the parameter count byte via `GetByte()` and
+pops operands from the interpreter stack before pushing the engine result,
+ensuring correct stack accounting for multi-argument functions.
+
+Metric movements:
+- `interp4_dispatch_legacy_lambda_count`: 21 → 18
+- `interp4_dispatch_legacy_call_count`: 31 → 22
+- `interp4_dispatch_engine_attempt_count`: 2 → 11
+
+CI validation:
+- `testInterpretTailRetiredMathScalarCoreForcedMode` — verifies all 9
+  retired functions produce correct results via engine evaluation under
+  core-forced full-legacy mode
+- `testSeamReconciliationTryPushWrapperFloor` — updated to assert
+  `mnTryPushAttemptCaseCount == 11`
+
+Exit criteria satisfied:
+1. Three `pushLegacy*` lambdas fully retired ✓
+2. `interp4_dispatch_legacy_lambda_count` dropped from 21 to 18 ✓
+3. Retirement template proven repeatable beyond ocBad prototype ✓
 
 ## Immediate Execution Sequence
 

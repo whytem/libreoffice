@@ -4693,6 +4693,69 @@ StackVar ScInterpreter::Interpret()
                     PushError(selibreoffice::toFormulaError(aAttempt.maResult.meError));
                     return true;
                 };
+                const auto tryPushEngineRetiredScalar = [&](const char* /*pOpName*/) -> bool {
+                    sal_uInt8 nParamCount = GetByte();
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore().mnEngineAttemptedCount);
+
+                    const auto popOperands = [&]() {
+                        for (sal_uInt8 i = 0; i < nParamCount; ++i)
+                            Pop();
+                    };
+
+                    if (!pMyFormulaCell || !pArr)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore().mnEngineDeclinedCount);
+                        popOperands();
+                        return false;
+                    }
+
+                    const OUString aFormulaSource
+                        = pMyFormulaCell->GetFormula(FormulaGrammar::GRAM_ODFF, &mrContext);
+                    if (aFormulaSource.isEmpty())
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore().mnEngineDeclinedCount);
+                        popOperands();
+                        return false;
+                    }
+
+                    const auto aAttempt = setaileval::tryEvaluateFormula(
+                        mrDoc, mrContext, aPos,
+                        std::u16string_view(aFormulaSource.getStr(), aFormulaSource.getLength()),
+                        mrDoc.GetCalcConfig().mbEmptyStringAsZero, pArr);
+                    if (!aAttempt.mbSupported)
+                    {
+                        addDispatchRuntimeStat(
+                            interpreterDispatchRuntimeStatsStore().mnEngineDeclinedCount);
+                        popOperands();
+                        return false;
+                    }
+
+                    popOperands();
+                    nGlobalError = FormulaError::NONE;
+                    addDispatchRuntimeStat(
+                        interpreterDispatchRuntimeStatsStore().mnEngineSucceededCount);
+                    switch (aAttempt.maResult.meType)
+                    {
+                        case spreadsheetengine::api::formulavalue::ValueType::Value:
+                            PushDouble(aAttempt.maResult.mfValue);
+                            return true;
+                        case spreadsheetengine::api::formulavalue::ValueType::String:
+                            PushString(OUString(aAttempt.maResult.maString.data(),
+                                               aAttempt.maResult.maString.size()));
+                            return true;
+                        case spreadsheetengine::api::formulavalue::ValueType::Error:
+                            PushError(selibreoffice::toFormulaError(aAttempt.maResult.meError));
+                            return true;
+                        default:
+                            interpreterDispatchRuntimeStatsStore().mnEngineSucceededCount--;
+                            addDispatchRuntimeStat(
+                                interpreterDispatchRuntimeStatsStore().mnEngineDeclinedCount);
+                            return false;
+                    }
+                };
                 const auto tryPushEngineBadLiteralRangeOpcode = [&]() {
                     if (!pMyFormulaCell || !pArr)
                         return false;
@@ -4757,113 +4820,6 @@ StackVar ScInterpreter::Interpret()
                     PushTokenRef(xRangeResult);
                     return true;
                 };
-                const auto pushLegacyGcdOrLcm = [&](std::u16string_view rLabel, bool bLcm) {
-                    warnIfLegacyDefaultOnReached(
-                        rLabel, "family-local default-on math scalar reached ScInterpreter");
-                    short nParamCount = GetByte();
-                    if (!MustHaveParamCountMin(nParamCount, 1))
-                        return;
-
-                    double fx;
-                    double fy = bLcm ? 1.0 : 0.0;
-                    ScRange aRange;
-                    size_t nRefInList = 0;
-                    const auto aAccumulate = [&](double fInput) -> bool {
-                        fx = ::rtl::math::approxFloor(fInput);
-                        if (fx < 0.0)
-                        {
-                            PushIllegalArgument();
-                            return false;
-                        }
-                        if (bLcm)
-                        {
-                            if (fx == 0.0 || fy == 0.0)
-                                fy = 0.0;
-                            else
-                                fy = fx * fy / ScGetGCD(fx, fy);
-                        }
-                        else
-                            fy = ScGetGCD(fx, fy);
-                        return true;
-                    };
-
-                    while (nGlobalError == FormulaError::NONE && nParamCount-- > 0)
-                    {
-                        switch (GetStackType())
-                        {
-                            case svDouble:
-                            case svString:
-                            case svSingleRef:
-                                if (!aAccumulate(GetDouble()))
-                                    return;
-                                break;
-                            case svDoubleRef:
-                            case svRefList:
-                            {
-                                FormulaError nErr = FormulaError::NONE;
-                                PopDoubleRef(aRange, nParamCount, nRefInList);
-                                double nCellVal;
-                                ScValueIterator aValIter(mrContext, aRange, mnSubTotalFlags);
-                                if (aValIter.GetFirst(nCellVal, nErr))
-                                {
-                                    do
-                                    {
-                                        if (!aAccumulate(nCellVal))
-                                            return;
-                                    } while (nErr == FormulaError::NONE
-                                             && aValIter.GetNext(nCellVal, nErr));
-                                }
-                                SetError(nErr);
-                            }
-                            break;
-                            case svMatrix:
-                            case svExternalSingleRef:
-                            case svExternalDoubleRef:
-                            {
-                                ScMatrixRef pMat = GetMatrix();
-                                if (pMat)
-                                {
-                                    SCSIZE nC;
-                                    SCSIZE nR;
-                                    pMat->GetDimensions(nC, nR);
-                                    if (nC == 0 || nR == 0)
-                                        SetError(FormulaError::IllegalArgument);
-                                    else
-                                    {
-                                        double nVal = bLcm ? pMat->GetLcm() : pMat->GetGcd();
-                                        if (bLcm)
-                                            fy = (nVal * fy) / ScGetGCD(nVal, fy);
-                                        else
-                                            fy = ScGetGCD(nVal, fy);
-                                    }
-                                }
-                            }
-                            break;
-                            default:
-                                SetError(FormulaError::IllegalParameter);
-                                break;
-                        }
-                    }
-                    PushDouble(fy);
-                };
-                const auto pushLegacyCombin = [&](std::u16string_view rLabel,
-                                                  bool bAllowRepetition) {
-                    warnIfLegacyDefaultOnReached(
-                        rLabel, "family-local default-on math scalar reached ScInterpreter");
-                    if (MustHaveParamCount(GetByte(), 2))
-                    {
-                        const double k = GetDouble();
-                        const double n = GetDouble();
-                        const auto aResult = semath::evaluateCombinValue(
-                            n, k, bAllowRepetition);
-                        if (!aResult)
-                        {
-                            PushError(selibreoffice::toFormulaError(aResult.meError));
-                            return;
-                        }
-                        PushDouble(aResult.maValue);
-                    }
-                };
                 const auto warnIfLegacyDateFamilyReached = [&](std::u16string_view rFunctionName) {
                     warnIfLegacyDispatchReached(
                         "family-local default-on", rFunctionName,
@@ -4879,25 +4835,6 @@ StackVar ScInterpreter::Interpret()
                             return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
                         },
                         "family-local default-on financial rate family reached ScInterpreter");
-                };
-                const auto pushLegacyBitwise = [&](std::u16string_view rFunctionName,
-                                                   auto aOperator) {
-                    warnIfLegacyDispatchReached(
-                        "family-local default-on", rFunctionName,
-                        [](std::u16string_view rFormula) {
-                            return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
-                        },
-                        "family-local default-on bitwise slice reached ScInterpreter");
-
-                    if (!MustHaveParamCount(GetByte(), 2))
-                        return;
-
-                    const double fRight = GetDouble();
-                    const double fLeft = GetDouble();
-                    if (std::optional<double> fResult = aOperator(fLeft, fRight))
-                        PushDouble(*fResult);
-                    else
-                        PushIllegalArgument();
                 };
                 const auto warnTextUtilityDispatch = [&](std::u16string_view rFunctionName) {
                     warnIfLegacyDispatchReached(
@@ -13922,8 +13859,22 @@ StackVar ScInterpreter::Interpret()
                             PushIllegalArgument();
                     }
                     break;
-                    case ocGCD              : pushLegacyGcdOrLcm(u"GCD", false); break;
-                    case ocLCM              : pushLegacyGcdOrLcm(u"LCM", true); break;
+                    case ocGCD:
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: MathScalar/GCD — retired via
+                        // engine evaluation; legacy deleted. Phase 7 retirement wave 2.
+                        if (!tryPushEngineRetiredScalar("GCD"))
+                        {
+                            PushError(FormulaError::UnknownState);
+                        }
+                        break;
+                    case ocLCM:
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: MathScalar/LCM — retired via
+                        // engine evaluation; legacy deleted. Phase 7 retirement wave 2.
+                        if (!tryPushEngineRetiredScalar("LCM"))
+                        {
+                            PushError(FormulaError::UnknownState);
+                        }
+                        break;
                     case ocGetDate          :
                         warnIfLegacyDateFamilyReached(u"DATE");
                         nFuncFmtType = SvNumFormatType::DATE;
@@ -15400,8 +15351,22 @@ StackVar ScInterpreter::Interpret()
                                 evaluateLegacyPoissonDist(fX, fLambda, bCumulative));
                     }
                     break;
-                    case ocCombin           : pushLegacyCombin(u"COMBIN", false);  break;
-                    case ocCombinA          : pushLegacyCombin(u"COMBINA", true);  break;
+                    case ocCombin:
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: MathScalar/COMBIN — retired via
+                        // engine evaluation; legacy deleted. Phase 7 retirement wave 2.
+                        if (!tryPushEngineRetiredScalar("COMBIN"))
+                        {
+                            PushError(FormulaError::UnknownState);
+                        }
+                        break;
+                    case ocCombinA:
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: MathScalar/COMBINA — retired via
+                        // engine evaluation; legacy deleted. Phase 7 retirement wave 2.
+                        if (!tryPushEngineRetiredScalar("COMBINA"))
+                        {
+                            PushError(FormulaError::UnknownState);
+                        }
+                        break;
                     case ocPermut:
                     case ocPermutationA:
                     {
@@ -16333,40 +16298,45 @@ StackVar ScInterpreter::Interpret()
                         spreadsheetengine::compat::libreoffice::interpretercompatdispatch::Dispatcher::
                             textInfoUnichar(*this);
                         break;
-                    case ocBitAnd           :
-                        pushLegacyBitwise(u"BITAND",
-                                          [](double fLeft, double fRight) {
-                                              return spreadsheetengine::core::math::computeBitAnd(
-                                                  fLeft, fRight);
-                                          });
+                    case ocBitAnd:
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: MathScalar/BITAND — retired via
+                        // engine evaluation; legacy deleted. Phase 7 retirement wave 2.
+                        if (!tryPushEngineRetiredScalar("BITAND"))
+                        {
+                            PushError(FormulaError::UnknownState);
+                        }
                         break;
-                    case ocBitOr            :
-                        pushLegacyBitwise(u"BITOR",
-                                          [](double fLeft, double fRight) {
-                                              return spreadsheetengine::core::math::computeBitOr(
-                                                  fLeft, fRight);
-                                          });
+                    case ocBitOr:
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: MathScalar/BITOR — retired via
+                        // engine evaluation; legacy deleted. Phase 7 retirement wave 2.
+                        if (!tryPushEngineRetiredScalar("BITOR"))
+                        {
+                            PushError(FormulaError::UnknownState);
+                        }
                         break;
-                    case ocBitXor           :
-                        pushLegacyBitwise(u"BITXOR",
-                                          [](double fLeft, double fRight) {
-                                              return spreadsheetengine::core::math::computeBitXor(
-                                                  fLeft, fRight);
-                                          });
+                    case ocBitXor:
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: MathScalar/BITXOR — retired via
+                        // engine evaluation; legacy deleted. Phase 7 retirement wave 2.
+                        if (!tryPushEngineRetiredScalar("BITXOR"))
+                        {
+                            PushError(FormulaError::UnknownState);
+                        }
                         break;
-                    case ocBitRshift        :
-                        pushLegacyBitwise(u"BITRSHIFT",
-                                          [](double fLeft, double fRight) {
-                                              return spreadsheetengine::core::math::computeBitRightShift(
-                                                  fLeft, fRight);
-                                          });
+                    case ocBitRshift:
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: MathScalar/BITRSHIFT — retired via
+                        // engine evaluation; legacy deleted. Phase 7 retirement wave 2.
+                        if (!tryPushEngineRetiredScalar("BITRSHIFT"))
+                        {
+                            PushError(FormulaError::UnknownState);
+                        }
                         break;
-                    case ocBitLshift        :
-                        pushLegacyBitwise(u"BITLSHIFT",
-                                          [](double fLeft, double fRight) {
-                                              return spreadsheetengine::core::math::computeBitLeftShift(
-                                                  fLeft, fRight);
-                                          });
+                    case ocBitLshift:
+                        // PIVOT_ALLOW_LOWER_SEAM_ADMISSION: MathScalar/BITLSHIFT — retired via
+                        // engine evaluation; legacy deleted. Phase 7 retirement wave 2.
+                        if (!tryPushEngineRetiredScalar("BITLSHIFT"))
+                        {
+                            PushError(FormulaError::UnknownState);
+                        }
                         break;
                     case ocTTT              : ScTTT();                      break;
                     case ocDebugVar         : ScDebugVar();                 break;
