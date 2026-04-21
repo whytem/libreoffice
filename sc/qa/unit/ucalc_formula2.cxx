@@ -3580,6 +3580,101 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorNumericAggreg
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorArrayContextIfDefaultOn)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+        m_pDoc->InsertTab(0, u"EngineArrayContextIfDefaultOn"_ustr));
+
+    m_pDoc->SetValue(0, 0, 0, 1.0);
+    m_pDoc->SetValue(0, 1, 0, 0.0);
+    m_pDoc->SetValue(0, 2, 0, 1.0);
+    m_pDoc->SetValue(0, 3, 0, 0.0);
+    m_pDoc->SetValue(1, 0, 0, 1.0);
+    m_pDoc->SetValue(1, 1, 0, 1.0);
+    m_pDoc->SetValue(1, 2, 0, 0.0);
+    m_pDoc->SetValue(1, 3, 0, 0.0);
+    m_pDoc->SetValue(2, 0, 0, 16.0);
+    m_pDoc->SetValue(2, 1, 0, 32.0);
+    m_pDoc->SetValue(2, 2, 0, 64.0);
+    m_pDoc->SetValue(2, 3, 0, 128.0);
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(0, 7, 0, u"=SUM(IF(A1:A4;IF(B1:B4;C1:C4;0);0))"_ustr);
+        m_pDoc->SetString(1, 7, 0, u"=SUM(IF(IF({1;0};12);34;56))"_ustr);
+        m_pDoc->SetString(2, 7, 0, u"=SUM(IF({1;0};IF(1;23);42))"_ustr);
+
+        ASSERT_DOUBLES_EQUAL(16.0, m_pDoc->GetValue(0, 7, 0));
+        ASSERT_DOUBLES_EQUAL(90.0, m_pDoc->GetValue(1, 7, 0));
+        ASSERT_DOUBLES_EQUAL(65.0, m_pDoc->GetValue(2, 7, 0));
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT_MESSAGE(
+            "array-context IF should stay authoritative in default-on mode",
+            aStats.mnAuthoritativeCount >= 3);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(
+            "array-context IF should not need legacy fallback in default-on mode",
+            static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT_MESSAGE(
+            "numeric aggregate roots should stay upstream for array-context IF formulas",
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::NumericAggregate)]
+                >= 3);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(
+            "numeric aggregate roots should not fall back for array-context IF formulas",
+            static_cast<sal_uInt64>(0),
+            aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::NumericAggregate)]);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorBroadcastMatrixDefaultOn)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+        m_pDoc->InsertTab(0, u"EngineBroadcastMatrixDefaultOn"_ustr));
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+        setaileval::resetStats();
+
+        m_pDoc->SetString(0, 7, 0, u"=SUM({1;2;3}+{10|20|30})"_ustr);
+
+        ASSERT_DOUBLES_EQUAL(198.0, m_pDoc->GetValue(0, 7, 0));
+
+        const auto aStats = setaileval::getStatsSnapshot();
+        CPPUNIT_ASSERT_MESSAGE(
+            "broadcast-compatible matrix shapes should stay authoritative in default-on mode",
+            aStats.mnAuthoritativeCount >= 1);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(
+            "broadcast-compatible matrix shapes should not need legacy fallback",
+            static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+        CPPUNIT_ASSERT_MESSAGE(
+            "numeric aggregate roots should stay upstream for broadcast-compatible matrix shapes",
+            aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::NumericAggregate)]
+                >= 1);
+        CPPUNIT_ASSERT_EQUAL_MESSAGE(
+            "numeric aggregate roots should not fall back for broadcast-compatible matrix shapes",
+            static_cast<sal_uInt64>(0),
+            aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                setaileval::FunctionKind::NumericAggregate)]);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
 CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorRankedAggregateAuthoritative)
 {
     namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
