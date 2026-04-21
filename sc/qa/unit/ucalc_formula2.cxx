@@ -25,6 +25,8 @@
 #include <kahan.hxx>
 #include <spreadsheetengine/compat/libreoffice/InterpretTailEngineEvaluator.hxx>
 
+#include <cmath>
+
 #include <svl/broadcast.hxx>
 #include <sfx2/docfile.hxx>
 
@@ -5074,6 +5076,244 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorCriteriaAggre
         CPPUNIT_ASSERT_EQUAL(static_cast<sal_uInt64>(0),
             aStats.maFunctionFallbackCount[static_cast<std::size_t>(
                 setaileval::FunctionKind::CriteriaAggregate)]);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorDatabaseAggregateAuthoritative)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+        m_pDoc->InsertTab(0, u"EngineDatabaseAggregateAuthority"_ustr));
+
+    m_pDoc->SetString(0, 0, 0, u"Region"_ustr);
+    m_pDoc->SetString(1, 0, 0, u"Amount"_ustr);
+    m_pDoc->SetString(2, 0, 0, u"Quantity"_ustr);
+    m_pDoc->SetString(0, 1, 0, u"West"_ustr);
+    m_pDoc->SetValue(1, 1, 0, 100.0);
+    m_pDoc->SetValue(2, 1, 0, 10.0);
+    m_pDoc->SetString(0, 2, 0, u"East"_ustr);
+    m_pDoc->SetValue(1, 2, 0, 200.0);
+    m_pDoc->SetValue(2, 2, 0, 20.0);
+    m_pDoc->SetString(0, 3, 0, u"West"_ustr);
+    m_pDoc->SetString(1, 3, 0, u"pending"_ustr);
+    m_pDoc->SetValue(2, 3, 0, 15.0);
+    m_pDoc->SetString(0, 4, 0, u"West"_ustr);
+    m_pDoc->SetValue(1, 4, 0, 300.0);
+    m_pDoc->SetValue(2, 4, 0, 25.0);
+
+    m_pDoc->SetString(4, 0, 0, u"Region"_ustr);
+    m_pDoc->SetString(5, 0, 0, u"Amount"_ustr);
+    m_pDoc->SetString(4, 1, 0, u"West"_ustr);
+    m_pDoc->SetString(7, 0, 0, u"Region"_ustr);
+    m_pDoc->SetString(8, 0, 0, u"Amount"_ustr);
+    m_pDoc->SetString(7, 1, 0, u"East"_ustr);
+
+    m_pDoc->SetString(0, 7, 0, u"Region"_ustr);
+    m_pDoc->SetString(1, 7, 0, u"Amount"_ustr);
+    m_pDoc->SetString(2, 7, 0, u"Quantity"_ustr);
+    m_pDoc->SetString(0, 8, 0, u"West"_ustr);
+    m_pDoc->SetValue(1, 8, 0, 100.0);
+    m_pDoc->SetValue(2, 8, 0, 10.0);
+    m_pDoc->SetString(0, 9, 0, u"East"_ustr);
+    m_pDoc->SetValue(1, 9, 0, 200.0);
+    m_pDoc->SetValue(2, 9, 0, 20.0);
+    m_pDoc->SetString(0, 10, 0, u"West"_ustr);
+    m_pDoc->SetValue(1, 10, 0, 300.0);
+    m_pDoc->SetValue(2, 10, 0, 15.0);
+    m_pDoc->SetString(0, 11, 0, u"West"_ustr);
+    m_pDoc->SetValue(1, 11, 0, 500.0);
+    m_pDoc->SetValue(2, 11, 0, 25.0);
+
+    m_pDoc->SetString(4, 7, 0, u"Region"_ustr);
+    m_pDoc->SetString(5, 7, 0, u"Amount"_ustr);
+    m_pDoc->SetString(4, 8, 0, u"West"_ustr);
+    m_pDoc->SetString(10, 0, 0, u"Region"_ustr);
+    m_pDoc->SetString(11, 0, 0, u"Amount"_ustr);
+    m_pDoc->SetString(10, 1, 0, u"East"_ustr);
+    m_pDoc->SetString(11, 1, 0, u">150"_ustr);
+    m_pDoc->SetString(10, 2, 0, u"West"_ustr);
+    m_pDoc->SetString(11, 2, 0, u">200"_ustr);
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(new ScRangeData(
+        *m_pDoc, u"db_named"_ustr,
+        u"$EngineDatabaseAggregateAuthority.$A$1:$C$5"_ustr)));
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(new ScRangeData(
+        *m_pDoc, u"crit_or"_ustr,
+        u"$EngineDatabaseAggregateAuthority.$K$1:$L$3"_ustr)));
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "authority");
+        const auto assertAuthoritative = [&](std::u16string_view rFormula, double fExpected) {
+            setaileval::resetStats();
+            m_pDoc->SetString(15, 13, 0, OUString(rFormula));
+            ASSERT_DOUBLES_EQUAL(fExpected, m_pDoc->GetValue(15, 13, 0));
+
+            const auto aStats = setaileval::getStatsSnapshot();
+            const std::string aLabel
+                = OUStringToOString(OUString(rFormula), RTL_TEXTENCODING_UTF8).getStr()
+                  + std::string(" authoritative=")
+                  + std::to_string(aStats.mnAuthoritativeCount)
+                  + " fallback="
+                  + std::to_string(aStats.mnAuthoritativeFallbackCount)
+                  + " criteria_authoritative="
+                  + std::to_string(aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                      setaileval::FunctionKind::CriteriaAggregate)])
+                  + " criteria_fallback="
+                  + std::to_string(aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                      setaileval::FunctionKind::CriteriaAggregate)]);
+            CPPUNIT_ASSERT_MESSAGE(
+                aLabel,
+                aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                    setaileval::FunctionKind::CriteriaAggregate)]
+                    >= 1);
+            CPPUNIT_ASSERT_EQUAL_MESSAGE(
+                aLabel, static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+            CPPUNIT_ASSERT_EQUAL_MESSAGE(
+                aLabel, static_cast<sal_uInt64>(0),
+                aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                    setaileval::FunctionKind::CriteriaAggregate)]);
+        };
+
+        assertAuthoritative(u"=DSUM(A1:C5;\"Amount\";E1:F2)", 400.0);
+        assertAuthoritative(u"=DSUM(A1:C5;2;E1:F2)", 400.0);
+        assertAuthoritative(u"=DCOUNT(A1:C5;\"Amount\";E1:F2)", 2.0);
+        assertAuthoritative(u"=DCOUNTA(A1:C5;\"Amount\";E1:F2)", 3.0);
+        assertAuthoritative(u"=DAVERAGE(A1:C5;\"Amount\";E1:F2)", 200.0);
+        assertAuthoritative(u"=DMAX(A1:C5;\"Amount\";E1:F2)", 300.0);
+        assertAuthoritative(u"=DMIN(A1:C5;\"Amount\";E1:F2)", 100.0);
+        assertAuthoritative(u"=DPRODUCT(A1:C5;\"Amount\";E1:F2)", 30000.0);
+        assertAuthoritative(u"=DGET(A1:C5;\"Amount\";H1:I2)", 200.0);
+        assertAuthoritative(u"=DVAR(A8:C12;\"Amount\";E8:F9)", 40000.0);
+        assertAuthoritative(u"=DVARP(A8:C12;\"Amount\";E8:F9)", 80000.0 / 3.0);
+        assertAuthoritative(u"=DSTDEV(A8:C12;\"Amount\";E8:F9)", 200.0);
+        assertAuthoritative(u"=DSTDEVP(A8:C12;\"Amount\";E8:F9)", std::sqrt(80000.0 / 3.0));
+        assertAuthoritative(u"=DSUM(db_named;2;crit_or)", 500.0);
+        assertAuthoritative(u"=DCOUNT(db_named;0;crit_or)", 2.0);
+        assertAuthoritative(u"=DCOUNTA(db_named;;crit_or)", 2.0);
+    }
+
+    m_pDoc->DeleteTab(0);
+}
+
+CPPUNIT_TEST_FIXTURE(TestFormula2, testInterpretTailEngineEvaluatorDatabaseAggregateDefaultOn)
+{
+    namespace setaileval = spreadsheetengine::compat::libreoffice::interprettaileval;
+
+    sc::AutoCalcSwitch aACSwitch(*m_pDoc, true);
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet",
+        m_pDoc->InsertTab(0, u"EngineDatabaseAggregateDefaultOn"_ustr));
+
+    m_pDoc->SetString(0, 0, 0, u"Region"_ustr);
+    m_pDoc->SetString(1, 0, 0, u"Amount"_ustr);
+    m_pDoc->SetString(2, 0, 0, u"Quantity"_ustr);
+    m_pDoc->SetString(0, 1, 0, u"West"_ustr);
+    m_pDoc->SetValue(1, 1, 0, 100.0);
+    m_pDoc->SetValue(2, 1, 0, 10.0);
+    m_pDoc->SetString(0, 2, 0, u"East"_ustr);
+    m_pDoc->SetValue(1, 2, 0, 200.0);
+    m_pDoc->SetValue(2, 2, 0, 20.0);
+    m_pDoc->SetString(0, 3, 0, u"West"_ustr);
+    m_pDoc->SetString(1, 3, 0, u"pending"_ustr);
+    m_pDoc->SetValue(2, 3, 0, 15.0);
+    m_pDoc->SetString(0, 4, 0, u"West"_ustr);
+    m_pDoc->SetValue(1, 4, 0, 300.0);
+    m_pDoc->SetValue(2, 4, 0, 25.0);
+
+    m_pDoc->SetString(4, 0, 0, u"Region"_ustr);
+    m_pDoc->SetString(5, 0, 0, u"Amount"_ustr);
+    m_pDoc->SetString(4, 1, 0, u"West"_ustr);
+    m_pDoc->SetString(7, 0, 0, u"Region"_ustr);
+    m_pDoc->SetString(8, 0, 0, u"Amount"_ustr);
+    m_pDoc->SetString(7, 1, 0, u"East"_ustr);
+
+    m_pDoc->SetString(0, 7, 0, u"Region"_ustr);
+    m_pDoc->SetString(1, 7, 0, u"Amount"_ustr);
+    m_pDoc->SetString(2, 7, 0, u"Quantity"_ustr);
+    m_pDoc->SetString(0, 8, 0, u"West"_ustr);
+    m_pDoc->SetValue(1, 8, 0, 100.0);
+    m_pDoc->SetValue(2, 8, 0, 10.0);
+    m_pDoc->SetString(0, 9, 0, u"East"_ustr);
+    m_pDoc->SetValue(1, 9, 0, 200.0);
+    m_pDoc->SetValue(2, 9, 0, 20.0);
+    m_pDoc->SetString(0, 10, 0, u"West"_ustr);
+    m_pDoc->SetValue(1, 10, 0, 300.0);
+    m_pDoc->SetValue(2, 10, 0, 15.0);
+    m_pDoc->SetString(0, 11, 0, u"West"_ustr);
+    m_pDoc->SetValue(1, 11, 0, 500.0);
+    m_pDoc->SetValue(2, 11, 0, 25.0);
+
+    m_pDoc->SetString(4, 7, 0, u"Region"_ustr);
+    m_pDoc->SetString(5, 7, 0, u"Amount"_ustr);
+    m_pDoc->SetString(4, 8, 0, u"West"_ustr);
+    m_pDoc->SetString(10, 0, 0, u"Region"_ustr);
+    m_pDoc->SetString(11, 0, 0, u"Amount"_ustr);
+    m_pDoc->SetString(10, 1, 0, u"East"_ustr);
+    m_pDoc->SetString(11, 1, 0, u">150"_ustr);
+    m_pDoc->SetString(10, 2, 0, u"West"_ustr);
+    m_pDoc->SetString(11, 2, 0, u">200"_ustr);
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(new ScRangeData(
+        *m_pDoc, u"db_named"_ustr,
+        u"$EngineDatabaseAggregateDefaultOn.$A$1:$C$5"_ustr)));
+    CPPUNIT_ASSERT(m_pDoc->GetRangeName()->insert(new ScRangeData(
+        *m_pDoc, u"crit_or"_ustr,
+        u"$EngineDatabaseAggregateDefaultOn.$K$1:$L$3"_ustr)));
+
+    {
+        ScopedEnvironmentOverride aMode(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_ENGINE_EVALUATOR", "off");
+        ScopedEnvironmentOverride aAuthority(
+            "SPREADSHEET_ENGINE_INTERPRET_TAIL_AUTHORITATIVE_WHILE_OFF", "true");
+        const auto assertAuthoritative = [&](std::u16string_view rFormula, double fExpected) {
+            setaileval::resetStats();
+            m_pDoc->SetString(15, 13, 0, OUString(rFormula));
+            ASSERT_DOUBLES_EQUAL(fExpected, m_pDoc->GetValue(15, 13, 0));
+
+            const auto aStats = setaileval::getStatsSnapshot();
+            const std::string aLabel
+                = OUStringToOString(OUString(rFormula), RTL_TEXTENCODING_UTF8).getStr()
+                  + std::string(" authoritative=")
+                  + std::to_string(aStats.mnAuthoritativeCount)
+                  + " fallback="
+                  + std::to_string(aStats.mnAuthoritativeFallbackCount)
+                  + " criteria_authoritative="
+                  + std::to_string(aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                      setaileval::FunctionKind::CriteriaAggregate)])
+                  + " criteria_fallback="
+                  + std::to_string(aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                      setaileval::FunctionKind::CriteriaAggregate)]);
+            CPPUNIT_ASSERT_MESSAGE(
+                aLabel,
+                aStats.maFunctionAuthoritativeCount[static_cast<std::size_t>(
+                    setaileval::FunctionKind::CriteriaAggregate)]
+                    >= 1);
+            CPPUNIT_ASSERT_EQUAL_MESSAGE(
+                aLabel, static_cast<sal_uInt64>(0), aStats.mnAuthoritativeFallbackCount);
+            CPPUNIT_ASSERT_EQUAL_MESSAGE(
+                aLabel, static_cast<sal_uInt64>(0),
+                aStats.maFunctionFallbackCount[static_cast<std::size_t>(
+                    setaileval::FunctionKind::CriteriaAggregate)]);
+        };
+
+        assertAuthoritative(u"=DSUM(A1:C5;\"Amount\";E1:F2)", 400.0);
+        assertAuthoritative(u"=DSUM(A1:C5;2;E1:F2)", 400.0);
+        assertAuthoritative(u"=DCOUNT(A1:C5;\"Amount\";E1:F2)", 2.0);
+        assertAuthoritative(u"=DCOUNTA(A1:C5;\"Amount\";E1:F2)", 3.0);
+        assertAuthoritative(u"=DAVERAGE(A1:C5;\"Amount\";E1:F2)", 200.0);
+        assertAuthoritative(u"=DMAX(A1:C5;\"Amount\";E1:F2)", 300.0);
+        assertAuthoritative(u"=DMIN(A1:C5;\"Amount\";E1:F2)", 100.0);
+        assertAuthoritative(u"=DPRODUCT(A1:C5;\"Amount\";E1:F2)", 30000.0);
+        assertAuthoritative(u"=DGET(A1:C5;\"Amount\";H1:I2)", 200.0);
+        assertAuthoritative(u"=DVAR(A8:C12;\"Amount\";E8:F9)", 40000.0);
+        assertAuthoritative(u"=DVARP(A8:C12;\"Amount\";E8:F9)", 80000.0 / 3.0);
+        assertAuthoritative(u"=DSTDEV(A8:C12;\"Amount\";E8:F9)", 200.0);
+        assertAuthoritative(u"=DSTDEVP(A8:C12;\"Amount\";E8:F9)", std::sqrt(80000.0 / 3.0));
+        assertAuthoritative(u"=DSUM(db_named;2;crit_or)", 500.0);
+        assertAuthoritative(u"=DCOUNT(db_named;0;crit_or)", 2.0);
+        assertAuthoritative(u"=DCOUNTA(db_named;;crit_or)", 2.0);
     }
 
     m_pDoc->DeleteTab(0);

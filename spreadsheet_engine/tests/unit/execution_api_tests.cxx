@@ -463,6 +463,14 @@ int main()
                 "spreadsheetengine_execution_tests", "applyFieldSelector(number) mismatch");
         }
 
+        DatabaseQueryDescriptor aDescZero;
+        const auto aZeroSelector = applyFieldSelector(RpnValue::number(0.0), aDescZero);
+        if (!aZeroSelector || !aDescZero.mbFieldMissing)
+        {
+            return fail(
+                "spreadsheetengine_execution_tests", "applyFieldSelector(zero) mismatch");
+        }
+
         DatabaseQueryDescriptor aDescName;
         const auto aTextSelector = applyFieldSelector(RpnValue::text(u"Amount"), aDescName);
         if (!aTextSelector || !aDescName.moFieldByName

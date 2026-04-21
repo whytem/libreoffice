@@ -11,12 +11,15 @@
 
 #include <cstdint>
 
+#include <spreadsheetengine/runtime/RpnDatabase.hxx>
+
 namespace spreadsheetengine::core::eval
 {
 namespace
 {
 
 namespace semath = spreadsheetengine::core::math;
+namespace serpn = spreadsheetengine::core::rpn;
 
 [[nodiscard]] bool formulaContainsAggregateLike(const formula::Node& rNode)
 {
@@ -55,7 +58,13 @@ std::optional<EvaluationResult> Evaluator::tryEvaluateAggregateFamily(
         = rFunctionName == u"COUNTIF" || rFunctionName == u"COUNTIFS"
           || rFunctionName == u"SUMIF" || rFunctionName == u"SUMIFS"
           || rFunctionName == u"AVERAGEIF" || rFunctionName == u"AVERAGEIFS"
-          || rFunctionName == u"MAXIFS" || rFunctionName == u"MINIFS";
+          || rFunctionName == u"MAXIFS" || rFunctionName == u"MINIFS"
+          || rFunctionName == u"DSUM" || rFunctionName == u"DCOUNT"
+          || rFunctionName == u"DCOUNTA" || rFunctionName == u"DAVERAGE"
+          || rFunctionName == u"DGET" || rFunctionName == u"DMAX"
+          || rFunctionName == u"DMIN" || rFunctionName == u"DPRODUCT"
+          || rFunctionName == u"DSTDEV" || rFunctionName == u"DSTDEVP"
+          || rFunctionName == u"DVAR" || rFunctionName == u"DVARP";
     const bool bRankedAggregate
         = rFunctionName == u"LARGE" || rFunctionName == u"SMALL"
           || rFunctionName == u"PERCENTILE" || rFunctionName == u"PERCENTILE.INC"
@@ -608,6 +617,35 @@ EvaluationResult Evaluator::evaluateAggregateCriteriaFamilyBody(
 {
     const api::StringView aFunctionName = rFunctionName;
 
+    auto databaseAggregationFromFunctionName
+        = [&](api::StringView rName) -> std::optional<serpn::DatabaseAggregation> {
+        if (rName == u"DSUM")
+            return serpn::DatabaseAggregation::Sum;
+        if (rName == u"DCOUNT")
+            return serpn::DatabaseAggregation::Count;
+        if (rName == u"DCOUNTA")
+            return serpn::DatabaseAggregation::Count2;
+        if (rName == u"DAVERAGE")
+            return serpn::DatabaseAggregation::Average;
+        if (rName == u"DGET")
+            return serpn::DatabaseAggregation::Get;
+        if (rName == u"DMAX")
+            return serpn::DatabaseAggregation::Max;
+        if (rName == u"DMIN")
+            return serpn::DatabaseAggregation::Min;
+        if (rName == u"DPRODUCT")
+            return serpn::DatabaseAggregation::Product;
+        if (rName == u"DSTDEV")
+            return serpn::DatabaseAggregation::StandardDeviation;
+        if (rName == u"DSTDEVP")
+            return serpn::DatabaseAggregation::StandardDeviationPopulation;
+        if (rName == u"DVAR")
+            return serpn::DatabaseAggregation::Variance;
+        if (rName == u"DVARP")
+            return serpn::DatabaseAggregation::VariancePopulation;
+        return std::nullopt;
+    };
+
     if (aFunctionName == u"COUNTIF" || aFunctionName == u"COUNTIFS"
         || aFunctionName == u"SUMIF" || aFunctionName == u"SUMIFS"
         || aFunctionName == u"AVERAGEIF" || aFunctionName == u"AVERAGEIFS"
@@ -757,6 +795,58 @@ EvaluationResult Evaluator::evaluateAggregateCriteriaFamilyBody(
         const auto aResult = sequery::evaluateCriteriaAggregate(aMaterializer, aRanges, aCriteria,
             &aTargetRange.maValue, eAggregateKind, eQuerySearchType,
             mrWorkbook.mbSearchCriteriaMustApplyToWholeCell);
+        return aResult ? makeScalarResult(aResult.maValue) : makeFailure(aResult.meError);
+    }
+
+    if (const auto oDatabaseAggregation = databaseAggregationFromFunctionName(aFunctionName))
+    {
+        if (rNode.maChildren.size() != 3)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto eQuerySearchType = toQuerySearchType(mrWorkbook.meFormulaSearchType);
+        const EvaluatorCriteriaAggregateMaterializer aMaterializer(*this);
+
+        auto evaluateAggregateInput = [&](const formula::Node& rArgument)
+            -> api::ValueResult<CriteriaAggregateInput> {
+            EvaluationResult aValue = evaluateNode(rArgument, rCurrentAddress);
+            if (!aValue)
+                return api::ValueResult<CriteriaAggregateInput>::failure(aValue.meError);
+            const auto oInput = makeCriteriaAggregateInput(aValue);
+            if (!oInput)
+                return api::ValueResult<CriteriaAggregateInput>::failure(api::Error::IllegalArgument);
+            return api::ValueResult<CriteriaAggregateInput>::success(*oInput);
+        };
+
+        const auto aDatabaseRange = evaluateAggregateInput(*rNode.maChildren[0]);
+        if (!aDatabaseRange)
+            return makeFailure(aDatabaseRange.meError);
+        if (aDatabaseRange.maValue.mbScalar)
+            return makeFailure(api::Error::IllegalArgument);
+
+        const auto aCriteriaRange = evaluateAggregateInput(*rNode.maChildren[2]);
+        if (!aCriteriaRange)
+            return makeFailure(aCriteriaRange.meError);
+        if (aCriteriaRange.maValue.mbScalar)
+            return makeFailure(api::Error::IllegalArgument);
+
+        EvaluationResult aFieldSelector
+            = ensureScalarValue(*this, evaluateNode(*rNode.maChildren[1], rCurrentAddress));
+        if (!aFieldSelector)
+            return makeFailure(aFieldSelector.meError);
+
+        serpn::DatabaseQueryDescriptor aDescriptor;
+        aDescriptor.maDataRange = aDatabaseRange.maValue.maReference;
+        aDescriptor.maCriteriaRange = aCriteriaRange.maValue.maReference;
+        aDescriptor.meAggregation = *oDatabaseAggregation;
+        const auto aFieldResult = serpn::applyFieldSelector(
+            serpn::RpnValue::fromCellValue(aFieldSelector.maValue.maValue), aDescriptor);
+        if (!aFieldResult)
+            return makeFailure(aFieldResult.meError);
+
+        const auto aResult = serpn::evaluateDatabaseQuery(
+            aMaterializer, aDescriptor, eQuerySearchType,
+            mrWorkbook.mbSearchCriteriaMustApplyToWholeCell,
+            sedatetime::parseStandaloneNumberText, parseAsciiDouble);
         return aResult ? makeScalarResult(aResult.maValue) : makeFailure(aResult.meError);
     }
 

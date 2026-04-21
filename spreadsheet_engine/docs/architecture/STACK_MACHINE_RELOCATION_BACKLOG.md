@@ -66,7 +66,17 @@ families that are explicitly not yet relocated.
    `testSharedInterpreterRetiredMatrixReferenceWave`, plus
    `CppunitTest_sc_interpret_tail_corpus` covering
    `testSeamReconciliationTryPushWrapperFloor`.
-5. Slice 5: pending
+5. Slice 5: complete
+   Verified with `CppunitTest_sc_ucalc_formula2` covering
+   `testInterpretTailEngineEvaluatorCriteriaAggregateAuthoritative`,
+   `testInterpretTailEngineEvaluatorCriteriaAggregateDefaultOn`,
+   `testInterpretTailEngineEvaluatorDatabaseAggregateAuthoritative`,
+   `testInterpretTailEngineEvaluatorDatabaseAggregateDefaultOn`,
+   `testSharedInterpreterDatabaseDispatch`,
+   `testSharedInterpreterDatabaseGetDispatch`,
+   `testSharedInterpreterDatabaseVarianceDispatch`, and
+   `testSharedInterpreterDatabaseCountDispatch`, plus
+   `spreadsheetengine_execution_tests`.
 6. Slice 6: pending
 7. Slice 7: pending
 8. Slice 8: pending
@@ -199,6 +209,21 @@ Definition of done:
   reference helpers
 
 ### Slice 5: Criteria/database tail substrate
+
+Status: complete
+
+Current landing on the tree:
+
+- the upper seam and standalone `FormulaEvaluator` now share
+  `runtime/RpnDatabase.hxx` for database-query materialization, field-selector
+  normalization, OR-row criteria matching, and DB aggregation execution
+- COUNTIF/SUMIF/AVERAGEIF-style tails and the DB family (`DSUM`, `DCOUNT`,
+  `DCOUNTA`, `DAVERAGE`, `DGET`, `DMAX`, `DMIN`, `DPRODUCT`, `DSTDEV(P)`,
+  `DVAR(P)`) now consume that shared engine-native substrate instead of
+  bespoke Calc-local loops
+- focused authoritative/default-on tests now prove named-range, missing-field,
+  and count-without-field DB shapes at the upper seam, while the existing
+  shared-interpreter audit tests still cover the lower seam
 
 Goal: finish the remaining host-sensitive criteria/database substrate in a form
 that can later retire the corresponding lower-seam admissions.

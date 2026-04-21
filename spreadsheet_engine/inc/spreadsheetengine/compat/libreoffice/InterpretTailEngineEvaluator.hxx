@@ -77,6 +77,7 @@
 #include <spreadsheetengine/runtime/MathTranscendental.hxx>
 #include <spreadsheetengine/runtime/QueryRuntime.hxx>
 #include <spreadsheetengine/runtime/RpnControlFlow.hxx>
+#include <spreadsheetengine/runtime/RpnDatabase.hxx>
 #include <spreadsheetengine/runtime/RpnMatrix.hxx>
 #include <spreadsheetengine/runtime/ScalarCoercion.hxx>
 #include <spreadsheetengine/runtime/TextFunctionRuntime.hxx>
@@ -1299,7 +1300,13 @@ classifyImportedStoredHostTruthFunction(api::StringView rFunctionName)
     if (rFunctionName == u"COUNTIF" || rFunctionName == u"COUNTIFS"
         || rFunctionName == u"SUMIF" || rFunctionName == u"SUMIFS"
         || rFunctionName == u"AVERAGEIF" || rFunctionName == u"AVERAGEIFS"
-        || rFunctionName == u"MAXIFS" || rFunctionName == u"MINIFS")
+        || rFunctionName == u"MAXIFS" || rFunctionName == u"MINIFS"
+        || rFunctionName == u"DSUM" || rFunctionName == u"DCOUNT"
+        || rFunctionName == u"DCOUNTA" || rFunctionName == u"DAVERAGE"
+        || rFunctionName == u"DGET" || rFunctionName == u"DMAX"
+        || rFunctionName == u"DMIN" || rFunctionName == u"DPRODUCT"
+        || rFunctionName == u"DSTDEV" || rFunctionName == u"DSTDEVP"
+        || rFunctionName == u"DVAR" || rFunctionName == u"DVARP")
     {
         return FunctionKind::CriteriaAggregate;
     }
@@ -10527,39 +10534,82 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
     const auto eSearchType = searchTypeFromDocument(rDoc);
     const bool bMatchWholeCell = rDoc.GetDocOptions().IsMatchWholeCell();
     const CriteriaAggregateMaterializer aMaterializer(rDoc, rContext);
+    const auto oDatabaseAggregation = [&]() -> std::optional<spreadsheetengine::core::rpn::DatabaseAggregation> {
+        using DatabaseAggregation = spreadsheetengine::core::rpn::DatabaseAggregation;
+        if (aFunctionName == u"DSUM")
+            return DatabaseAggregation::Sum;
+        if (aFunctionName == u"DCOUNT")
+            return DatabaseAggregation::Count;
+        if (aFunctionName == u"DCOUNTA")
+            return DatabaseAggregation::Count2;
+        if (aFunctionName == u"DAVERAGE")
+            return DatabaseAggregation::Average;
+        if (aFunctionName == u"DGET")
+            return DatabaseAggregation::Get;
+        if (aFunctionName == u"DMAX")
+            return DatabaseAggregation::Max;
+        if (aFunctionName == u"DMIN")
+            return DatabaseAggregation::Min;
+        if (aFunctionName == u"DPRODUCT")
+            return DatabaseAggregation::Product;
+        if (aFunctionName == u"DSTDEV")
+            return DatabaseAggregation::StandardDeviation;
+        if (aFunctionName == u"DSTDEVP")
+            return DatabaseAggregation::StandardDeviationPopulation;
+        if (aFunctionName == u"DVAR")
+            return DatabaseAggregation::Variance;
+        if (aFunctionName == u"DVARP")
+            return DatabaseAggregation::VariancePopulation;
+        return std::nullopt;
+    }();
 
     auto evaluateAggregateInput = [&](const core::formula::Node& rArgument)
         -> Materialization<CriteriaAggregateInput> {
         return materializeCriteriaAggregateInput(rArgument, rDoc, rContext, rFormulaPos);
     };
 
+    auto resolveAggregateRange = [&](const core::formula::Node& rArgument)
+        -> Materialization<ScRange> {
+        const auto aRange = resolveReferenceRangeNode(rArgument, rDoc, rFormulaPos);
+        if (!aRange.mbSupported)
+            return makeUnsupportedMaterialization<ScRange>(aRange.meFallbackReason);
+        if (!aRange.moValue)
+            return makeMaterializedError<ScRange>(aRange.meError);
+        return makeMaterializedValue(*aRange.moValue);
+    };
+
+    auto evaluateScalarValue = [&](const core::formula::Node& rArgument)
+        -> Materialization<api::CellValue> {
+        if (rArgument.meKind == core::formula::NodeKind::EmptyArgument)
+            return makeMaterializedValue(api::CellValue::empty());
+
+        if (rArgument.meKind == core::formula::NodeKind::CellReference
+            || rArgument.meKind == core::formula::NodeKind::RangeReference
+            || rArgument.meKind == core::formula::NodeKind::NamedReference)
+        {
+            return materializeScalarizedReferenceValueNode(rArgument, rDoc, rContext, rFormulaPos);
+        }
+
+        if (rArgument.meKind == core::formula::NodeKind::ArrayConstant
+            || rArgument.meKind == core::formula::NodeKind::BinaryOperation
+            || rArgument.meKind == core::formula::NodeKind::FunctionCall)
+        {
+            const auto aMatrix = materializeMatrixNode(rArgument, rDoc, rContext, rFormulaPos);
+            if (aMatrix.mbSupported && aMatrix.moValue)
+            {
+                return makeMaterializedValue(lookupexecution::detail::toApiCellValue(
+                    (*aMatrix.moValue)->Get(0, 0)));
+            }
+            if (aMatrix.mbSupported && !aMatrix.moValue)
+                return makeMaterializedError<api::CellValue>(aMatrix.meError);
+        }
+
+        return materializeScalarNode(rArgument, rDoc, rContext, rFormulaPos);
+    };
+
     auto evaluateCriteria = [&](const core::formula::Node& rArgument)
         -> Materialization<CriteriaPredicate> {
-        auto aArgument = [&]() -> Materialization<api::CellValue> {
-            if (rArgument.meKind == core::formula::NodeKind::CellReference
-                || rArgument.meKind == core::formula::NodeKind::RangeReference
-                || rArgument.meKind == core::formula::NodeKind::NamedReference)
-            {
-                return materializeScalarizedReferenceValueNode(
-                    rArgument, rDoc, rContext, rFormulaPos);
-            }
-
-            if (rArgument.meKind == core::formula::NodeKind::ArrayConstant
-                || rArgument.meKind == core::formula::NodeKind::BinaryOperation
-                || rArgument.meKind == core::formula::NodeKind::FunctionCall)
-            {
-                const auto aMatrix = materializeMatrixNode(rArgument, rDoc, rContext, rFormulaPos);
-                if (aMatrix.mbSupported && aMatrix.moValue)
-                {
-                    return makeMaterializedValue(lookupexecution::detail::toApiCellValue(
-                        (*aMatrix.moValue)->Get(0, 0)));
-                }
-                if (aMatrix.mbSupported && !aMatrix.moValue)
-                    return makeMaterializedError<api::CellValue>(aMatrix.meError);
-            }
-
-            return materializeScalarNode(rArgument, rDoc, rContext, rFormulaPos);
-        }();
+        auto aArgument = evaluateScalarValue(rArgument);
         if (!aArgument.mbSupported)
             return makeUnsupportedMaterialization<CriteriaPredicate>(aArgument.meFallbackReason);
         if (!aArgument.moValue)
@@ -10591,6 +10641,48 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
             return makeErrorResult(eFunction, aResult.meError);
         return makeScalarAttempt(eFunction, aResult.maValue);
     };
+
+    if (oDatabaseAggregation)
+    {
+        if (rNode.maChildren.size() != 3)
+            return makeErrorResult(eFunction, api::Error::IllegalArgument);
+
+        const auto aDatabaseRange = resolveAggregateRange(*rNode.maChildren[0]);
+        if (!aDatabaseRange.mbSupported)
+            return makeUnsupported(eFunction, aDatabaseRange.meFallbackReason);
+        if (!aDatabaseRange.moValue)
+            return makeErrorResult(eFunction, aDatabaseRange.meError);
+
+        const auto aCriteriaRange = resolveAggregateRange(*rNode.maChildren[2]);
+        if (!aCriteriaRange.mbSupported)
+            return makeUnsupported(eFunction, aCriteriaRange.meFallbackReason);
+        if (!aCriteriaRange.moValue)
+            return makeErrorResult(eFunction, aCriteriaRange.meError);
+
+        const auto aFieldSelector = evaluateScalarValue(*rNode.maChildren[1]);
+        if (!aFieldSelector.mbSupported)
+            return makeUnsupported(eFunction, aFieldSelector.meFallbackReason);
+        if (!aFieldSelector.moValue)
+            return makeErrorResult(eFunction, aFieldSelector.meError);
+
+        spreadsheetengine::core::rpn::DatabaseQueryDescriptor aDescriptor;
+        aDescriptor.maDataRange = { toApiCellRange(*aDatabaseRange.moValue) };
+        aDescriptor.maCriteriaRange = { toApiCellRange(*aCriteriaRange.moValue) };
+        aDescriptor.meAggregation = *oDatabaseAggregation;
+        const auto aFieldResult = spreadsheetengine::core::rpn::applyFieldSelector(
+            spreadsheetengine::core::rpn::RpnValue::fromCellValue(*aFieldSelector.moValue),
+            aDescriptor);
+        if (!aFieldResult)
+            return makeErrorResult(eFunction, aFieldResult.meError);
+
+        const auto aResult = spreadsheetengine::core::rpn::evaluateDatabaseQuery(
+            aMaterializer, aDescriptor, eSearchType, bMatchWholeCell,
+            spreadsheetengine::core::datetime::parseStandaloneNumberText,
+            spreadsheetengine::core::coercion::parseAsciiDouble);
+        if (!aResult)
+            return makeErrorResult(eFunction, aResult.meError);
+        return makeScalarAttempt(eFunction, aResult.maValue);
+    }
 
     if (aFunctionName == u"COUNTIF")
     {

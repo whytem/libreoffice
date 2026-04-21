@@ -211,6 +211,14 @@ gate, independent of `resolveRolloutMode()`. Shadow comparison (requiring
 `ENGINE_EVALUATOR=shadow` AND `AUTHORITATIVE_WHILE_OFF=false` to bypass the
 authoritative short-circuit) produces zero mismatches. Both partial and full
 rollback controls are documented and validated by CI.
+Slice 5 of the relocation backlog is now complete: the upper seam and the
+standalone `FormulaEvaluator` share `runtime/RpnDatabase.hxx` for
+criteria/database execution, including DB field-selector normalization,
+named-range criteria grids, OR-row criteria matching, and the full DB
+aggregation family (`DSUM`, `DCOUNT`, `DCOUNTA`, `DAVERAGE`, `DGET`, `DMAX`,
+`DMIN`, `DPRODUCT`, `DSTDEV(P)`, `DVAR(P)`). The remaining criteria/database
+work is therefore no longer missing substrate; it is the later lower-seam
+retirement work tracked by Slices 6-7.
 
 Batch 1 of the five-batch RPN evaluator plan has now landed its substrate
 (`runtime/RpnControlFlow.hxx`) and six explicit admissions:
