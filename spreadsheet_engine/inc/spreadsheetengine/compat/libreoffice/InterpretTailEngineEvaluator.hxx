@@ -1453,6 +1453,7 @@ classifyImportedStoredHostTruthFunction(api::StringView rFunctionName)
         case FunctionKind::Aggregate:
         case FunctionKind::CalendarUtility:
         case FunctionKind::Match:
+            return false;
         case FunctionKind::Lookup:
         case FunctionKind::VLookup:
         case FunctionKind::HLookup:
@@ -7620,17 +7621,7 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
         else
         {
             lookupexecution::LookupInputSource aSource;
-            const ScRange aTrimmedRange = trimWholeMatchSearchRangeToUsedData(rDoc, *aRange.moValue);
-            const auto aMatrix = materializeReferencedMatrix(
-                aTrimmedRange, rDoc, rContext, rFormulaPos);
-            if (!aMatrix.mbSupported)
-            {
-                return makeUnsupportedMaterialization<lookupexecution::LookupInputSource>(
-                    aMatrix.meFallbackReason);
-            }
-            if (!aMatrix.moValue)
-                return makeMaterializedError<lookupexecution::LookupInputSource>(aMatrix.meError);
-            aSource.mpMatrix = *aMatrix.moValue;
+            aSource.moRange = trimWholeMatchSearchRangeToUsedData(rDoc, *aRange.moValue);
             return makeMaterializedValue(aSource);
         }
     }
@@ -16342,8 +16333,11 @@ materializeMatchLookupInputSourceNode(const core::formula::Node& rNode, const Sc
             if (aHostValue && !aHostValue.maValue.isEmpty())
                 return finalizeAttempt(detail::makeScalarAttempt(eRootFunction, aHostValue.maValue));
         }
-        return finalizeAttempt(
-            detail::makeErrorResult(eRootFunction, api::Error::VariableExpected));
+        if (detail::importedRootUsesVariableExpectedHostTruth(eRootFunction, aRootFunctionName))
+        {
+            return finalizeAttempt(
+                detail::makeErrorResult(eRootFunction, api::Error::VariableExpected));
+        }
     }
     if (rRoot.meKind == core::formula::NodeKind::ErrorLiteral)
     {

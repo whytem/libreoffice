@@ -57,6 +57,16 @@ Phase 2 of the relocation backlog is now complete:
 - canonical relocation-debt metrics now exclude the retired operator/control
   wrapper surface
 
+Phase 3 of the relocation backlog is now complete:
+
+- Calc no longer declares or dispatches the reference/lookup/addressing
+  wrapper surface for lookup, xlookup, match, indirect, address, index,
+  range-reference, union/intersection, multi-area union, or missing-token
+  handling
+- `ExecuteExternalTerminal` is now treated as explicitly host-owned
+  external-computation behavior rather than relocation debt
+- canonical relocation-debt metrics now exclude the closed reference wave
+
 ## Working Rules
 
 1. Do not reopen closed contract-gap work unless the code proves a new gap.
@@ -78,24 +88,6 @@ Phase 2 of the relocation backlog is now complete:
 - classic stack/token machinery in `interpre.hxx` and `interpr4.cxx`,
   including `sp`, `maxsp`, `Push*`, `Pop*`, token iteration helpers, and
   dispatch bookkeeping
-
-### Reference / Lookup / Addressing
-
-- `ExecuteLookupTerminal`
-- `ExecuteXLookupTerminal`
-- `ExecuteIndirectTerminal`
-- `ExecuteAddressTerminal`
-- `ExecuteIndexTerminal`
-- `ExecuteMultiAreaTerminal`
-- `ExecuteExternalTerminal`
-- `ExecuteMissingTerminal`
-- `ExecuteRangeReferenceTerminal`
-- `ExecuteUnionTerminal`
-- `ExecuteIntersectTerminal`
-- `ScMatchOp`
-
-These still need either upper-seam ownership or an explicit decision that the
-remaining terminal-only behavior is permanent host-owned glue.
 
 ### DB / Criteria / Transform
 
@@ -137,37 +129,6 @@ entrypoint or dispatch residue for them:
 - `ExecuteRandArrayTerminal`
 
 ## Phased Implementation Plan
-
-### Phase 3: Reference / Lookup / Addressing Ownership Closure
-
-Goal: finish the remaining reference/lookup wave now that `RangeResolver` is
-already available.
-
-Scope:
-
-- route `ExecuteLookupTerminal`, `ExecuteXLookupTerminal`,
-  `ExecuteIndirectTerminal`, `ExecuteAddressTerminal`,
-  `ExecuteIndexTerminal`, `ExecuteMultiAreaTerminal`,
-  `ExecuteExternalTerminal`, `ExecuteMissingTerminal`,
-  `ExecuteRangeReferenceTerminal`, `ExecuteUnionTerminal`,
-  `ExecuteIntersectTerminal`, and `ScMatchOp` through one explicit ownership
-  story
-- delete duplicated evaluator logic from Calc where the upper seam can now be
-  authoritative
-- classify any residual terminal-only behavior that truly must remain on the
-  host side
-- remove hidden reference-only execution from Calc-local stack code
-
-Exit criteria:
-
-- formulas that currently reach the listed terminals execute authoritatively
-  through `InterpretTail`, or the remaining behavior is explicitly documented
-  as host-owned
-- `ScMatchOp` no longer hides evaluator logic in Calc
-- no duplicated reference/lookup/address computation remains in Calc stack
-  code
-- parity coverage exists for named ranges, external references, INDIRECT,
-  union/intersection, and mixed matrix/reference shapes
 
 ### Phase 4: Query / Criteria / Transform Closure
 
@@ -298,6 +259,7 @@ status:
 - `ScTableOp`
 - `ScTTT`
 - `ScDebugVar`
+- `ExecuteExternalTerminal`
 - `ScMacro`
 - `ScDde`
 - `ScWebservice`

@@ -3596,14 +3596,6 @@ void ScInterpreter::ExecuteExternalTerminal()
     }
 }
 
-void ScInterpreter::ExecuteMissingTerminal()
-{
-    if ( aCode.IsEndOfPath() )
-        PushTempToken( new ScEmptyCellToken( false, false ) );
-    else
-        PushTempToken( new FormulaMissingToken );
-}
-
 #if HAVE_FEATURE_SCRIPTING
 
 static uno::Any lcl_getSheetModule( const uno::Reference<table::XCellRange>& xCellRange, const ScDocument* pDok )
@@ -11832,7 +11824,9 @@ StackVar ScInterpreter::Interpret()
                 {
                     case ocSep:
                     case ocClose:           // pushed by the compiler
-                    case ocMissing          : ExecuteMissingTerminal();     break;
+                    case ocMissing          :
+                        seinterpcompatdispatch::Dispatcher::missingTerminal(*this);
+                        break;
                     case ocMacro            : ScMacro();                    break;
                     case ocDBArea           : ExecuteDBAreaTerminal();      break;
                     case ocColRowNameAuto   : ExecuteColRowNameAutoTerminal(); break;
@@ -11970,7 +11964,9 @@ StackVar ScInterpreter::Interpret()
                             spreadsheetengine::compat::libreoffice::interpreterdispatch::
                                 LogicalFoldMode::Xor);
                         break;
-                    case ocIntersect        : ExecuteIntersectTerminal();   break;
+                    case ocIntersect        :
+                        seinterpcompatdispatch::Dispatcher::intersectTerminal(*this);
+                        break;
                     case ocRange            :
                         if (!pushRootErrorLiteralTerminal())
                         {
@@ -11982,10 +11978,12 @@ StackVar ScInterpreter::Interpret()
                                     return setaileval::isRootRangeReferenceFormula(rFormula);
                                 },
                                 "host-owned root range reference reached ScInterpreter");
-                            ExecuteRangeReferenceTerminal();
+                            seinterpcompatdispatch::Dispatcher::rangeReferenceTerminal(*this);
                         }
                         break;
-                    case ocUnion            : ExecuteUnionTerminal();       break;
+                    case ocUnion            :
+                        seinterpcompatdispatch::Dispatcher::unionTerminal(*this);
+                        break;
                     case ocNot              :
                         warnLogicalDispatch(u"NOT");
                         nFuncFmtType = SvNumFormatType::LOGICAL;
@@ -14046,8 +14044,12 @@ StackVar ScInterpreter::Interpret()
                         warnIfLegacyCriteriaAggregateReached(u"DVARP");
                         evaluateLegacyDBStVar(/*bSample*/false, /*bStdDev*/false);
                         break;
-                    case ocIndirect         : ExecuteIndirectTerminal(); break;
-                    case ocAddress          : ExecuteAddressTerminal(); break;
+                    case ocIndirect         :
+                        seinterpcompatdispatch::Dispatcher::indirectTerminal(*this);
+                        break;
+                    case ocAddress          :
+                        seinterpcompatdispatch::Dispatcher::addressTerminal(*this);
+                        break;
                     case ocMatch:
                     {
                         warnIfLegacyDispatchReached(
@@ -14056,7 +14058,7 @@ StackVar ScInterpreter::Interpret()
                                 return setaileval::isHardRoutedFormula(rFormula);
                             },
                             "hard-routed MATCH reached ScInterpreter");
-                        ScMatchOp(false);
+                        seinterpcompatdispatch::Dispatcher::matchOperation(*this, false);
                     }
                     break;
                     case ocXMatch:
@@ -14067,7 +14069,7 @@ StackVar ScInterpreter::Interpret()
                                 return setaileval::isHardRoutedFormula(rFormula);
                             },
                             "hard-routed XMATCH reached ScInterpreter");
-                        ScMatchOp(true);
+                        seinterpcompatdispatch::Dispatcher::matchOperation(*this, true);
                     }
                     break;
                     case ocCountEmptyCells  :
@@ -14120,7 +14122,9 @@ StackVar ScInterpreter::Interpret()
                                 [](const sc::ParamIfsResult& rRes) { return rRes.mfCount; });
                     }
                     break;
-                    case ocLookup           : ExecuteLookupTerminal();      break;
+                    case ocLookup           :
+                        seinterpcompatdispatch::Dispatcher::lookupTerminal(*this);
+                        break;
                     case ocVLookup:
                         warnIfLegacyDispatchReached(
                             "literal-only hard-routed", u"VLOOKUP",
@@ -14130,7 +14134,9 @@ StackVar ScInterpreter::Interpret()
                             "hard-routed VLOOKUP reached ScInterpreter");
                         CalculateLookup(false);
                         break;
-                    case ocXLookup          : ExecuteXLookupTerminal();     break;
+                    case ocXLookup          :
+                        seinterpcompatdispatch::Dispatcher::xlookupTerminal(*this);
+                        break;
                     case ocHLookup:
                         warnIfLegacyDispatchReached(
                             "literal-only hard-routed", u"HLOOKUP",
@@ -14147,9 +14153,11 @@ StackVar ScInterpreter::Interpret()
                                 return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
                             },
                             "family-local default-on INDEX reached ScInterpreter");
-                        ExecuteIndexTerminal();
+                        seinterpcompatdispatch::Dispatcher::indexTerminal(*this);
                         break;
-                    case ocMultiArea        : ExecuteMultiAreaTerminal();   break;
+                    case ocMultiArea        :
+                        seinterpcompatdispatch::Dispatcher::multiAreaTerminal(*this);
+                        break;
                     case ocOffset           :
                         dispatchOffset();
                         break;

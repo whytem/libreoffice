@@ -14,12 +14,15 @@
 #include <spreadsheetengine/compat/libreoffice/Date.hxx>
 #include <spreadsheetengine/compat/libreoffice/Error.hxx>
 #include <spreadsheetengine/compat/libreoffice/FormulaInspectionExecution.hxx>
+#include <spreadsheetengine/compat/libreoffice/IndirectExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/InterpreterDispatch.hxx>
 #include <spreadsheetengine/compat/libreoffice/LetExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/LookupExecution.hxx>
+#include <spreadsheetengine/compat/libreoffice/ReferenceExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/String.hxx>
 #include <spreadsheetengine/compat/libreoffice/TextServices.hxx>
 #include <spreadsheetengine/compat/libreoffice/TextParsingExecution.hxx>
+#include <spreadsheetengine/api/StringReference.hxx>
 #include <spreadsheetengine/runtime/ForecastEngine.hxx>
 #include <spreadsheetengine/runtime/ForecastEtsEngine.hxx>
 #include <spreadsheetengine/runtime/RpnMatrix.hxx>
@@ -30,9 +33,14 @@ namespace spreadsheetengine::compat::libreoffice::interpretercompatdispatch
 {
 
 namespace selibreoffice = spreadsheetengine::compat::libreoffice;
+namespace seindirectexec = spreadsheetengine::compat::libreoffice::indirectexecution;
 namespace seinterpre = spreadsheetengine::compat::libreoffice::interpreterdispatch;
+namespace selookup = spreadsheetengine::api::lookup;
 namespace selookupexec = spreadsheetengine::compat::libreoffice::lookupexecution;
 namespace seletexec = spreadsheetengine::compat::libreoffice::letexecution;
+namespace sestringref = spreadsheetengine::api::stringreference;
+namespace seref = spreadsheetengine::api::reference;
+namespace serefexec = spreadsheetengine::compat::libreoffice::referenceexecution;
 namespace semath = spreadsheetengine::core::math;
 namespace serpn = spreadsheetengine::core::rpn;
 using namespace formula;
@@ -200,6 +208,22 @@ inline void putScalarIntoMatrix(
 [[nodiscard]] inline double compatMatrixPow(const double& fLeft, const double& fRight)
 {
     return sc::power(fLeft, fRight);
+}
+
+[[nodiscard]] inline spreadsheetengine::api::query::SearchType toLookupSearchType(
+    utl::SearchParam::SearchType eSearchType)
+{
+    switch (eSearchType)
+    {
+        case utl::SearchParam::SearchType::Wildcard:
+            return spreadsheetengine::api::query::SearchType::Wildcard;
+        case utl::SearchParam::SearchType::Regexp:
+            return spreadsheetengine::api::query::SearchType::Regex;
+        case utl::SearchParam::SearchType::Normal:
+        case utl::SearchParam::SearchType::Unknown:
+        default:
+            return spreadsheetengine::api::query::SearchType::Normal;
+    }
 }
 
     [[nodiscard]] constexpr serpn::ForecastEtsVariant toForecastEtsVariant(ScETSType eType)
@@ -1638,6 +1662,17 @@ inline void putScalarIntoMatrix(
         ScInterpreter& rCalc, spreadsheetengine::core::rpn::BinaryScalarOperator eOperator);
     static void concatKernel(ScInterpreter& rCalc);
     static void letKernel(ScInterpreter& rCalc);
+    static void lookupTerminal(ScInterpreter& rCalc);
+    static void xlookupTerminal(ScInterpreter& rCalc);
+    static void matchOperation(ScInterpreter& rCalc, bool bExtended);
+    static void indirectTerminal(ScInterpreter& rCalc);
+    static void addressTerminal(ScInterpreter& rCalc);
+    static void indexTerminal(ScInterpreter& rCalc);
+    static void multiAreaTerminal(ScInterpreter& rCalc);
+    static void intersectTerminal(ScInterpreter& rCalc);
+    static void rangeReferenceTerminal(ScInterpreter& rCalc);
+    static void unionTerminal(ScInterpreter& rCalc);
+    static void missingTerminal(ScInterpreter& rCalc);
     static void matrixDeterminant(ScInterpreter& rCalc);
     static void random(ScInterpreter& rCalc);
     static void randArray(ScInterpreter& rCalc);
@@ -2211,6 +2246,880 @@ inline void Dispatcher::letKernel(ScInterpreter& rCalc)
 
     --nJumpCount;
     SEIC.aCode.Jump(pJump[nOriginalJumpCount], pJump[nOriginalJumpCount]);
+}
+
+inline void Dispatcher::intersectTerminal(ScInterpreter& rCalc)
+{
+    FormulaConstTokenRef xSecond = PopToken();
+    FormulaConstTokenRef xFirst = PopToken();
+
+    if (nGlobalError != FormulaError::NONE || !xSecond || !xFirst)
+    {
+        PushIllegalArgument();
+        return;
+    }
+
+    const StackVar eFirstType = xFirst->GetType();
+    const StackVar eSecondType = xSecond->GetType();
+    if (!serefexec::isReferenceOperandType(eFirstType)
+        || !serefexec::isReferenceOperandType(eSecondType))
+    {
+        PushIllegalArgument();
+        return;
+    }
+
+    const FormulaToken* pFirst = xFirst.get();
+    const FormulaToken* pSecond = xSecond.get();
+    if (eFirstType == svRefList || eSecondType == svRefList)
+    {
+        const auto aReferences1 = serefexec::collectReferenceOperandEntries(*pFirst);
+        const auto aReferences2 = serefexec::collectReferenceOperandEntries(*pSecond);
+
+        ScTokenRef xResult(new ScRefListToken);
+        ScRefList* pResultList = xResult->GetRefList();
+        for (const auto& rRef1 : aReferences1)
+        {
+            const ScAddress aFirstStart = rRef1.Ref1.toAbs(mrDoc, SEIC.aPos);
+            const ScAddress aFirstEnd = rRef1.Ref2.toAbs(mrDoc, SEIC.aPos);
+            for (const auto& rRef2 : aReferences2)
+            {
+                const ScAddress aSecondStart = rRef2.Ref1.toAbs(mrDoc, SEIC.aPos);
+                const ScAddress aSecondEnd = rRef2.Ref2.toAbs(mrDoc, SEIC.aPos);
+                const SCCOL nCol1 = std::max(aFirstStart.Col(), aSecondStart.Col());
+                const SCROW nRow1 = std::max(aFirstStart.Row(), aSecondStart.Row());
+                const SCTAB nTab1 = std::max(aFirstStart.Tab(), aSecondStart.Tab());
+                const SCCOL nCol2 = std::min(aFirstEnd.Col(), aSecondEnd.Col());
+                const SCROW nRow2 = std::min(aFirstEnd.Row(), aSecondEnd.Row());
+                const SCTAB nTab2 = std::min(aFirstEnd.Tab(), aSecondEnd.Tab());
+                if (nCol2 < nCol1 || nRow2 < nRow1 || nTab2 < nTab1)
+                    continue;
+
+                ScComplexRefData aRef;
+                aRef.InitRange(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2);
+                pResultList->push_back(aRef);
+            }
+        }
+
+        const std::size_t nResultCount = pResultList->size();
+        if (!nResultCount)
+            PushError(FormulaError::NoCode);
+        else if (nResultCount == 1)
+        {
+            const ScComplexRefData& rRef = (*pResultList)[0];
+            if (rRef.Ref1 == rRef.Ref2)
+                SEIC.PushTempToken(new ScSingleRefToken(mrDoc.GetSheetLimits(), rRef.Ref1));
+            else
+                SEIC.PushTempToken(new ScDoubleRefToken(mrDoc.GetSheetLimits(), rRef));
+        }
+        else
+            PushTokenRef(xResult);
+        return;
+    }
+
+    const FormulaToken* pTokens[2] = { pFirst, pSecond };
+    const StackVar eTypes[2] = { eFirstType, eSecondType };
+    SCCOL nColStart[2] = { 0, 0 };
+    SCCOL nColEnd[2] = { 0, 0 };
+    SCROW nRowStart[2] = { 0, 0 };
+    SCROW nRowEnd[2] = { 0, 0 };
+    SCTAB nTabStart[2] = { 0, 0 };
+    SCTAB nTabEnd[2] = { 0, 0 };
+    for (std::size_t i = 0; i < 2; ++i)
+    {
+        switch (eTypes[i])
+        {
+            case svSingleRef:
+            case svDoubleRef:
+            {
+                const ScAddress aStart = pTokens[i]->GetSingleRef()->toAbs(mrDoc, SEIC.aPos);
+                nColStart[i] = aStart.Col();
+                nRowStart[i] = aStart.Row();
+                nTabStart[i] = aStart.Tab();
+                if (eTypes[i] == svDoubleRef)
+                {
+                    const ScAddress aEnd = pTokens[i]->GetSingleRef2()->toAbs(mrDoc, SEIC.aPos);
+                    nColEnd[i] = aEnd.Col();
+                    nRowEnd[i] = aEnd.Row();
+                    nTabEnd[i] = aEnd.Tab();
+                }
+                else
+                {
+                    nColEnd[i] = nColStart[i];
+                    nRowEnd[i] = nRowStart[i];
+                    nTabEnd[i] = nTabStart[i];
+                }
+                break;
+            }
+            default:
+                break;
+        }
+    }
+
+    const SCCOL nCol1 = std::max(nColStart[0], nColStart[1]);
+    const SCROW nRow1 = std::max(nRowStart[0], nRowStart[1]);
+    const SCTAB nTab1 = std::max(nTabStart[0], nTabStart[1]);
+    const SCCOL nCol2 = std::min(nColEnd[0], nColEnd[1]);
+    const SCROW nRow2 = std::min(nRowEnd[0], nRowEnd[1]);
+    const SCTAB nTab2 = std::min(nTabEnd[0], nTabEnd[1]);
+    if (nCol2 < nCol1 || nRow2 < nRow1 || nTab2 < nTab1)
+        PushError(FormulaError::NoCode);
+    else if (nCol2 == nCol1 && nRow2 == nRow1 && nTab2 == nTab1)
+        SEIC.PushSingleRef(nCol1, nRow1, nTab1);
+    else
+        SEIC.PushDoubleRef(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2);
+}
+
+inline void Dispatcher::rangeReferenceTerminal(ScInterpreter& rCalc)
+{
+    FormulaConstTokenRef xSecond = PopToken();
+    FormulaConstTokenRef xFirst = PopToken();
+
+    if (nGlobalError != FormulaError::NONE || !xSecond || !xFirst)
+    {
+        PushIllegalArgument();
+        return;
+    }
+
+    FormulaTokenRef xResult = rangeReferenceToken(rCalc, *xFirst, *xSecond);
+    if (!xResult)
+        PushIllegalArgument();
+    else
+        PushTokenRef(xResult);
+}
+
+inline void Dispatcher::unionTerminal(ScInterpreter& rCalc)
+{
+    FormulaConstTokenRef xSecond = PopToken();
+    FormulaConstTokenRef xFirst = PopToken();
+
+    if (nGlobalError != FormulaError::NONE || !xSecond || !xFirst)
+    {
+        PushIllegalArgument();
+        return;
+    }
+
+    const StackVar eFirstType = xFirst->GetType();
+    const StackVar eSecondType = xSecond->GetType();
+    if (!serefexec::isReferenceOperandType(eFirstType)
+        || !serefexec::isReferenceOperandType(eSecondType))
+    {
+        PushIllegalArgument();
+        return;
+    }
+
+    const FormulaToken* pFirst = xFirst.get();
+    const FormulaToken* pSecond = xSecond.get();
+    ScTokenRef xResult;
+    bool bHandledFirst = false;
+    bool bHandledSecond = false;
+    if (eFirstType == svRefList)
+    {
+        xResult = pFirst->Clone();
+        bHandledFirst = true;
+    }
+    else if (eSecondType == svRefList)
+    {
+        xResult = pSecond->Clone();
+        bHandledSecond = true;
+    }
+    else
+        xResult = new ScRefListToken;
+
+    ScRefList* pResultList = xResult->GetRefList();
+    if (!bHandledFirst)
+        serefexec::appendReferenceOperandEntries(*pResultList, *pFirst);
+    if (!bHandledSecond)
+        serefexec::appendReferenceOperandEntries(*pResultList, *pSecond);
+    SEIC.ValidateRef(*pResultList);
+    PushTokenRef(xResult);
+}
+
+inline void Dispatcher::multiAreaTerminal(ScInterpreter& rCalc)
+{
+    sal_uInt8 nParamCount = GetByte();
+    if (!MustHaveParamCountMin(nParamCount, 1))
+        return;
+
+    while (nGlobalError == FormulaError::NONE && nParamCount-- > 1)
+        unionTerminal(rCalc);
+}
+
+inline void Dispatcher::missingTerminal(ScInterpreter& rCalc)
+{
+    if (SEIC.aCode.IsEndOfPath())
+        SEIC.PushTempToken(new ScEmptyCellToken(false, false));
+    else
+        SEIC.PushTempToken(new FormulaMissingToken);
+}
+
+inline void Dispatcher::lookupTerminal(ScInterpreter& rCalc)
+{
+    const sal_uInt8 nParamCount = GetByte();
+    if (!MustHaveParamCount(nParamCount, 2, 3))
+        return;
+
+    selookupexec::LegacyLookupRequest aRequest;
+    if (nParamCount == 3)
+    {
+        const auto aResultInput = SEIC.PopLookupExecutionInput(true, true);
+        if (!aResultInput)
+        {
+            PushIllegalParameter();
+            return;
+        }
+        aRequest.moResultInput = aResultInput.maValue;
+    }
+
+    const auto aDataInput = SEIC.PopLookupExecutionInput(true, false);
+    if (!aDataInput)
+    {
+        PushIllegalParameter();
+        return;
+    }
+    aRequest.maDataInput = aDataInput.maValue;
+
+    const auto aLookupValue = SEIC.PopLookupExecutionValue(false);
+    if (!aLookupValue)
+    {
+        PushIllegalParameter();
+        return;
+    }
+    aRequest.maLookupValue = aLookupValue.maValue;
+    if (aRequest.maLookupValue.isText())
+    {
+        aRequest.meSearchType = toLookupSearchType(SEIC.DetectSearchType(
+            selibreoffice::toLibreOfficeString(aRequest.maLookupValue.maString), mrDoc));
+    }
+
+    const auto aResult = selookupexec::resolveLookupResult(mrDoc, mrContext, aRequest);
+    if (!aResult)
+    {
+        if (aResult.meError == spreadsheetengine::api::Error::NotAvailable)
+            PushNA();
+        else
+            PushError(selibreoffice::toFormulaError(aResult.meError));
+        return;
+    }
+
+    SEIC.PushLookupExecutionResult(aResult.maValue, false);
+}
+
+inline void Dispatcher::xlookupTerminal(ScInterpreter& rCalc)
+{
+    const sal_uInt8 nParamCount = GetByte();
+    if (!MustHaveParamCount(nParamCount, 3, 6))
+        return;
+
+    selookupexec::XLookupExecutionRequest aRequest;
+    aRequest.mbAllowPatternMatch = true;
+
+    if (nParamCount == 6)
+    {
+        const auto aSearchMode = selookup::normalizeSearchMode(SEIC.GetInt16());
+        if (!aSearchMode)
+        {
+            PushIllegalParameter();
+            return;
+        }
+        aRequest.meSearchMode = aSearchMode.maValue;
+    }
+
+    if (nParamCount >= 5)
+    {
+        const auto aMatchMode = selookup::normalizeExtendedMatchMode(SEIC.GetInt16());
+        if (!aMatchMode)
+        {
+            PushIllegalParameter();
+            return;
+        }
+        aRequest.meMatchMode = aMatchMode.maValue;
+    }
+
+    FormulaConstTokenRef xNotFound;
+    FormulaError eFirstMatchError = FormulaError::NONE;
+    if (nParamCount >= 4 && GetStackType() != svEmptyCell)
+    {
+        xNotFound = PopToken();
+        eFirstMatchError = xNotFound->GetError();
+        nGlobalError = FormulaError::NONE;
+    }
+
+    const auto aResultInput = SEIC.PopLookupExecutionInput(false, false);
+    if (!aResultInput)
+    {
+        PushIllegalParameter();
+        return;
+    }
+    aRequest.maResultInput = aResultInput.maValue;
+
+    const auto aSearchInput = SEIC.PopLookupExecutionInput(false, true);
+    if (!aSearchInput)
+    {
+        PushIllegalParameter();
+        return;
+    }
+    aRequest.maSearchInput = aSearchInput.maValue;
+
+    const auto aLookupValue = SEIC.PopLookupExecutionValue(true, true);
+    if (!aLookupValue)
+    {
+        PushIllegalParameter();
+        return;
+    }
+    aRequest.maLookupValue = aLookupValue.maValue;
+    if (aRequest.maLookupValue.isText())
+    {
+        aRequest.meSearchType = toLookupSearchType(SEIC.DetectSearchType(
+            selibreoffice::toLibreOfficeString(aRequest.maLookupValue.maString), mrDoc));
+    }
+
+    const auto aResult = selookupexec::resolveXLookupResult(mrDoc, mrContext, aRequest);
+    if (!aResult)
+    {
+        if (aResult.meError == spreadsheetengine::api::Error::NotAvailable)
+        {
+            if (xNotFound && xNotFound->GetType() != svMissing)
+            {
+                nGlobalError = eFirstMatchError;
+                PushTokenRef(xNotFound);
+            }
+            else
+                PushNA();
+        }
+        else if (aResult.meError == spreadsheetengine::api::Error::NoValue)
+            PushNoValue();
+        else
+            PushError(selibreoffice::toFormulaError(aResult.meError));
+        return;
+    }
+
+    SEIC.PushLookupExecutionResult(aResult.maValue, true);
+}
+
+inline void Dispatcher::matchOperation(ScInterpreter& rCalc, bool bExtended)
+{
+    const sal_uInt8 nParamCount = GetByte();
+    if (!MustHaveParamCount(nParamCount, 2, bExtended ? 4 : 3))
+        return;
+
+    selookupexec::MatchExecutionRequest aRequest;
+    aRequest.mbExtended = bExtended;
+    aRequest.mbAllowPatternMatch = bExtended;
+    aRequest.meSearchType = toLookupSearchType(mrDoc.GetDocOptions().GetFormulaSearchType());
+
+    if (bExtended)
+    {
+        if (nParamCount == 4)
+        {
+            const auto aSearchMode = selookup::normalizeSearchMode(SEIC.GetInt16());
+            if (!aSearchMode)
+            {
+                PushIllegalParameter();
+                return;
+            }
+            aRequest.meSearchMode = aSearchMode.maValue;
+        }
+
+        if (nParamCount >= 3)
+        {
+            const auto aMatchMode = selookup::normalizeExtendedMatchMode(SEIC.GetInt16());
+            if (!aMatchMode)
+            {
+                PushIllegalParameter();
+                return;
+            }
+            aRequest.meMatchMode = aMatchMode.maValue;
+        }
+    }
+    else
+    {
+        const auto aModePlan = selookup::normalizeMatchType(nParamCount == 3 ? SEIC.GetDouble() : 1.0);
+        if (!aModePlan)
+        {
+            PushIllegalParameter();
+            return;
+        }
+        aRequest.maLegacyModes = aModePlan.maValue;
+    }
+
+    switch (GetStackType())
+    {
+        case svSingleRef:
+        {
+            SCCOL nCol = 0;
+            SCROW nRow = 0;
+            SCTAB nTab = 0;
+            PopSingleRef(nCol, nRow, nTab);
+            aRequest.maSearchSource.moRange = ScRange(nCol, nRow, nTab, nCol, nRow, nTab);
+            break;
+        }
+        case svDoubleRef:
+        {
+            SCCOL nCol1 = 0;
+            SCROW nRow1 = 0;
+            SCTAB nTab1 = 0;
+            SCCOL nCol2 = 0;
+            SCROW nRow2 = 0;
+            SCTAB nTab2 = 0;
+            PopDoubleRef(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2);
+            if (nTab1 != nTab2 || (nCol1 != nCol2 && nRow1 != nRow2))
+            {
+                PushIllegalParameter();
+                return;
+            }
+            aRequest.maSearchSource.moRange = ScRange(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2);
+            break;
+        }
+        case svMatrix:
+        {
+            aRequest.maSearchSource.mpMatrix = SEIC.PopMatrix();
+            if (!aRequest.maSearchSource.mpMatrix)
+            {
+                PushIllegalParameter();
+                return;
+            }
+            break;
+        }
+        case svExternalDoubleRef:
+            SEIC.PopExternalDoubleRef(aRequest.maSearchSource.mpMatrix);
+            if (!aRequest.maSearchSource.mpMatrix)
+            {
+                PushIllegalParameter();
+                return;
+            }
+            break;
+        default:
+            PushIllegalParameter();
+            return;
+    }
+
+    if (nGlobalError != FormulaError::NONE)
+    {
+        PushIllegalParameter();
+        return;
+    }
+
+    const auto makeTextValue = [](const OUString& rText) {
+        return spreadsheetengine::api::CellValue::text(selibreoffice::toApiString(rText));
+    };
+
+    switch (bExtended ? SEIC.GetRawStackType() : GetStackType())
+    {
+        case svMissing:
+        case svEmptyCell:
+            if (!bExtended)
+            {
+                PushIllegalParameter();
+                return;
+            }
+            Pop();
+            aRequest.maLookupValue = spreadsheetengine::api::CellValue::empty();
+            break;
+        case svDouble:
+            aRequest.maLookupValue = spreadsheetengine::api::CellValue::number(SEIC.GetDouble());
+            break;
+        case svString:
+            aRequest.maLookupValue = makeTextValue(SEIC.GetString().getString());
+            break;
+        case svDoubleRef:
+        case svSingleRef:
+        {
+            ScAddress aAddress;
+            if (!SEIC.PopDoubleRefOrSingleRef(aAddress))
+            {
+                SEIC.PushInt(0);
+                return;
+            }
+
+            ScRefCellValue aCell(mrDoc, aAddress);
+            if (aCell.hasNumeric())
+            {
+                aRequest.maLookupValue
+                    = spreadsheetengine::api::CellValue::number(GetCellValue(aAddress, aCell));
+            }
+            else
+            {
+                svl::SharedString aString;
+                SEIC.GetCellString(aString, aCell);
+                aRequest.maLookupValue = makeTextValue(aString.getString());
+            }
+            break;
+        }
+        case svExternalSingleRef:
+        {
+            ScExternalRefCache::TokenRef xToken;
+            SEIC.PopExternalSingleRef(xToken);
+            if (nGlobalError != FormulaError::NONE)
+            {
+                PushError(nGlobalError);
+                return;
+            }
+            if (xToken->GetType() == svDouble)
+                aRequest.maLookupValue
+                    = spreadsheetengine::api::CellValue::number(xToken->GetDouble());
+            else
+                aRequest.maLookupValue = makeTextValue(xToken->GetString().getString());
+            break;
+        }
+        case svExternalDoubleRef:
+        case svMatrix:
+        {
+            double fValue = 0.0;
+            svl::SharedString aString;
+            const ScMatValType eType = SEIC.GetDoubleOrStringFromMatrix(fValue, aString);
+            if (nGlobalError != FormulaError::NONE)
+            {
+                PushError(nGlobalError);
+                return;
+            }
+
+            if (ScMatrix::IsNonValueType(eType))
+                aRequest.maLookupValue = makeTextValue(aString.getString());
+            else if (ScMatrix::IsBooleanType(eType))
+                aRequest.maLookupValue = spreadsheetengine::api::CellValue::boolean(fValue != 0.0);
+            else
+                aRequest.maLookupValue = spreadsheetengine::api::CellValue::number(fValue);
+            break;
+        }
+        default:
+            PushIllegalParameter();
+            return;
+    }
+
+    const auto aResolvedIndex = selookupexec::resolveMatchIndex(mrDoc, mrContext, aRequest);
+    if (!aResolvedIndex)
+    {
+        if (aResolvedIndex.meError == spreadsheetengine::api::Error::NotAvailable)
+            PushNA();
+        else
+            PushError(selibreoffice::toFormulaError(aResolvedIndex.meError));
+        return;
+    }
+
+    PushDouble(static_cast<double>(aResolvedIndex.maValue + 1));
+}
+
+inline void Dispatcher::indirectTerminal(ScInterpreter& rCalc)
+{
+    sal_uInt8 nParamCount = GetByte();
+    if (!MustHaveParamCount(nParamCount, 1, 2))
+        return;
+
+    const bool bForceR1C1 = (nParamCount == 2 && 0.0 == SEIC.GetDouble());
+    const auto aSyntaxPolicy = sestringref::resolveIndirectAddressSyntaxPolicy(
+        selibreoffice::toApiAddressConvention(SEIC.maCalcConfig.meStringRefAddressSyntax),
+        selibreoffice::toApiAddressConvention(mrDoc.GetAddressConvention()),
+        SEIC.maCalcConfig.meStringRefAddressSyntax == FormulaGrammar::CONV_A1_XL_A1,
+        bForceR1C1);
+    FormulaGrammar::AddressConvention eConvention
+        = selibreoffice::toLibreOfficeAddressConvention(aSyntaxPolicy.mePrimary);
+    const bool bTryXlA1
+        = aSyntaxPolicy.moFallback == spreadsheetengine::api::AddressConvention::XlA1;
+
+    svl::SharedString aSharedRef = SEIC.GetString();
+    if (aSharedRef.getString().isEmpty())
+    {
+        PushError(FormulaError::NoRef);
+        return;
+    }
+
+    const auto oResolved = seindirectexec::resolveIndirectReference(
+        mrDoc, SEIC.aPos, aSharedRef, eConvention, bTryXlA1);
+    if (!oResolved)
+    {
+        PushError(FormulaError::NoRef);
+        return;
+    }
+
+    switch (oResolved->meKind)
+    {
+        case seindirectexec::IndirectExecutionResult::Kind::SingleRef:
+            SEIC.PushSingleRef(oResolved->maRef1);
+            return;
+        case seindirectexec::IndirectExecutionResult::Kind::DoubleRef:
+            SEIC.PushDoubleRef(oResolved->maRef1, oResolved->maRef2);
+            return;
+        case seindirectexec::IndirectExecutionResult::Kind::ExternalSingleRef:
+            SEIC.PushExternalSingleRef(oResolved->mnFileId, oResolved->maTabName,
+                oResolved->maRef1.Col(), oResolved->maRef1.Row(), oResolved->maRef1.Tab());
+            return;
+        case seindirectexec::IndirectExecutionResult::Kind::ExternalDoubleRef:
+            SEIC.PushExternalDoubleRef(oResolved->mnFileId, oResolved->maTabName,
+                oResolved->maRef1.Col(), oResolved->maRef1.Row(), oResolved->maRef1.Tab(),
+                oResolved->maRef2.Col(), oResolved->maRef2.Row(), oResolved->maRef2.Tab());
+            return;
+        case seindirectexec::IndirectExecutionResult::Kind::Token:
+            PushTokenRef(oResolved->mxToken);
+            return;
+    }
+}
+
+inline void Dispatcher::addressTerminal(ScInterpreter& rCalc)
+{
+    OUString aSheetToken;
+
+    sal_uInt8 nParamCount = GetByte();
+    if (!MustHaveParamCount(nParamCount, 2, 5))
+        return;
+
+    if (nParamCount >= 5)
+        aSheetToken = SEIC.GetString().getString();
+
+    const bool bForceR1C1 = (nParamCount >= 4 && 0.0 == GetDoubleWithDefault(1.0));
+    const FormulaGrammar::AddressConvention eConvention
+        = selibreoffice::toLibreOfficeAddressConvention(
+            sestringref::resolveAddressFunctionConvention(
+                selibreoffice::toApiAddressConvention(SEIC.maCalcConfig.meStringRefAddressSyntax),
+                selibreoffice::toApiAddressConvention(mrDoc.GetAddressConvention()),
+                bForceR1C1));
+
+    ScRefFlags nFlags = ScRefFlags::COL_ABS | ScRefFlags::ROW_ABS;
+    sal_Int32 nAbsMode = 1;
+    if (nParamCount >= 3)
+    {
+        const sal_Int32 nMode = SEIC.GetInt32WithDefault(1);
+        switch (nMode)
+        {
+            default:
+                PushNoValue();
+                return;
+            case 5:
+            case 1:
+                nAbsMode = nMode;
+                break;
+            case 6:
+            case 2:
+                nAbsMode = nMode;
+                nFlags = ScRefFlags::ROW_ABS;
+                break;
+            case 7:
+            case 3:
+                nAbsMode = nMode;
+                nFlags = ScRefFlags::COL_ABS;
+                break;
+            case 8:
+            case 4:
+                nAbsMode = nMode;
+                nFlags = ScRefFlags::ZERO;
+                break;
+        }
+    }
+    nFlags |= ScRefFlags::VALID | ScRefFlags::ROW_VALID | ScRefFlags::COL_VALID;
+
+    SCCOL nCol = static_cast<SCCOL>(SEIC.GetInt16());
+    SCROW nRow = static_cast<SCROW>(GetInt32());
+    if (eConvention == FormulaGrammar::CONV_XL_R1C1)
+    {
+        if (!(nFlags & ScRefFlags::COL_ABS))
+            nCol += SEIC.aPos.Col() + 1;
+        if (!(nFlags & ScRefFlags::ROW_ABS))
+            nRow += SEIC.aPos.Row() + 1;
+    }
+
+    --nCol;
+    --nRow;
+    if (nGlobalError != FormulaError::NONE || !mrDoc.ValidCol(nCol) || !mrDoc.ValidRow(nRow))
+    {
+        PushIllegalArgument();
+        return;
+    }
+
+    serefexec::AddressFunctionRequest aRequest;
+    aRequest.mnRow = nRow;
+    aRequest.mnColumn = nCol;
+    aRequest.mnAbsMode = nAbsMode;
+    aRequest.mbA1Style = eConvention != FormulaGrammar::CONV_XL_R1C1;
+    aRequest.maSheetToken = aSheetToken;
+    aRequest.meConvention = eConvention;
+    const auto aAddress = serefexec::formatAddressFunctionResult(aRequest);
+    if (!aAddress)
+        PushIllegalArgument();
+    else
+        SEIC.PushString(aAddress.maValue);
+}
+
+inline void Dispatcher::indexTerminal(ScInterpreter& rCalc)
+{
+    const sal_uInt8 nParamCount = GetByte();
+    if (!MustHaveParamCount(nParamCount, 1, 4))
+        return;
+
+    sal_Int32 nArea = (nParamCount == 4) ? GetInt32() : 1;
+    std::size_t nAreaCount = 0;
+    SCCOL nCol = 0;
+    SCROW nRow = 0;
+    bool bColMissing = false;
+    if (nParamCount >= 3)
+    {
+        bColMissing = IsMissing();
+        nCol = static_cast<SCCOL>(SEIC.GetInt16());
+    }
+    if (nParamCount >= 2)
+        nRow = static_cast<SCROW>(GetInt32());
+
+    if (nArea < 1 || nCol < 0 || nRow < 0)
+    {
+        PushIllegalArgument();
+        return;
+    }
+
+    if (GetStackType() == svRefList)
+        nAreaCount = (sp ? pStack[sp - 1]->GetRefList()->size() : 0);
+    else
+        nAreaCount = 1;
+
+    const auto aAreaSelection = serefexec::normalizeAreaSelection(nArea, nAreaCount);
+    if (nGlobalError != FormulaError::NONE || !aAreaSelection)
+    {
+        PushError(FormulaError::NoRef);
+        return;
+    }
+
+    switch (GetStackType())
+    {
+        case svMatrix:
+        case svExternalSingleRef:
+        case svExternalDoubleRef:
+        {
+            const sal_uInt16 nOldSp = sp;
+            ScMatrixRef pMatrix = GetMatrix();
+            if (!pMatrix)
+                PushError(FormulaError::NoRef);
+            else
+            {
+                SCSIZE nColumns = 0;
+                SCSIZE nRows = 0;
+                pMatrix->GetDimensions(nColumns, nRows);
+                const auto aSelection = seref::planIndexMatrixSelection(
+                    { static_cast<sal_Int32>(nColumns), static_cast<sal_Int32>(nRows) }, nRow,
+                    nCol, bColMissing, nParamCount);
+                if (!aSelection)
+                    PushError(FormulaError::NoRef);
+                else if (aSelection.maValue.meKind == seref::IndexSelectionKind::KeepSource)
+                    sp = nOldSp;
+                else if (aSelection.maValue.meKind == seref::IndexSelectionKind::Scalar)
+                {
+                    const SCSIZE nMatrixColumn
+                        = static_cast<SCSIZE>(aSelection.maValue.maStart.mnColumn);
+                    const SCSIZE nMatrixRow
+                        = static_cast<SCSIZE>(aSelection.maValue.maStart.mnRow);
+                    if (pMatrix->IsStringOrEmpty(nMatrixColumn, nMatrixRow))
+                        SEIC.PushString(pMatrix->GetString(nMatrixColumn, nMatrixRow).getString());
+                    else
+                        PushDouble(pMatrix->GetDouble(nMatrixColumn, nMatrixRow));
+                }
+                else
+                {
+                    const auto& rSelection = aSelection.maValue;
+                    ScMatrixRef pResultMatrix = GetNewMat(
+                        rSelection.maDimensions.mnColumns, rSelection.maDimensions.mnRows,
+                        /*bEmpty*/ true);
+                    if (pResultMatrix)
+                    {
+                        for (SCSIZE nResultRow = 0;
+                             nResultRow < static_cast<SCSIZE>(rSelection.maDimensions.mnRows);
+                             ++nResultRow)
+                        {
+                            for (SCSIZE nResultCol = 0;
+                                 nResultCol
+                                 < static_cast<SCSIZE>(rSelection.maDimensions.mnColumns);
+                                 ++nResultCol)
+                            {
+                                const SCSIZE nMatrixColumn = static_cast<SCSIZE>(
+                                    rSelection.maStart.mnColumn + nResultCol);
+                                const SCSIZE nMatrixRow = static_cast<SCSIZE>(
+                                    rSelection.maStart.mnRow + nResultRow);
+                                if (!pMatrix->IsStringOrEmpty(nMatrixColumn, nMatrixRow))
+                                {
+                                    pResultMatrix->PutDouble(
+                                        pMatrix->GetDouble(nMatrixColumn, nMatrixRow), nResultCol,
+                                        nResultRow);
+                                }
+                                else
+                                {
+                                    pResultMatrix->PutString(
+                                        pMatrix->GetString(nMatrixColumn, nMatrixRow), nResultCol,
+                                        nResultRow);
+                                }
+                            }
+                        }
+                        PushMatrix(pResultMatrix);
+                    }
+                    else
+                        PushError(FormulaError::NoRef);
+                }
+            }
+            break;
+        }
+        case svSingleRef:
+        {
+            SCCOL nCol1 = 0;
+            SCROW nRow1 = 0;
+            SCTAB nTab1 = 0;
+            PopSingleRef(nCol1, nRow1, nTab1);
+            const auto aSelection = serefexec::planIndexReferenceSelection(
+                ScRange(nCol1, nRow1, nTab1, nCol1, nRow1, nTab1), nRow, nCol, nParamCount);
+            if (!aSelection)
+                PushError(FormulaError::NoRef);
+            else
+            {
+                const ScRange aRange
+                    = selibreoffice::toLibreOfficeRange(aSelection.maValue.maRange);
+                SEIC.PushSingleRef(aRange.aStart.Col(), aRange.aStart.Row(), aRange.aStart.Tab());
+            }
+            break;
+        }
+        case svDoubleRef:
+        case svRefList:
+        {
+            SCCOL nCol1 = 0;
+            SCROW nRow1 = 0;
+            SCTAB nTab1 = 0;
+            SCCOL nCol2 = 0;
+            SCROW nRow2 = 0;
+            SCTAB nTab2 = 0;
+            if (GetStackType() == svRefList)
+            {
+                FormulaConstTokenRef xRef = PopToken();
+                if (nGlobalError != FormulaError::NONE || !xRef)
+                {
+                    PushError(FormulaError::NoRef);
+                    return;
+                }
+                ScRange aRange(ScAddress::UNINITIALIZED);
+                SEIC.DoubleRefToRange((*(xRef->GetRefList()))[aAreaSelection.maValue], aRange);
+                aRange.GetVars(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2);
+            }
+            else
+                PopDoubleRef(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2);
+
+            const auto aSelection = serefexec::planIndexReferenceSelection(
+                ScRange(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2), nRow, nCol, nParamCount);
+            if (!aSelection)
+                PushError(FormulaError::NoRef);
+            else
+            {
+                const ScRange aRange
+                    = selibreoffice::toLibreOfficeRange(aSelection.maValue.maRange);
+                if (aSelection.maValue.maRange.isSingleCell())
+                {
+                    SEIC.PushSingleRef(
+                        aRange.aStart.Col(), aRange.aStart.Row(), aRange.aStart.Tab());
+                }
+                else
+                {
+                    SEIC.PushDoubleRef(
+                        aRange.aStart.Col(), aRange.aStart.Row(), aRange.aStart.Tab(),
+                        aRange.aEnd.Col(), aRange.aEnd.Row(), aRange.aEnd.Tab());
+                }
+            }
+            break;
+        }
+        default:
+            PopError();
+            PushError(FormulaError::NoRef);
+            break;
+    }
 }
 
 inline void Dispatcher::aggregateSumProduct(ScInterpreter& rCalc)

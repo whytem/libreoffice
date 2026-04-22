@@ -302,19 +302,7 @@ std::vector<std::string> listLegacyInterpreterSubroutineNames()
     if (aText.empty())
         return {};
 
-    static constexpr std::array<std::string_view, 32> aTrackedNames = {
-        "ExecuteLookupTerminal",
-        "ExecuteXLookupTerminal",
-        "ExecuteIndirectTerminal",
-        "ExecuteAddressTerminal",
-        "ExecuteIndexTerminal",
-        "ExecuteMultiAreaTerminal",
-        "ExecuteExternalTerminal",
-        "ExecuteMissingTerminal",
-        "ExecuteRangeReferenceTerminal",
-        "ExecuteUnionTerminal",
-        "ExecuteIntersectTerminal",
-        "ScMatchOp",
+    static constexpr std::array<std::string_view, 20> aTrackedNames = {
         "ExecuteSubTotalTerminal",
         "ExecuteDBAreaTerminal",
         "ExecuteSortByTerminal",
@@ -5053,9 +5041,8 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedIndexNestedXMatchParit
                 aCanonicalFormulaSource.getLength()));
     CPPUNIT_ASSERT(aAttempt.mbSupported);
     CPPUNIT_ASSERT_EQUAL(
-        spreadsheetengine::api::formulavalue::ValueType::Error, aAttempt.maResult.meType);
-    CPPUNIT_ASSERT_EQUAL(
-        spreadsheetengine::api::Error::VariableExpected, aAttempt.maResult.meError);
+        spreadsheetengine::api::formulavalue::ValueType::Value, aAttempt.maResult.meType);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(5.5, aAttempt.maResult.mfValue, 1e-12);
 }
 
 CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testImportedIndexLogestLiveHostTruth)

@@ -35,6 +35,9 @@ is complete on the current tree:
   - `intentionally unsupported`
 - the relocation backlog now uses those landed contracts as baseline rather
   than treating them as open blockers
+- Phase 3 of the relocation backlog has already retired the remaining
+  reference/lookup/addressing `Execute*` wrappers and `ScMatchOp`; only the
+  explicitly host-owned external-computation terminal remains on the Calc side
 
 ## Audit Scope
 
@@ -140,13 +143,6 @@ more service IDs from the ledger above.
   no live relocation-relevant `Execute*` wrappers remain after Phase 2; the
   outstanding debt is the structural `Interpret()` shell plus classic
   stack/token helpers
-- `HS4` symbolic range resolution with `HS3` / `HS5` follow-through:
-  `ExecuteIntersectTerminal`, `ExecuteRangeReferenceTerminal`,
-  `ExecuteUnionTerminal`, `ExecuteLookupTerminal`, `ExecuteXLookupTerminal`,
-  `ScMatchOp`, `ExecuteIndirectTerminal`, `ExecuteAddressTerminal`,
-  `ExecuteIndexTerminal`, `ExecuteMultiAreaTerminal`,
-  `ExecuteExternalTerminal`, `ExecuteMissingTerminal`,
-  `ExecuteColRowNameAutoTerminal`
 - `HS7` cell type / format inspection:
   `ExecuteTypeTerminal`, `ExecuteCellTerminal`,
   `ExecuteCellExternalTerminal`, `ExecuteCurrentTerminal`,
@@ -164,8 +160,8 @@ more service IDs from the ledger above.
 - explicit host/debug utilities outside relocation debt:
   `ScTableOp`, `ScTTT`, `ScDebugVar`
 - `HS12` intentionally unsupported host terminals:
-  `ScMacro`, `ScDde`, `ScGetPivotData`, `ScHyperLink`, `ScFilterXML`,
-  `ScWebservice`
+  `ExecuteExternalTerminal`, `ScMacro`, `ScDde`, `ScGetPivotData`,
+  `ScHyperLink`, `ScFilterXML`, `ScWebservice`
 
 ### `pushLegacy*` lambdas by primary host-service dependency
 
@@ -451,9 +447,8 @@ Phase 2 closes the audit from "next steps" into a usable contract baseline:
 2. the current tree no longer treats host-contract gaps as open blockers:
    `HS1` through `HS10` are already exposed, while `HS11` and `HS12`
    remain intentionally non-contract surfaces
-3. Phase 2 of the relocation backlog has already consumed the operator/control
-   `Execute*` wrapper inventory, leaving only structural shell debt under
-   `HS11`
-4. the next subsystem phases can focus on the remaining reference, query,
-   inspection, matrix, and random terminals instead of inventing new Host
-   surfaces ad hoc
+3. Phases 2 and 3 of the relocation backlog have already consumed the
+   operator/control and reference/lookup/addressing `Execute*` wrapper
+   inventories, leaving only structural shell debt under `HS11`
+4. the next subsystem phases can focus on the remaining query, inspection,
+   matrix, and random terminals instead of inventing new Host surfaces ad hoc

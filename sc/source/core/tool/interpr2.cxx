@@ -55,7 +55,6 @@
 #include <spreadsheetengine/runtime/NumeralConversion.hxx>
 #include <spreadsheetengine/compat/libreoffice/Date.hxx>
 #include <spreadsheetengine/compat/libreoffice/InterpretTailEngineEvaluator.hxx>
-#include <spreadsheetengine/compat/libreoffice/ReferenceExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/String.hxx>
 #include <spreadsheetengine/compat/libreoffice/TextParsingExecution.hxx>
 
@@ -69,7 +68,6 @@ namespace sedatetime = spreadsheetengine::core::datetime;
 namespace semath = spreadsheetengine::core::math;
 namespace seconvert = spreadsheetengine::core::convert;
 namespace selibreoffice = spreadsheetengine::compat::libreoffice;
-namespace serefexec = spreadsheetengine::compat::libreoffice::referenceexecution;
 
 #define SCdEpsilon                1.0E-7
 
@@ -274,192 +272,6 @@ double ScInterpreter::ScGetIpmt(double fRate, double fPer, double fNper, double 
     fPmt = aResult.mfPayment;
     nFuncFmtType = SvNumFormatType::CURRENCY;
     return aResult.mfInterest;
-}
-
-void ScInterpreter::ExecuteIntersectTerminal()
-{
-    formula::FormulaConstTokenRef p2nd = PopToken();
-    formula::FormulaConstTokenRef p1st = PopToken();
-
-    if (nGlobalError != FormulaError::NONE || !p2nd || !p1st)
-    {
-        PushIllegalArgument();
-        return;
-    }
-
-    StackVar sv1 = p1st->GetType();
-    StackVar sv2 = p2nd->GetType();
-    if (!serefexec::isReferenceOperandType(sv1) || !serefexec::isReferenceOperandType(sv2))
-    {
-        PushIllegalArgument();
-        return;
-    }
-
-    const formula::FormulaToken* x1 = p1st.get();
-    const formula::FormulaToken* x2 = p2nd.get();
-    if (sv1 == svRefList || sv2 == svRefList)
-    {
-        const auto aReferences1 = serefexec::collectReferenceOperandEntries(*x1);
-        const auto aReferences2 = serefexec::collectReferenceOperandEntries(*x2);
-
-        ScTokenRef xRes = new ScRefListToken;
-        ScRefList* pRefList = xRes->GetRefList();
-        for (const auto& rRef1 : aReferences1)
-        {
-            const ScAddress r11 = rRef1.Ref1.toAbs(mrDoc, aPos);
-            const ScAddress r12 = rRef1.Ref2.toAbs(mrDoc, aPos);
-            for (const auto& rRef2 : aReferences2)
-            {
-                const ScAddress r21 = rRef2.Ref1.toAbs(mrDoc, aPos);
-                const ScAddress r22 = rRef2.Ref2.toAbs(mrDoc, aPos);
-                SCCOL nCol1 = ::std::max( r11.Col(), r21.Col());
-                SCROW nRow1 = ::std::max( r11.Row(), r21.Row());
-                SCTAB nTab1 = ::std::max( r11.Tab(), r21.Tab());
-                SCCOL nCol2 = ::std::min( r12.Col(), r22.Col());
-                SCROW nRow2 = ::std::min( r12.Row(), r22.Row());
-                SCTAB nTab2 = ::std::min( r12.Tab(), r22.Tab());
-                if (nCol2 < nCol1 || nRow2 < nRow1 || nTab2 < nTab1)
-                    ;   // nothing
-                else
-                {
-                    ScComplexRefData aRef;
-                    aRef.InitRange( nCol1, nRow1, nTab1, nCol2, nRow2, nTab2);
-                    pRefList->push_back( aRef);
-                }
-            }
-        }
-        size_t n = pRefList->size();
-        if (!n)
-            PushError( FormulaError::NoCode);
-        else if (n == 1)
-        {
-            const ScComplexRefData& rRef = (*pRefList)[0];
-            if (rRef.Ref1 == rRef.Ref2)
-                PushTempToken( new ScSingleRefToken(mrDoc.GetSheetLimits(), rRef.Ref1));
-            else
-                PushTempToken( new ScDoubleRefToken(mrDoc.GetSheetLimits(), rRef));
-        }
-        else
-            PushTokenRef( xRes);
-    }
-    else
-    {
-        const formula::FormulaToken* pt[2] = { x1, x2 };
-        StackVar sv[2] = { sv1, sv2 };
-        SCCOL nC1[2], nC2[2];
-        SCROW nR1[2], nR2[2];
-        SCTAB nT1[2], nT2[2];
-        for (size_t i=0; i<2; ++i)
-        {
-            switch (sv[i])
-            {
-                case svSingleRef:
-                case svDoubleRef:
-                {
-                    {
-                        const ScAddress r = pt[i]->GetSingleRef()->toAbs(mrDoc, aPos);
-                        nC1[i] = r.Col();
-                        nR1[i] = r.Row();
-                        nT1[i] = r.Tab();
-                    }
-                    if (sv[i] == svDoubleRef)
-                    {
-                        const ScAddress r = pt[i]->GetSingleRef2()->toAbs(mrDoc, aPos);
-                        nC2[i] = r.Col();
-                        nR2[i] = r.Row();
-                        nT2[i] = r.Tab();
-                    }
-                    else
-                    {
-                        nC2[i] = nC1[i];
-                        nR2[i] = nR1[i];
-                        nT2[i] = nT1[i];
-                    }
-                }
-                break;
-                default:
-                    ;   // nothing, prevent compiler warning
-            }
-        }
-        SCCOL nCol1 = ::std::max( nC1[0], nC1[1]);
-        SCROW nRow1 = ::std::max( nR1[0], nR1[1]);
-        SCTAB nTab1 = ::std::max( nT1[0], nT1[1]);
-        SCCOL nCol2 = ::std::min( nC2[0], nC2[1]);
-        SCROW nRow2 = ::std::min( nR2[0], nR2[1]);
-        SCTAB nTab2 = ::std::min( nT2[0], nT2[1]);
-        if (nCol2 < nCol1 || nRow2 < nRow1 || nTab2 < nTab1)
-            PushError( FormulaError::NoCode);
-        else if (nCol2 == nCol1 && nRow2 == nRow1 && nTab2 == nTab1)
-            PushSingleRef( nCol1, nRow1, nTab1);
-        else
-            PushDoubleRef( nCol1, nRow1, nTab1, nCol2, nRow2, nTab2);
-    }
-}
-
-void ScInterpreter::ExecuteRangeReferenceTerminal()
-{
-    formula::FormulaConstTokenRef x2 = PopToken();
-    formula::FormulaConstTokenRef x1 = PopToken();
-
-    if (nGlobalError != FormulaError::NONE || !x2 || !x1)
-    {
-        PushIllegalArgument();
-        return;
-    }
-    // We explicitly tell extendRangeReference() to not reuse the token,
-    // casting const away spares two clones.
-    FormulaTokenRef xRes = extendRangeReference(
-            mrDoc.GetSheetLimits(), const_cast<FormulaToken&>(*x1), const_cast<FormulaToken&>(*x2), aPos, false);
-    if (!xRes)
-        PushIllegalArgument();
-    else
-        PushTokenRef( xRes);
-}
-
-void ScInterpreter::ExecuteUnionTerminal()
-{
-    formula::FormulaConstTokenRef p2nd = PopToken();
-    formula::FormulaConstTokenRef p1st = PopToken();
-
-    if (nGlobalError != FormulaError::NONE || !p2nd || !p1st)
-    {
-        PushIllegalArgument();
-        return;
-    }
-
-    StackVar sv1 = p1st->GetType();
-    StackVar sv2 = p2nd->GetType();
-    if (!serefexec::isReferenceOperandType(sv1) || !serefexec::isReferenceOperandType(sv2))
-    {
-        PushIllegalArgument();
-        return;
-    }
-
-    const formula::FormulaToken* x1 = p1st.get();
-    const formula::FormulaToken* x2 = p2nd.get();
-
-    ScTokenRef xRes;
-    bool bHandledFirst = false;
-    bool bHandledSecond = false;
-    if (sv1 == svRefList)
-    {
-        xRes = x1->Clone();
-        bHandledFirst = true;
-    }
-    else if (sv2 == svRefList)
-    {
-        xRes = x2->Clone();
-        bHandledSecond = true;
-    }
-    else
-        xRes = new ScRefListToken;
-    ScRefList* pRes = xRes->GetRefList();
-    if (!bHandledFirst)
-        serefexec::appendReferenceOperandEntries(*pRes, *x1);
-    if (!bHandledSecond)
-        serefexec::appendReferenceOperandEntries(*pRes, *x2);
-    ValidateRef( *pRes);    // set #REF! if needed
-    PushTokenRef( xRes);
 }
 
 void ScInterpreter::ExecuteCurrentTerminal()

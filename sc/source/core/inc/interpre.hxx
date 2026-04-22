@@ -636,9 +636,6 @@ private:
      */
     sc::RangeMatrix CompareMat( ScQueryOp eOp, sc::CompareOptions* pOptions = nullptr );
     ScMatrixRef QueryMat( const ScMatrixRef& pMat, sc::CompareOptions& rOptions );
-    void ExecuteIntersectTerminal();
-    void ExecuteRangeReferenceTerminal();
-    void ExecuteUnionTerminal();
     void ExecuteRandomTerminal();
     void ExecuteRandbetweenTerminal();
     void ExecuteRandArrayTerminal();
@@ -659,15 +656,8 @@ private:
     void GetStVarParams( bool bTextAsZero, double(*VarResult)( double fVal, size_t nValCount ) );
     void IterateParametersIf( ScIterFuncIf );
     void IterateParametersIfs( double(*ResultFunc)( const sc::ParamIfsResult& rRes ) );
-    void ExecuteLookupTerminal();
-    void ExecuteXLookupTerminal();
     void ExecuteSortByTerminal();
     void ExecuteSubTotalTerminal();
-
-private:
-    void ScMatchOp(bool bExtended);
-
-public:
     // If upon call rMissingField==true then the database field parameter may be
     // missing (Xcl DCOUNT() syntax), or may be faked as missing by having the
     // value 0.0 or being exactly the entire database range reference (old SO
@@ -678,12 +668,7 @@ public:
 
     void DBIterator( ScIterFunc );
     void GetDBStVarParams( std::vector<double>& rValues );
-    void ExecuteIndirectTerminal();
-    void ExecuteAddressTerminal();
-    void ExecuteIndexTerminal();
-    void ExecuteMultiAreaTerminal();
     void ExecuteExternalTerminal();
-    void ExecuteMissingTerminal();
     void ScMacro();
     bool SetSbxVariable( SbxVariable* pVar, const ScAddress& );
     FormulaError GetErrorType();
