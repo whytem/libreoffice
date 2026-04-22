@@ -1682,6 +1682,9 @@ inline void putScalarIntoMatrix(
     static void fourier(ScInterpreter& rCalc);
     static void aggregateFunction(ScInterpreter& rCalc);
     static void subtotalFunction(ScInterpreter& rCalc);
+    static void sortByTerminal(ScInterpreter& rCalc);
+    static void dbAreaTerminal(ScInterpreter& rCalc);
+    static void colRowNameAutoTerminal(ScInterpreter& rCalc);
     static void probability(ScInterpreter& rCalc);
     static void zTest(ScInterpreter& rCalc);
     static void tTest(ScInterpreter& rCalc);
@@ -3977,6 +3980,344 @@ inline void Dispatcher::subtotalFunction(ScInterpreter& rCalc)
     FormulaConstTokenRef xRef(PopToken());
     Pop();
     PushTokenRef(xRef);
+}
+
+inline void Dispatcher::sortByTerminal(ScInterpreter& rCalc)
+{
+    sal_uInt8 nParamCount = GetByte();
+    if (nParamCount < 2)
+    {
+        PushError(FormulaError::ParameterExpected);
+        return;
+    }
+
+    const sal_uInt8 nSortCount = nParamCount / 2;
+    ScSortParam aSortData;
+    aSortData.maKeyState.resize(nSortCount);
+    bool bNoNeedToSort = false;
+
+    sal_uInt8 nSortBy = nSortCount;
+    ScMatrixRef pFullMatSortBy = nullptr;
+    while (nSortBy-- > 0 && nGlobalError == FormulaError::NONE)
+    {
+        if (nParamCount >= 3 && (nParamCount % 2 == 1))
+        {
+            const sal_Int8 nSortOrder
+                = static_cast<sal_Int8>(SEIC.GetInt32WithDefault(1));
+            if (nSortOrder != 1 && nSortOrder != -1)
+            {
+                PushIllegalParameter();
+                return;
+            }
+            aSortData.maKeyState[nSortBy].bAscending = (nSortOrder == 1);
+            --nParamCount;
+        }
+
+        ScMatrixRef pMatSortBy = nullptr;
+        SCSIZE nByColumns = 0;
+        SCSIZE nByRows = 0;
+        switch (GetStackType())
+        {
+            case svSingleRef:
+            case svDoubleRef:
+            case svMatrix:
+            case svExternalSingleRef:
+            case svExternalDoubleRef:
+            {
+                if (nSortCount == 1)
+                {
+                    pFullMatSortBy = GetMatrix();
+                    if (!pFullMatSortBy)
+                    {
+                        PushIllegalParameter();
+                        return;
+                    }
+                    pFullMatSortBy->GetDimensions(nByColumns, nByRows);
+                }
+                else
+                {
+                    pMatSortBy = GetMatrix();
+                    if (!pMatSortBy)
+                    {
+                        PushIllegalParameter();
+                        return;
+                    }
+                    pMatSortBy->GetDimensions(nByColumns, nByRows);
+                }
+
+                if (nSortBy == nSortCount - 1)
+                {
+                    if (nByColumns == 1 && nByRows > 1)
+                        aSortData.bByRow = true;
+                    else if (nByRows == 1 && nByColumns > 1)
+                        aSortData.bByRow = false;
+                    else if (nByColumns == 1 && nByRows == 1)
+                        bNoNeedToSort = true;
+                    else
+                    {
+                        PushIllegalParameter();
+                        return;
+                    }
+
+                    if (nSortCount > 1)
+                    {
+                        pFullMatSortBy = GetNewMat(
+                            aSortData.bByRow ? (nByColumns * nSortCount) : nByColumns,
+                            aSortData.bByRow ? nByRows : (nByRows * nSortCount), true);
+                    }
+                }
+                break;
+            }
+            default:
+                PushIllegalParameter();
+                return;
+        }
+
+        if (nSortCount > 1 && nSortBy <= nSortCount - 1)
+        {
+            SCSIZE nCheckColumns = 0;
+            SCSIZE nCheckRows = 0;
+            pFullMatSortBy->GetDimensions(nCheckColumns, nCheckRows);
+            if ((aSortData.bByRow && nByRows == nCheckRows && nByColumns == 1)
+                || (!aSortData.bByRow && nByColumns == nCheckColumns && nByRows == 1))
+            {
+                for (SCSIZE nColumn = 0; nColumn < nByColumns; ++nColumn)
+                {
+                    for (SCSIZE nRow = 0; nRow < nByRows; ++nRow)
+                    {
+                        if (pMatSortBy->IsEmptyCell(nColumn, nRow))
+                        {
+                            if (aSortData.bByRow)
+                                pFullMatSortBy->PutEmpty(nColumn + nSortBy, nRow);
+                            else
+                                pFullMatSortBy->PutEmpty(nColumn, nRow + nSortBy);
+                        }
+                        else if (pMatSortBy->IsStringOrEmpty(nColumn, nRow))
+                        {
+                            if (aSortData.bByRow)
+                            {
+                                pFullMatSortBy->PutString(
+                                    pMatSortBy->GetString(nColumn, nRow), nColumn + nSortBy,
+                                    nRow);
+                            }
+                            else
+                            {
+                                pFullMatSortBy->PutString(
+                                    pMatSortBy->GetString(nColumn, nRow), nColumn,
+                                    nRow + nSortBy);
+                            }
+                        }
+                        else if (aSortData.bByRow)
+                        {
+                            pFullMatSortBy->PutDouble(
+                                pMatSortBy->GetDouble(nColumn, nRow), nColumn + nSortBy, nRow);
+                        }
+                        else
+                        {
+                            pFullMatSortBy->PutDouble(
+                                pMatSortBy->GetDouble(nColumn, nRow), nColumn, nRow + nSortBy);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                PushIllegalParameter();
+                return;
+            }
+        }
+
+        aSortData.maKeyState[nSortBy].bDoSort = true;
+        aSortData.maKeyState[nSortBy].nField = nSortBy;
+        --nParamCount;
+    }
+
+    SCSIZE nSourceColumns = 0;
+    SCSIZE nSourceRows = 0;
+    SCCOL nSortCol1 = 0;
+    SCCOL nSortCol2 = 0;
+    SCROW nSortRow1 = 0;
+    SCROW nSortRow2 = 0;
+    SCTAB nSortTab1 = 0;
+    SCTAB nSortTab2 = 0;
+    ScMatrixRef pMatSource = nullptr;
+    switch (GetStackType())
+    {
+        case svSingleRef:
+            PopSingleRef(nSortCol1, nSortRow1, nSortTab1);
+            nSortCol2 = nSortCol1;
+            nSortRow2 = nSortRow1;
+            nSourceColumns = nSortCol2 - nSortCol1 + 1;
+            nSourceRows = nSortRow2 - nSortRow1 + 1;
+            break;
+        case svDoubleRef:
+            PopDoubleRef(nSortCol1, nSortRow1, nSortTab1, nSortCol2, nSortRow2, nSortTab2);
+            if (nSortTab1 != nSortTab2)
+            {
+                PushIllegalParameter();
+                return;
+            }
+            nSourceColumns = nSortCol2 - nSortCol1 + 1;
+            nSourceRows = nSortRow2 - nSortRow1 + 1;
+            break;
+        case svMatrix:
+        case svExternalSingleRef:
+        case svExternalDoubleRef:
+            pMatSource = GetMatrix();
+            if (!pMatSource)
+            {
+                PushIllegalParameter();
+                return;
+            }
+            pMatSource->GetDimensions(nSourceColumns, nSourceRows);
+            if (nSourceColumns == 0 || nSourceRows == 0)
+            {
+                PushIllegalArgument();
+                return;
+            }
+            nSortCol2 = nSourceColumns - 1;
+            nSortRow2 = nSourceRows - 1;
+            break;
+        default:
+            PushIllegalParameter();
+            return;
+    }
+
+    SCSIZE nCheckMatrixColumns = 0;
+    SCSIZE nCheckMatrixRows = 0;
+    pFullMatSortBy->GetDimensions(nCheckMatrixColumns, nCheckMatrixRows);
+    if (nGlobalError != FormulaError::NONE)
+    {
+        PushError(nGlobalError);
+        return;
+    }
+    if ((aSortData.bByRow && nSourceRows != nCheckMatrixRows)
+        || (!aSortData.bByRow && nSourceColumns != nCheckMatrixColumns))
+    {
+        PushIllegalParameter();
+        return;
+    }
+
+    aSortData.nCol2 = nCheckMatrixColumns - 1;
+    aSortData.nRow2 = nCheckMatrixRows - 1;
+
+    if (bNoNeedToSort)
+    {
+        if (pMatSource)
+            PushMatrix(pMatSource);
+        else
+            SEIC.PushDoubleRef(
+                nSortCol1, nSortRow1, nSortTab1, nSortCol2, nSortRow2, nSortTab2);
+        return;
+    }
+
+    const std::vector<SCCOLROW> aOrderIndices = SEIC.GetSortOrder(aSortData, pFullMatSortBy);
+    ScMatrixRef pResultMatrix = SEIC.CreateSortedMatrix(
+        aSortData, pMatSource,
+        ScRange(nSortCol1, nSortRow1, nSortTab1, nSortCol2, nSortRow2, nSortTab2),
+        aOrderIndices, nSourceColumns, nSourceRows);
+    if (pResultMatrix)
+        PushMatrix(pResultMatrix);
+    else
+        PushIllegalParameter();
+}
+
+inline void Dispatcher::dbAreaTerminal(ScInterpreter& rCalc)
+{
+    ScDBData* pDBData = mrDoc.GetDBCollection()->getNamedDBs().findByIndex(SEIC.pCur->GetIndex());
+    if (!pDBData)
+    {
+        PushError(FormulaError::NoName);
+        return;
+    }
+
+    ScComplexRefData aRefData;
+    aRefData.InitFlags();
+    ScRange aRange;
+    pDBData->GetArea(aRange);
+    aRange.aEnd.SetTab(aRange.aStart.Tab());
+    aRefData.SetRange(mrDoc.GetSheetLimits(), aRange, SEIC.aPos);
+    SEIC.PushTempToken(new ScDoubleRefToken(mrDoc.GetSheetLimits(), aRefData));
+}
+
+inline void Dispatcher::colRowNameAutoTerminal(ScInterpreter& rCalc)
+{
+    ScComplexRefData aRefData(*SEIC.pCur->GetDoubleRef());
+    ScRange aAbsolute = aRefData.toAbs(mrDoc, SEIC.aPos);
+    if (!mrDoc.ValidRange(aAbsolute))
+    {
+        PushError(FormulaError::NoRef);
+        return;
+    }
+
+    SCCOL nStartCol = aAbsolute.aStart.Col();
+    SCROW nStartRow = aAbsolute.aStart.Row();
+    SCCOL nCol2 = aAbsolute.aEnd.Col();
+    SCROW nRow2 = aAbsolute.aEnd.Row();
+    aAbsolute.aEnd = aAbsolute.aStart;
+
+    {
+        SCCOL nDataAreaCol1 = aAbsolute.aStart.Col();
+        SCCOL nDataAreaCol2 = aAbsolute.aEnd.Col();
+        SCROW nDataAreaRow1 = aAbsolute.aStart.Row();
+        SCROW nDataAreaRow2 = aAbsolute.aEnd.Row();
+        mrDoc.GetDataArea(aAbsolute.aStart.Tab(), nDataAreaCol1, nDataAreaRow1, nDataAreaCol2,
+            nDataAreaRow2, true, false);
+        aAbsolute.aEnd.SetCol(nDataAreaCol2);
+        aAbsolute.aEnd.SetRow(nDataAreaRow2);
+    }
+
+    if (aRefData.Ref1.IsColRel())
+    {
+        aAbsolute.aEnd.SetCol(nStartCol);
+        if (aAbsolute.aEnd.Row() > nRow2)
+            aAbsolute.aEnd.SetRow(nRow2);
+        if (SEIC.aPos.Col() == nStartCol)
+        {
+            const SCROW nMyRow = SEIC.aPos.Row();
+            if (nStartRow <= nMyRow && nMyRow <= aAbsolute.aEnd.Row())
+            {
+                if (nMyRow == nStartRow)
+                {
+                    ++nStartRow;
+                    if (nStartRow > mrDoc.MaxRow())
+                        nStartRow = mrDoc.MaxRow();
+                    aAbsolute.aStart.SetRow(nStartRow);
+                }
+                else
+                {
+                    aAbsolute.aEnd.SetRow(nMyRow - 1);
+                }
+            }
+        }
+    }
+    else
+    {
+        aAbsolute.aEnd.SetRow(nStartRow);
+        if (aAbsolute.aEnd.Col() > nCol2)
+            aAbsolute.aEnd.SetCol(nCol2);
+        if (SEIC.aPos.Row() == nStartRow)
+        {
+            const SCCOL nMyCol = SEIC.aPos.Col();
+            if (nStartCol <= nMyCol && nMyCol <= aAbsolute.aEnd.Col())
+            {
+                if (nMyCol == nStartCol)
+                {
+                    ++nStartCol;
+                    if (nStartCol > mrDoc.MaxCol())
+                        nStartCol = mrDoc.MaxCol();
+                    aAbsolute.aStart.SetCol(nStartCol);
+                }
+                else
+                {
+                    aAbsolute.aEnd.SetCol(nMyCol - 1);
+                }
+            }
+        }
+    }
+
+    aRefData.SetRange(mrDoc.GetSheetLimits(), aAbsolute, SEIC.aPos);
+    SEIC.PushTempToken(new ScDoubleRefToken(mrDoc.GetSheetLimits(), aRefData));
 }
 
 inline void Dispatcher::probability(ScInterpreter& rCalc)

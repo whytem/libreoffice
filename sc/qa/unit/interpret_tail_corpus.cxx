@@ -302,11 +302,7 @@ std::vector<std::string> listLegacyInterpreterSubroutineNames()
     if (aText.empty())
         return {};
 
-    static constexpr std::array<std::string_view, 20> aTrackedNames = {
-        "ExecuteSubTotalTerminal",
-        "ExecuteDBAreaTerminal",
-        "ExecuteSortByTerminal",
-        "ExecuteColRowNameAutoTerminal",
+    static constexpr std::array<std::string_view, 16> aTrackedNames = {
         "ExecuteTypeTerminal",
         "ExecuteCellTerminal",
         "ExecuteCellExternalTerminal",

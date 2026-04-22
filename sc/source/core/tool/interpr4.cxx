@@ -4155,108 +4155,6 @@ void ScInterpreter::ScTableOp()
     mrDoc.DecInterpreterTableOpLevel();
 }
 
-void ScInterpreter::ExecuteDBAreaTerminal()
-{
-    ScDBData* pDBData = mrDoc.GetDBCollection()->getNamedDBs().findByIndex(pCur->GetIndex());
-    if (pDBData)
-    {
-        ScComplexRefData aRefData;
-        aRefData.InitFlags();
-        ScRange aRange;
-        pDBData->GetArea(aRange);
-        aRange.aEnd.SetTab(aRange.aStart.Tab());
-        aRefData.SetRange(mrDoc.GetSheetLimits(), aRange, aPos);
-        PushTempToken( new ScDoubleRefToken( mrDoc.GetSheetLimits(), aRefData ) );
-    }
-    else
-        PushError( FormulaError::NoName);
-}
-
-void ScInterpreter::ExecuteColRowNameAutoTerminal()
-{
-    ScComplexRefData aRefData( *pCur->GetDoubleRef() );
-    ScRange aAbs = aRefData.toAbs(mrDoc, aPos);
-    if (!mrDoc.ValidRange(aAbs))
-    {
-        PushError( FormulaError::NoRef );
-        return;
-    }
-
-    SCCOL nStartCol;
-    SCROW nStartRow;
-
-    // maybe remember limit by using defined ColRowNameRange
-    SCCOL nCol2 = aAbs.aEnd.Col();
-    SCROW nRow2 = aAbs.aEnd.Row();
-    // DataArea of the first cell
-    nStartCol = aAbs.aStart.Col();
-    nStartRow = aAbs.aStart.Row();
-    aAbs.aEnd = aAbs.aStart; // Shrink to the top-left cell.
-
-    {
-        // Expand to the data area. Only modify the end position.
-        SCCOL nDACol1 = aAbs.aStart.Col(), nDACol2 = aAbs.aEnd.Col();
-        SCROW nDARow1 = aAbs.aStart.Row(), nDARow2 = aAbs.aEnd.Row();
-        mrDoc.GetDataArea(aAbs.aStart.Tab(), nDACol1, nDARow1, nDACol2, nDARow2, true, false);
-        aAbs.aEnd.SetCol(nDACol2);
-        aAbs.aEnd.SetRow(nDARow2);
-    }
-
-    // corresponds with ScCompiler::GetToken
-    if ( aRefData.Ref1.IsColRel() )
-    {   // ColName
-        aAbs.aEnd.SetCol(nStartCol);
-        // maybe get previous limit by using defined ColRowNameRange
-        if (aAbs.aEnd.Row() > nRow2)
-            aAbs.aEnd.SetRow(nRow2);
-        if ( aPos.Col() == nStartCol )
-        {
-            SCROW nMyRow = aPos.Row();
-            if ( nStartRow <= nMyRow && nMyRow <= aAbs.aEnd.Row())
-            {   //Formula in the same column and within the range
-                if ( nMyRow == nStartRow )
-                {   // take the rest under the name
-                    nStartRow++;
-                    if ( nStartRow > mrDoc.MaxRow() )
-                        nStartRow = mrDoc.MaxRow();
-                    aAbs.aStart.SetRow(nStartRow);
-                }
-                else
-                {   // below the name to the formula cell
-                    aAbs.aEnd.SetRow(nMyRow - 1);
-                }
-            }
-        }
-    }
-    else
-    {   // RowName
-        aAbs.aEnd.SetRow(nStartRow);
-        // maybe get previous limit by using defined ColRowNameRange
-        if (aAbs.aEnd.Col() > nCol2)
-            aAbs.aEnd.SetCol(nCol2);
-        if ( aPos.Row() == nStartRow )
-        {
-            SCCOL nMyCol = aPos.Col();
-            if (nStartCol <= nMyCol && nMyCol <= aAbs.aEnd.Col())
-            {   //Formula in the same column and within the range
-                if ( nMyCol == nStartCol )
-                {    // take the rest under the name
-                    nStartCol++;
-                    if ( nStartCol > mrDoc.MaxCol() )
-                        nStartCol = mrDoc.MaxCol();
-                    aAbs.aStart.SetCol(nStartCol);
-                }
-                else
-                {   // below the name to the formula cell
-                    aAbs.aEnd.SetCol(nMyCol - 1);
-                }
-            }
-        }
-    }
-    aRefData.SetRange(mrDoc.GetSheetLimits(), aAbs, aPos);
-    PushTempToken( new ScDoubleRefToken( mrDoc.GetSheetLimits(), aRefData ) );
-}
-
 // --- internals ------------------------------------------------------------
 
 void ScInterpreter::ScTTT()
@@ -11828,8 +11726,12 @@ StackVar ScInterpreter::Interpret()
                         seinterpcompatdispatch::Dispatcher::missingTerminal(*this);
                         break;
                     case ocMacro            : ScMacro();                    break;
-                    case ocDBArea           : ExecuteDBAreaTerminal();      break;
-                    case ocColRowNameAuto   : ExecuteColRowNameAutoTerminal(); break;
+                    case ocDBArea           :
+                        seinterpcompatdispatch::Dispatcher::dbAreaTerminal(*this);
+                        break;
+                    case ocColRowNameAuto   :
+                        seinterpcompatdispatch::Dispatcher::colRowNameAutoTerminal(*this);
+                        break;
                     case ocIf               :
                         if (!dispatchIfTerminal())
                         {
@@ -12038,7 +11940,7 @@ StackVar ScInterpreter::Interpret()
                                 return setaileval::isFamilyLocalDefaultOnFormula(rFormula);
                             },
                             "family-local default-on SORTBY reached ScInterpreter");
-                        ExecuteSortByTerminal();
+                        seinterpcompatdispatch::Dispatcher::sortByTerminal(*this);
                         break;
                     case ocDrop             :
                         if (!dispatchSpillTakeOrDropTerminal(/*bTake*/ false))
@@ -13986,7 +13888,9 @@ StackVar ScInterpreter::Interpret()
                         pushValueResult(sefinance::evaluateNominal(fEffective, fPeriods));
                     }
                     break;
-                    case ocSubTotal         : ExecuteSubTotalTerminal();    break;
+                    case ocSubTotal         :
+                        seinterpcompatdispatch::Dispatcher::subtotalFunction(*this);
+                        break;
                     case ocAggregate:
                         warnIfLegacyDispatchReached(
                             "family-local default-on", u"AGGREGATE",

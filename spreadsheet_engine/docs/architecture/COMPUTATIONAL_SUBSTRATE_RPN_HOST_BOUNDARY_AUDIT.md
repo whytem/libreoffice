@@ -147,9 +147,6 @@ more service IDs from the ledger above.
   `ExecuteTypeTerminal`, `ExecuteCellTerminal`,
   `ExecuteCellExternalTerminal`, `ExecuteCurrentTerminal`,
   `ExecuteStyleTerminal`, `ExecuteInfoTerminal`, `ExecuteNTerminal`
-- `HS6` range iteration / criteria walk:
-  `ExecuteSubTotalTerminal`, `ExecuteDBAreaTerminal`,
-  `ExecuteSortByTerminal`
 - `HS5` matrix materialization / matrix frame, often with `HS6`:
   `ExecuteMatValueTerminal`, `ExecuteMatRefTerminal`,
   `ExecuteSumXMY2Terminal`, `ExecuteFourierTerminal`,
@@ -447,8 +444,9 @@ Phase 2 closes the audit from "next steps" into a usable contract baseline:
 2. the current tree no longer treats host-contract gaps as open blockers:
    `HS1` through `HS10` are already exposed, while `HS11` and `HS12`
    remain intentionally non-contract surfaces
-3. Phases 2 and 3 of the relocation backlog have already consumed the
-   operator/control and reference/lookup/addressing `Execute*` wrapper
-   inventories, leaving only structural shell debt under `HS11`
-4. the next subsystem phases can focus on the remaining query, inspection,
+3. Phases 2, 3, and 4 of the relocation backlog have already consumed the
+   operator/control, reference/lookup/addressing, and
+   query/criteria/transform `Execute*` wrapper inventories, leaving only
+   structural shell debt under `HS11`
+4. the next subsystem phases can focus on the remaining inspection,
    matrix, and random terminals instead of inventing new Host surfaces ad hoc

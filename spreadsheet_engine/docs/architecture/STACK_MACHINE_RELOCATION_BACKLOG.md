@@ -67,6 +67,16 @@ Phase 3 of the relocation backlog is now complete:
   external-computation behavior rather than relocation debt
 - canonical relocation-debt metrics now exclude the closed reference wave
 
+Phase 4 of the relocation backlog is now complete:
+
+- Calc no longer declares or dispatches `ExecuteSubTotalTerminal`,
+  `ExecuteDBAreaTerminal`, `ExecuteSortByTerminal`, or
+  `ExecuteColRowNameAutoTerminal`
+- query iteration, named DB-area materialization, and spill-shaped SORTBY
+  dispatch now flow through explicit engine/host contracts rather than
+  Calc-local wrapper entrypoints
+- canonical relocation-debt metrics now exclude the closed query wave
+
 ## Working Rules
 
 1. Do not reopen closed contract-gap work unless the code proves a new gap.
@@ -88,13 +98,6 @@ Phase 3 of the relocation backlog is now complete:
 - classic stack/token machinery in `interpre.hxx` and `interpr4.cxx`,
   including `sp`, `maxsp`, `Push*`, `Pop*`, token iteration helpers, and
   dispatch bookkeeping
-
-### DB / Criteria / Transform
-
-- `ExecuteSubTotalTerminal`
-- `ExecuteDBAreaTerminal`
-- `ExecuteSortByTerminal`
-- `ExecuteColRowNameAutoTerminal`
 
 ### Cell / Metadata / Inspection
 
@@ -129,32 +132,6 @@ entrypoint or dispatch residue for them:
 - `ExecuteRandArrayTerminal`
 
 ## Phased Implementation Plan
-
-### Phase 4: Query / Criteria / Transform Closure
-
-Goal: finish the remaining query, subtotal, and transform ownership now that
-`RangeIterator` already exists.
-
-Scope:
-
-- retire Calc execution ownership for:
-  `ExecuteSubTotalTerminal`, `ExecuteDBAreaTerminal`,
-  `ExecuteSortByTerminal`, `ExecuteColRowNameAutoTerminal`
-- align `ExecuteSortByTerminal` with the spill-family ownership model instead
-  of leaving it as a Calc-only transform
-- delete Calc-local row walkers and criteria loops that duplicate engine-side
-  iteration and aggregation
-- classify any surviving host-only query behavior explicitly
-
-Exit criteria:
-
-- subtotal, DB-area, column-row-name, and SORTBY execution no longer depend on
-  interpreter-resident query loops
-- the listed terminals are either deleted or reduced to explicit host adapters
-  with no duplicated evaluator logic
-- parity coverage exists for named DB ranges, criteria grids, hidden/filter
-  semantics, and spill-shaped transforms
-- this backlog no longer treats query iteration as an open contract-gap area
 
 ### Phase 5: Inspection / Metadata Closure
 

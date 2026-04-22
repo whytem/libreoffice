@@ -656,8 +656,6 @@ private:
     void GetStVarParams( bool bTextAsZero, double(*VarResult)( double fVal, size_t nValCount ) );
     void IterateParametersIf( ScIterFuncIf );
     void IterateParametersIfs( double(*ResultFunc)( const sc::ParamIfsResult& rRes ) );
-    void ExecuteSortByTerminal();
-    void ExecuteSubTotalTerminal();
     // If upon call rMissingField==true then the database field parameter may be
     // missing (Xcl DCOUNT() syntax), or may be faked as missing by having the
     // value 0.0 or being exactly the entire database range reference (old SO
@@ -672,8 +670,6 @@ private:
     void ScMacro();
     bool SetSbxVariable( SbxVariable* pVar, const ScAddress& );
     FormulaError GetErrorType();
-    void ExecuteDBAreaTerminal();
-    void ExecuteColRowNameAutoTerminal();
     void ScGetPivotData();
     void ScHyperLink();
     void ScTTT();

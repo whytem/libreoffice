@@ -55,7 +55,7 @@ quietly drift out of date.
 | Basic reference resolution | `RangeResolver::resolveRange`, `ReferenceResolver::resolveReference`, external-ref fetch helpers | `already exposed` | host-only union/intersection/range terminals, external add-in terminals | Compile-time and evaluation-time reference resolution now share one contract; the remaining Calc sites are explicit host terminals rather than duplicate evaluator logic |
 | Named / external / database / structured range resolution | compile-host lookup resolvers, `RangeResolver::resolveRange`, `DocumentRangeResolver` | `already exposed` | query-family range walking, structured-reference materialization follow-ups | One evaluation-time resolver now covers named, DB, external, and INDIRECT-driven range binding; structured references that cannot flatten still round-trip as `TokenBackedSymbol` |
 | Matrix materialization | `materializeHostRangeToMatrixOperand`, `CellValueView::matrixReference`, matrix operand bridges | `already exposed` | `ExecuteMatValueTerminal`, `ExecuteMatRefTerminal`, explicit matrix-reference projection glue | Phase 8 moved `ExecuteFrequencyTerminal`, `ExecuteForecastEtsTerminal`, `ExecuteFourierTerminal`, and `ExecuteSumXMY2Terminal` onto runtime-owned planners; the residual Calc surface is host projection glue rather than duplicated computation |
-| Criteria / range iteration | `RangeIterator`, `CriteriaAggregateMaterializer::iterate` | `already exposed` | `ExecuteSubTotalTerminal`, DB-family tails, COUNTBLANK widening, future streaming criteria work | Phase 7 landed a standalone row-major walker on `EvaluationHost`; production query/countblank scans now route through it instead of baking iteration into Calc-local walkers |
+| Criteria / range iteration | `RangeIterator`, `CriteriaAggregateMaterializer::iterate` | `already exposed` | DB-family tails, COUNTBLANK widening, future streaming criteria work | Phase 7 landed a standalone row-major walker on `EvaluationHost`; production query/countblank scans now route through it instead of baking iteration into Calc-local walkers |
 | Formula text / inspection | `runtime::formulainspection::Provider`, `DirectFormulaInspectionAdapter` | `already exposed` | `ExecuteCellTerminal`, `ExecuteCellExternalTerminal`, `ExecuteInfoTerminal`, formula inspection predicates | Formula-presence and formula-text reads now flow through an explicit inspection provider instead of ad hoc document peeks |
 | Format / type inspection | `runtime::cellinspection::*`, `DirectCellInspectionAdapter`, `DirectHostCellInspectionAdapter` | `already exposed` | `ExecuteTypeTerminal`, `ExecuteCellTerminal`, `ExecuteCellExternalTerminal`, `ExecuteCurrentTerminal`, `ExecuteStyleTerminal`, host-sensitive text terminals | The bounded/value vs. host-property split is now explicit, so remaining Calc ownership is terminal glue rather than hidden evaluator policy |
 | Locale / calendar / date / search policy | `RuntimeEnvironment::getNullDate()`, `RuntimeEnvironment::getLocaleTag()`, `RuntimeEnvironment::getSearchType()`, `RuntimeEnvironment::sampleUniformReal()`, `TextCoercion` | `already exposed` | host-sensitive text/search terminals, date/time parsing tails | Locale, null-date, search-mode, and random-source policy now flow through explicit host contracts rather than Calc-local evaluator code |
@@ -88,7 +88,6 @@ debt.
 
 | Legacy cluster | Representative surviving surface | Required host-service categories | Contract status summary |
 | --- | --- | --- | --- |
-| DB / criteria / transform | `ExecuteSubTotalTerminal`, `ExecuteDBAreaTerminal`, `ExecuteSortByTerminal`, `ExecuteColRowNameAutoTerminal` | criteria/range iteration, named/database range resolution, spill allocation | Phase 7 moved the remaining query/subtotal glue onto explicit terminals now that `RangeIterator` owns production iteration |
 | Cell / metadata / inspection | `ExecuteTypeTerminal`, `ExecuteCellTerminal`, `ExecuteCellExternalTerminal`, `ExecuteCurrentTerminal`, `ExecuteStyleTerminal`, `ExecuteInfoTerminal`, `ExecuteNTerminal` | scalar cell read, formula text/inspection, format/type inspection | Phase 6 moved the remaining inspection/text-search surface onto explicit runtime contracts plus host-owned terminals; the residual Calc logic is terminal glue rather than hidden evaluator policy |
 | Matrix / statistical tails | `ExecuteMatValueTerminal`, `ExecuteMatRefTerminal`, `ExecuteFrequencyTerminal`, `ExecuteForecastEtsTerminal`, `ExecuteFourierTerminal`, `ExecuteSumXMY2Terminal` | matrix materialization, scalar cell read, criteria/range iteration | Phase 8 retired the engine-worthy computation into runtime planners; only the explicit matrix-reference projection terminals remain Calc-owned |
 | Random / system-policy | `ExecuteRandomTerminal`, `ExecuteRandbetweenTerminal`, `ExecuteRandArrayTerminal` | runtime RNG state, locale/calendar/date mode | Phase 9 moved RAND / RANDBETWEEN.NV / RANDARRAY behind `RuntimeEnvironment::sampleUniformReal()` plus engine-native random planners; the remaining Calc surface is terminal glue for stack/matrix context only |
@@ -749,6 +748,13 @@ green on the admission commit.
 
 ## Change log
 
+- 2026-04 — Phase 4 query/criteria/transform closeout. Retired the
+  remaining Calc-owned `ExecuteSubTotalTerminal`,
+  `ExecuteDBAreaTerminal`, `ExecuteSortByTerminal`, and
+  `ExecuteColRowNameAutoTerminal` wrappers so query iteration, named
+  DB-area resolution, and spill-shaped transforms now route only
+  through the explicit host/runtime contracts already documented
+  above.
 - 2026-04 — Phase 4 range-resolution closeout. Landed
   `api/RangeResolver.hxx` plus the LibreOffice
   `DocumentRangeResolver` adapter, documented the unified
