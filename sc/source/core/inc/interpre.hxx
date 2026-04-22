@@ -636,9 +636,6 @@ private:
      */
     sc::RangeMatrix CompareMat( ScQueryOp eOp, sc::CompareOptions* pOptions = nullptr );
     ScMatrixRef QueryMat( const ScMatrixRef& pMat, sc::CompareOptions& rOptions );
-    void ExecuteRandomTerminal();
-    void ExecuteRandbetweenTerminal();
-    void ExecuteRandArrayTerminal();
     bool IsString();
     bool IsEven();
     /** Check for array of references to determine the maximum size of a return

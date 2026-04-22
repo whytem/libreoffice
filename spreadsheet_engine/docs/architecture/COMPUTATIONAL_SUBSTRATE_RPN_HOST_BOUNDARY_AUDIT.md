@@ -141,15 +141,16 @@ more service IDs from the ledger above.
 
 - `HS11` evaluator state / control flow / typed stack:
   no live relocation-relevant `Execute*` wrappers remain after Phase 2; the
-  outstanding debt is the structural `Interpret()` shell plus classic
-  stack/token helpers
+  surviving `Interpret()` shell plus classic stack/token helpers are retained
+  host-owned scaffolding rather than active relocation debt
 - `HS5` matrix materialization / matrix frame, often with `HS6`:
   no live relocation-relevant `Execute*` wrappers remain after Phase 6; the
   remaining matrix debt is structural matrix/state ownership inside surviving
   `ScMat*` and regression-family consumers
 - `HS10` runtime environment / workbook metadata:
-  `ExecuteRandomTerminal`, `ExecuteRandbetweenTerminal`,
-  `ExecuteRandArrayTerminal`
+  no live relocation-relevant `Execute*` wrappers remain after Phase 7; random
+  policy now flows through `RuntimeEnvironment::sampleUniformReal()` plus
+  direct compat dispatch
 - explicit host/debug utilities outside relocation debt:
   `ScTableOp`, `ScTTT`, `ScDebugVar`
 - `HS12` intentionally unsupported host terminals:
@@ -361,20 +362,15 @@ Required host services:
 
 Representative surviving Calc surfaces:
 
-- `ExecuteRandomTerminal`
-- `ExecuteRandbetweenTerminal`
-- `ExecuteRandArrayTerminal`
-- `pushLegacySearch`
-- `pushLegacyRegex`
-- `pushLegacyTextBeforeAfter`
-- `pushLegacyDateOrTimeValue`
+- no dedicated relocation-relevant wrapper surface remains; system-state
+  policy is consumed through explicit compat terminals and runtime contracts
 
 Immediate implication:
 
 - the engine contract now separates deterministic system services from
   document services explicitly: random draws come from
-  `RuntimeEnvironment::sampleUniformReal()`, while Calc keeps only the
-  terminal-level matrix/stack-shape bridge
+  `RuntimeEnvironment::sampleUniformReal()`, and Calc no longer carries a
+  dedicated random wrapper surface
 
 ## Category 8: External Computation
 
@@ -436,10 +432,10 @@ Phase 2 closes the audit from "next steps" into a usable contract baseline:
 2. the current tree no longer treats host-contract gaps as open blockers:
    `HS1` through `HS10` are already exposed, while `HS11` and `HS12`
    remain intentionally non-contract surfaces
-3. Phases 2, 3, 4, 5, and 6 of the relocation backlog have already consumed the
+3. Phases 2, 3, 4, 5, 6, and 7 of the relocation backlog have already consumed the
    operator/control, reference/lookup/addressing,
-   query/criteria/transform, inspection/metadata, and matrix/statistical
-   `Execute*` wrapper inventories, leaving only the random wrapper residue
-   plus structural shell debt under `HS10` / `HS11`
-4. the next subsystem phase can focus on the remaining random terminals and
-   shell contraction instead of inventing new Host surfaces ad hoc
+   query/criteria/transform, inspection/metadata, matrix/statistical, and
+   random `Execute*` wrapper inventories, leaving only explicit host-owned /
+   retained shell and utility surfaces outside relocation debt
+4. follow-on subsystem work can focus on deliberate evaluator widening rather
+   than inventing new Host surfaces ad hoc to close wrapper debt

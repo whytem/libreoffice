@@ -23,13 +23,14 @@ Historical slice writeups, phase plans, and retired ledgers now live under
 
 - shared-engine extraction is materially achieved and remains in active use
 - the authority-transfer pivot is closed on the current tree
-- active work is now the relocation backlog: continue moving remaining
-  stack-machine ownership from Calc interpreter paths into
-  `spreadsheet_engine/`
+- the stack-machine relocation backlog is closed on the current tree; new
+  evaluator widening should start from explicit host/runtime contracts rather
+  than reopen wrapper debt implicitly
 - the intended long-term production path is
   `ScFormulaCell::InterpretTail() -> tryEvaluateFormula() -> FormulaEvaluator -> RpnEvaluator`
-- `ScInterpreter::Interpret()` remains only for residual fallback and
-  audit-oriented lower-seam coverage while relocation continues
+- `ScInterpreter::Interpret()` now remains only as the explicit host-owned /
+  retained fallback shell around external terminals, repeated-operation
+  utilities, and debug policy
 - Phase 1 ownership classification for the relocation backlog is complete:
   `ScTableOp`, `ScTTT`, and `ScDebugVar` are now treated as explicit
   host/debug utilities rather than active relocation debt
@@ -62,13 +63,18 @@ Historical slice writeups, phase plans, and retired ledgers now live under
   `ExecuteSumXMY2Terminal`; the residual matrix work now lives in engine
   runtime planners plus explicit host-backed matrix consumers rather than in
   dedicated Calc wrapper terminals
+- Phase 7 random/runtime closure is complete: Calc no longer declares or
+  dispatches `ExecuteRandomTerminal`, `ExecuteRandbetweenTerminal`, or
+  `ExecuteRandArrayTerminal`; RNG policy stays behind
+  `RuntimeEnvironment::sampleUniformReal()`, and the active relocation
+  backlog now has no remaining `Execute*` debt on the current tree
 
 ## Canonical Dashboard
 
 Canonical dashboard metrics live in this file only. Static relocation-debt
 metrics on the current tree are:
 
-- `legacy_interpreter_subroutine_count=3`
+- `legacy_interpreter_subroutine_count=0`
 - `interp4_dispatch_legacy_lambda_count=0`
 - `interp4_dispatch_engine_backed_plan_engine_attempt_count=0`
 
@@ -81,13 +87,12 @@ when the runtime envelope changes:
 
 ## Current Priorities
 
-1. Close the remaining random adapter residue still owned by Calc.
-2. Contract the residual `ScInterpreter::Interpret()` shell once the random
-   wrappers are gone.
-3. Keep host-facing contracts explicit before widening new evaluator surface.
-4. Preserve replay parity and the known-regression baseline while relocation
-   lands.
-5. Keep active docs small and current; move closed slice reports and obsolete
+1. Preserve replay parity and the known-regression baseline now that the
+   relocation backlog is closed.
+2. Keep host-facing contracts explicit before widening new evaluator surface.
+3. Keep `ScInterpreter::Interpret()` limited to documented host-owned /
+   retained behavior.
+4. Keep active docs small and current; move closed slice reports and obsolete
    ledgers to `docs/archive/`.
 
 ## Working Rules

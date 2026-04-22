@@ -84,11 +84,14 @@ Phase 3 retired the remaining Calc-owned reference/lookup/addressing
 host-owned external-computation terminals rather than treated as relocation
 debt.
 
+Phase 7 retired the remaining random wrapper surface. No relocation-relevant
+engine-backed `Execute*` clusters remain on the current tree; the surviving
+rows below are intentionally retained host-owned utilities.
+
 ### Surviving `Sc*` clusters
 
 | Legacy cluster | Representative surviving surface | Required host-service categories | Contract status summary |
 | --- | --- | --- | --- |
-| Random / system-policy | `ExecuteRandomTerminal`, `ExecuteRandbetweenTerminal`, `ExecuteRandArrayTerminal` | runtime RNG state, locale/calendar/date mode | Phase 9 moved RAND / RANDBETWEEN.NV / RANDARRAY behind `RuntimeEnvironment::sampleUniformReal()` plus engine-native random planners; the remaining Calc surface is terminal glue for stack/matrix context only |
 | Host/debug utilities | `ScTableOp`, `ScTTT`, `ScDebugVar` | document mutation / repeated-operation state, debug-only projection | Phase 1 of the relocation backlog classified these as explicit host/debug utilities rather than active relocation debt |
 | External computation terminals | `ExecuteExternalTerminal`, `ScMacro`, `ScDde`, `ScWebservice`, `ScFilterXML`, `ScGetPivotData`, `ScHyperLink` | external computation | Intentionally host-owned and outside the engine-native evaluator contract |
 

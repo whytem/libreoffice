@@ -11915,10 +11915,18 @@ StackVar ScInterpreter::Interpret()
                             u"PI", "family-local default-on math scalar reached ScInterpreter");
                         PushDouble(semath::computePi());
                         break;
-                    case ocRandom           : ExecuteRandomTerminal();      break;
-                    case ocRandArray        : ExecuteRandArrayTerminal();   break;
-                    case ocRandomNV         : ExecuteRandomTerminal();      break;
-                    case ocRandbetweenNV    : ExecuteRandbetweenTerminal(); break;
+                    case ocRandom           :
+                        seinterpcompatdispatch::Dispatcher::random(*this);
+                        break;
+                    case ocRandArray        :
+                        seinterpcompatdispatch::Dispatcher::randArray(*this);
+                        break;
+                    case ocRandomNV         :
+                        seinterpcompatdispatch::Dispatcher::random(*this);
+                        break;
+                    case ocRandbetweenNV    :
+                        seinterpcompatdispatch::Dispatcher::randbetween(*this);
+                        break;
                     case ocFilter           :
                         if (!dispatchSpillFilterTerminal())
                         {

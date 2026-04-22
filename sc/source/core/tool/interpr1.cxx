@@ -109,7 +109,6 @@ namespace searray = spreadsheetengine::api::array;
 namespace selogic = spreadsheetengine::api::logic;
 namespace selookup = spreadsheetengine::api::lookup;
 namespace sestringref = spreadsheetengine::api::stringreference;
-namespace seinterpcompatdispatch = spreadsheetengine::compat::libreoffice::interpretercompatdispatch;
 namespace sejumpexec = spreadsheetengine::compat::libreoffice::jumpexecution;
 namespace sejumpmatrixexec = spreadsheetengine::compat::libreoffice::jumpmatrixexecution;
 namespace seformulainspect = spreadsheetengine::compat::libreoffice::formulainspection;
@@ -1028,21 +1027,6 @@ ScMatrixRef ScInterpreter::QueryMat( const ScMatrixRef& pMat, sc::CompareOptions
     }
 
     return pResultMatrix;
-}
-
-void ScInterpreter::ExecuteRandomTerminal()
-{
-    seinterpcompatdispatch::Dispatcher::random(*this);
-}
-
-void ScInterpreter::ExecuteRandArrayTerminal()
-{
-    seinterpcompatdispatch::Dispatcher::randArray(*this);
-}
-
-void ScInterpreter::ExecuteRandbetweenTerminal()
-{
-    seinterpcompatdispatch::Dispatcher::randbetween(*this);
 }
 
 bool ScInterpreter::IsString()

@@ -302,11 +302,7 @@ std::vector<std::string> listLegacyInterpreterSubroutineNames()
     if (aText.empty())
         return {};
 
-    static constexpr std::array<std::string_view, 3> aTrackedNames = {
-        "ExecuteRandomTerminal",
-        "ExecuteRandbetweenTerminal",
-        "ExecuteRandArrayTerminal",
-    };
+    static constexpr std::array<std::string_view, 0> aTrackedNames = {};
 
     std::vector<std::string> aMatches;
     aMatches.reserve(aTrackedNames.size());
@@ -5642,8 +5638,6 @@ CPPUNIT_TEST_FIXTURE(TestInterpretTailCorpus, testAuthorityStats)
     printStats(nWorkbookCount, nFormulaCellCount, aProbeStats);
     std::cout << "interpret_tail_probe_formula_cells=" << nProbeFormulaCount << '\n';
     const std::size_t nLegacyInterpreterSubroutineCount = countLegacyInterpreterSubroutines();
-    CPPUNIT_ASSERT_MESSAGE("legacy interpreter subroutine metric should scan interpre.hxx",
-        nLegacyInterpreterSubroutineCount > 0);
     const auto aLegacyLambdaInventory = countInterp4LegacyLambdas();
     CPPUNIT_ASSERT_EQUAL_MESSAGE(
         "Phase 6 should retire all pushLegacy* lambdas from interpr4.cxx",

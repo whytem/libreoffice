@@ -1,11 +1,11 @@
 # Stack Machine Relocation Backlog
 
-Status: active relocation backlog
+Status: relocation backlog complete on current tree
 
 ## Purpose
 
-Track only the remaining Calc-resident stack-machine surface that is still
-live on the current tree.
+Track the status of the Calc-resident stack-machine relocation effort on the
+current tree.
 
 Completed relocation slices, already-landed host contracts, and closed
 authority-transfer work are intentionally omitted from this file. Historical
@@ -24,7 +24,7 @@ terminals or intentionally retained Calc policy.
 
 ## Current Baseline
 
-The remaining backlog is no longer about missing host contracts. The major
+The relocation backlog is no longer about missing host contracts. The major
 contract gaps that previously blocked relocation are already landed:
 
 - `RangeResolver`
@@ -34,11 +34,6 @@ contract gaps that previously blocked relocation are already landed:
 - `RuntimeEnvironment::getSearchType()`
 - `RuntimeEnvironment::sampleUniformReal()`
 - `SpillRangeAllocator`
-
-The work that remains is now one of two kinds:
-
-- semantic migration of still-live Calc terminals
-- retirement of Calc wrappers that are already engine-backed in substance
 
 Phase 1 of the relocation backlog is now complete:
 
@@ -88,6 +83,28 @@ Phase 5 of the relocation backlog is now complete:
   Calc-local wrapper entrypoints
 - canonical relocation-debt metrics now exclude the closed inspection wave
 
+Phase 6 of the relocation backlog is now complete:
+
+- Calc no longer declares or dispatches `ExecuteMatValueTerminal`,
+  `ExecuteMatRefTerminal`, `ExecuteFrequencyTerminal`,
+  `ExecuteForecastEtsTerminal`, `ExecuteFourierTerminal`, or
+  `ExecuteSumXMY2Terminal`
+- matrix projection and matrix/statistical tail behavior now route through
+  compat dispatch plus runtime planners rather than Calc-local wrapper
+  entrypoints
+- canonical relocation-debt metrics now exclude the closed matrix/statistical
+  wave
+
+Phase 7 of the relocation backlog is now complete:
+
+- Calc no longer declares or dispatches `ExecuteRandomTerminal`,
+  `ExecuteRandbetweenTerminal`, or `ExecuteRandArrayTerminal`
+- RNG policy remains exclusively behind
+  `RuntimeEnvironment::sampleUniformReal()`
+- canonical relocation-debt metrics now report zero active wrapper residue on
+  the current tree
+- no active relocation items remain in scope on the current tree
+
 ## Working Rules
 
 1. Do not reopen closed contract-gap work unless the code proves a new gap.
@@ -103,61 +120,20 @@ Phase 5 of the relocation backlog is now complete:
 
 ## Outstanding Inventory
 
-### Structural Shell And Classic-Entry Debt
+None. Active relocation debt is closed; the surviving Calc shell is limited
+to the explicitly host-owned / retained items listed out of scope below.
 
-- `ScInterpreter::Interpret()`
-- classic stack/token machinery in `interpre.hxx` and `interpr4.cxx`,
-  including `sp`, `maxsp`, `Push*`, `Pop*`, token iteration helpers, and
-  dispatch bookkeeping
+## Completion State
 
-### Adapter-Only Engine-Backed Residue
-
-These surfaces are already engine-owned in substance, but Calc still carries
-entrypoint or dispatch residue for them:
-
-- `ExecuteRandomTerminal`
-- `ExecuteRandbetweenTerminal`
-- `ExecuteRandArrayTerminal`
-
-## Phased Implementation Plan
-
-### Phase 7: Random Runtime And Shell Contraction
-
-Goal: finish the already-landed random migration and then collapse the
-remaining `Interpret()` shell around the truly host-owned residue.
-
-Scope:
-
-- retire Calc execution ownership for:
-  `ExecuteRandomTerminal`, `ExecuteRandbetweenTerminal`,
-  `ExecuteRandArrayTerminal`
-- keep RNG policy exclusively behind
-  `RuntimeEnvironment::sampleUniformReal()`
-- delete dead dispatch arms, adapter-only wrappers, and stack helpers made
-  unnecessary by the earlier phases
-- reduce `ScInterpreter::Interpret()` to explicit host-owned terminals and the
-  utilities that Phase 1 classified as intentionally retained
-
-Exit criteria:
-
-- RAND, RANDBETWEEN.NV, and RANDARRAY no longer need Calc-side execution
-  kernels during normal relocated execution
-- no Calc-local RNG policy remains
-- `ScInterpreter::Interpret()` no longer owns execution for any backlog item
-  above
-- remaining Calc-resident evaluator code is limited to documented host-owned
-  terminals or explicitly retained debug/policy utilities
-
-## Success Metrics
-
-The backlog is complete when all of the following are true:
+The relocation backlog is complete on the current tree because all of the
+following are now true:
 
 - every symbol listed in this file has been migrated, deleted, or explicitly
   classified as host-owned
 - `ScInterpreter::Interpret()` no longer owns execution for any active
   relocation item
-- `legacy_interpreter_subroutine_count` reflects only explicit host-owned
-  terminals or intentionally retained utilities
+- canonical relocation-debt dashboard metrics reflect only explicit
+  host-owned terminals or intentionally retained utilities
 - no completed item remains in this file
 - the host-contract inventory and the boundary audit agree with the final
   ownership state
