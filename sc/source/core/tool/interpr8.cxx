@@ -14,9 +14,4 @@
 namespace seinterpcompatdispatch
     = spreadsheetengine::compat::libreoffice::interpretercompatdispatch;
 
-void ScInterpreter::ExecuteForecastEtsTerminal(ScETSType eETSType)
-{
-    seinterpcompatdispatch::Dispatcher::forecastEts(*this, eETSType);
-}
-
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

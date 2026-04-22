@@ -12998,7 +12998,9 @@ StackVar ScInterpreter::Interpret()
                         break;
                     case ocSumX2MY2         : CalculateSumX2MY2SumX2DY2(false); break;
                     case ocSumX2DY2         : CalculateSumX2MY2SumX2DY2(true);  break;
-                    case ocSumXMY2          : ExecuteSumXMY2Terminal();     break;
+                    case ocSumXMY2          :
+                        seinterpcompatdispatch::Dispatcher::matrixSumXMY2(*this);
+                        break;
                     case ocRawSubtract      :
                     {
                         warnIfLegacyDefaultOnReached(
@@ -14334,7 +14336,9 @@ StackVar ScInterpreter::Interpret()
                             });
                     }
                     break;
-                    case ocMatValue         : ExecuteMatValueTerminal();    break;
+                    case ocMatValue         :
+                        seinterpcompatdispatch::Dispatcher::matValueTerminal(*this);
+                        break;
                     case ocMatrixUnit       :
                         dispatchIdentityMatrix();
                         break;
@@ -14359,7 +14363,9 @@ StackVar ScInterpreter::Interpret()
                     case ocMatTrans         :
                         dispatchTranspose();
                         break;
-                    case ocMatRef           : ExecuteMatRefTerminal();      break;
+                    case ocMatRef           :
+                        seinterpcompatdispatch::Dispatcher::matRefTerminal(*this);
+                        break;
                     case ocB:
                     {
                         warnIfLegacyStatisticalDistributionReached(u"BINOMDIST");
@@ -14795,7 +14801,9 @@ StackVar ScInterpreter::Interpret()
                         break;
                     case ocLarge            : CalculateSmallLarge(false); break;
                     case ocSmall            : CalculateSmallLarge(true);  break;
-                    case ocFrequency        : ExecuteFrequencyTerminal();   break;
+                    case ocFrequency        :
+                        seinterpcompatdispatch::Dispatcher::matrixFrequency(*this);
+                        break;
                     case ocQuartile         :
                     case ocQuartile_Inc:
                         warnIfLegacyStatisticalDistributionReached(u"QUARTILE.INC");
@@ -14894,13 +14902,27 @@ StackVar ScInterpreter::Interpret()
                         warnIfLegacyStatisticalDistributionReached(u"FORECAST");
                         seinterpcompatdispatch::Dispatcher::forecast(*this);
                         break;
-                    case ocForecast_ETS_ADD : ExecuteForecastEtsTerminal( etsAdd );      break;
-                    case ocForecast_ETS_SEA : ExecuteForecastEtsTerminal( etsSeason );   break;
-                    case ocForecast_ETS_MUL : ExecuteForecastEtsTerminal( etsMult );     break;
-                    case ocForecast_ETS_PIA : ExecuteForecastEtsTerminal( etsPIAdd );    break;
-                    case ocForecast_ETS_PIM : ExecuteForecastEtsTerminal( etsPIMult );   break;
-                    case ocForecast_ETS_STA : ExecuteForecastEtsTerminal( etsStatAdd );  break;
-                    case ocForecast_ETS_STM : ExecuteForecastEtsTerminal( etsStatMult ); break;
+                    case ocForecast_ETS_ADD :
+                        seinterpcompatdispatch::Dispatcher::forecastEts(*this, etsAdd);
+                        break;
+                    case ocForecast_ETS_SEA :
+                        seinterpcompatdispatch::Dispatcher::forecastEts(*this, etsSeason);
+                        break;
+                    case ocForecast_ETS_MUL :
+                        seinterpcompatdispatch::Dispatcher::forecastEts(*this, etsMult);
+                        break;
+                    case ocForecast_ETS_PIA :
+                        seinterpcompatdispatch::Dispatcher::forecastEts(*this, etsPIAdd);
+                        break;
+                    case ocForecast_ETS_PIM :
+                        seinterpcompatdispatch::Dispatcher::forecastEts(*this, etsPIMult);
+                        break;
+                    case ocForecast_ETS_STA :
+                        seinterpcompatdispatch::Dispatcher::forecastEts(*this, etsStatAdd);
+                        break;
+                    case ocForecast_ETS_STM :
+                        seinterpcompatdispatch::Dispatcher::forecastEts(*this, etsStatMult);
+                        break;
                     case ocGammaLn          :
                     case ocGammaLn_MS       :
                         warnIfLegacyStatisticalDistributionReached(u"GAMMALN");
@@ -15088,7 +15110,7 @@ StackVar ScInterpreter::Interpret()
                     break;
                     case ocFourier:
                         warnIfLegacyMatrixMathReached(u"ORG.LIBREOFFICE.FOURIER");
-                        ExecuteFourierTerminal();
+                        seinterpcompatdispatch::Dispatcher::fourier(*this);
                         break;
                     case ocExternal         : ExecuteExternalTerminal();    break;
                     case ocTableOp          : ScTableOp();                  break;

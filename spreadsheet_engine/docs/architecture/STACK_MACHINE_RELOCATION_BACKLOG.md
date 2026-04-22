@@ -110,56 +110,16 @@ Phase 5 of the relocation backlog is now complete:
   including `sp`, `maxsp`, `Push*`, `Pop*`, token iteration helpers, and
   dispatch bookkeeping
 
-### Matrix / Reference Projection
-
-- `ExecuteMatValueTerminal`
-- `ExecuteMatRefTerminal`
-
-These are the remaining Calc-side matrix-reference projection terminals that
-still block full shell deletion even though the broader matrix/statistical
-waves already landed upstream.
-
 ### Adapter-Only Engine-Backed Residue
 
 These surfaces are already engine-owned in substance, but Calc still carries
 entrypoint or dispatch residue for them:
 
-- `ExecuteFrequencyTerminal`
-- `ExecuteForecastEtsTerminal`
-- `ExecuteFourierTerminal`
-- `ExecuteSumXMY2Terminal`
 - `ExecuteRandomTerminal`
 - `ExecuteRandbetweenTerminal`
 - `ExecuteRandArrayTerminal`
 
 ## Phased Implementation Plan
-
-### Phase 6: Matrix Projection And Adapter-Tail Retirement
-
-Goal: remove the remaining matrix/reference projection logic and the
-already-engine-backed matrix/statistical tail entrypoints from Calc.
-
-Scope:
-
-- retire Calc execution ownership for `ExecuteMatValueTerminal` and
-  `ExecuteMatRefTerminal`
-- retire Calc entrypoints for:
-  `ExecuteFrequencyTerminal`, `ExecuteForecastEtsTerminal`,
-  `ExecuteFourierTerminal`, `ExecuteSumXMY2Terminal`
-- unify remaining matrix/reference projection through runtime helpers rather
-  than interpreter-local bridges
-- classify any unavoidable host projection behavior explicitly
-
-Exit criteria:
-
-- normal execution of the listed matrix/statistical families no longer enters
-  Calc kernels
-- the only surviving Calc matrix/reference behavior is explicitly documented
-  host projection glue, or the terminals are deleted entirely
-- matrix-state edge cases are owned by engine runtime code rather than ad hoc
-  interpreter helpers
-- parity coverage exists for array-context, forecast-tail, and
-  local-versus-external matrix-reference shapes
 
 ### Phase 7: Random Runtime And Shell Contraction
 

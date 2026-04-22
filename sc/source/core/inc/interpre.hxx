@@ -707,10 +707,7 @@ private:
                                  double fFv, bool bPayInAdvance, double& fPmt);
 
     // matrix functions
-    void ExecuteMatValueTerminal();
-    void ExecuteMatRefTerminal();
     ScMatrixRef MatConcat(const ScMatrixRef& pMat1, const ScMatrixRef& pMat2);
-    void ExecuteSumXMY2Terminal();
     bool CalculateSkew(KahanSum& fSum, double& fCount, std::vector<double>& values);
     void CalculateSlopeIntercept(bool bSlope);
     void CalculateSmallLarge(bool bSmall);
@@ -725,9 +722,7 @@ private:
     void CalculateTrendGrowth(bool _bGrowth);
     void CalculateRGPRKP(bool _bRKP);
     void CalculateSumX2MY2SumX2DY2(bool _bSumX2DY2);
-    void CalculateMatrixValue(const ScMatrix* pMat,SCSIZE nC,SCSIZE nR);
     bool CheckMatrix(bool _bLOG,sal_uInt8& nCase,SCSIZE& nCX,SCSIZE& nCY,SCSIZE& nRX,SCSIZE& nRY,SCSIZE& M,SCSIZE& N,ScMatrixRef& pMatX,ScMatrixRef& pMatY);
-    void ExecuteFourierTerminal();
     // Statistics:
 public:
     static double gaussinv(double x);
@@ -748,11 +743,9 @@ private:
     void GetSortArray( sal_uInt8 nParamCount, ::std::vector<double>& rSortArray, ::std::vector<tools::Long>* pIndexOrder, bool bConvertTextInArray, bool bAllowEmptyArray );
     static void QuickSort(::std::vector<double>& rSortArray, ::std::vector<tools::Long>* pIndexOrder);
     static double GetPercentrank( ::std::vector<double> & rArray, double fVal, bool bInclusive );
-    void ExecuteFrequencyTerminal();
 
     void ScFilterXML();
     void ScWebservice();
-    void ExecuteForecastEtsTerminal( ScETSType eETSType );
 
     // probability density function; fLambda is "scale" parameter
     double GetGammaDistPDF(double fX, double fAlpha, double fLambda);

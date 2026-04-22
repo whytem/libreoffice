@@ -144,9 +144,9 @@ more service IDs from the ledger above.
   outstanding debt is the structural `Interpret()` shell plus classic
   stack/token helpers
 - `HS5` matrix materialization / matrix frame, often with `HS6`:
-  `ExecuteMatValueTerminal`, `ExecuteMatRefTerminal`,
-  `ExecuteSumXMY2Terminal`, `ExecuteFourierTerminal`,
-  `ExecuteFrequencyTerminal`, `ExecuteForecastEtsTerminal`
+  no live relocation-relevant `Execute*` wrappers remain after Phase 6; the
+  remaining matrix debt is structural matrix/state ownership inside surviving
+  `ScMat*` and regression-family consumers
 - `HS10` runtime environment / workbook metadata:
   `ExecuteRandomTerminal`, `ExecuteRandbetweenTerminal`,
   `ExecuteRandArrayTerminal`
@@ -331,18 +331,14 @@ Required host services:
 
 Representative surviving Calc surfaces:
 
-- `ExecuteMatValueTerminal`
 - `ScMatInv`
 - `ScMatMult`
 - `ScMatSequence`
 - `ScMatTrans`
 - `ScEMat`
-- `ExecuteMatRefTerminal`
-- `ExecuteFrequencyTerminal`
 - `ScLinest`
 - `ScLogest`
 - `ScTrend`
-- `ExecuteForecastEtsTerminal`
 - `ScChooseColsOrRows`
 - `ScToColOrRow`
 - `ScWrapColsOrRows`
@@ -440,9 +436,10 @@ Phase 2 closes the audit from "next steps" into a usable contract baseline:
 2. the current tree no longer treats host-contract gaps as open blockers:
    `HS1` through `HS10` are already exposed, while `HS11` and `HS12`
    remain intentionally non-contract surfaces
-3. Phases 2, 3, 4, and 5 of the relocation backlog have already consumed the
+3. Phases 2, 3, 4, 5, and 6 of the relocation backlog have already consumed the
    operator/control, reference/lookup/addressing,
-   query/criteria/transform, and inspection/metadata `Execute*`
-   wrapper inventories, leaving only structural shell debt under `HS11`
-4. the next subsystem phases can focus on the remaining matrix and random
-   terminals instead of inventing new Host surfaces ad hoc
+   query/criteria/transform, inspection/metadata, and matrix/statistical
+   `Execute*` wrapper inventories, leaving only the random wrapper residue
+   plus structural shell debt under `HS10` / `HS11`
+4. the next subsystem phase can focus on the remaining random terminals and
+   shell contraction instead of inventing new Host surfaces ad hoc

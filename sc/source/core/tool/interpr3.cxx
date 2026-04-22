@@ -1466,9 +1466,4 @@ void ScInterpreter::CalculateSlopeIntercept(bool bSlope)
     }
 }
 
-void ScInterpreter::ExecuteFourierTerminal()
-{
-    seinterpcompatdispatch::Dispatcher::fourier(*this);
-}
-
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

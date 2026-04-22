@@ -55,13 +55,20 @@ Historical slice writeups, phase plans, and retired ledgers now live under
   `ExecuteStyleTerminal`, `ExecuteInfoTerminal`, or `ExecuteNTerminal`;
   inspection and metadata reads now route through explicit inspection/runtime
   adapters or host-owned side-effect dispatch
+- Phase 6 matrix projection and adapter-tail closure is complete: Calc no
+  longer declares or dispatches `ExecuteMatValueTerminal`,
+  `ExecuteMatRefTerminal`, `ExecuteFrequencyTerminal`,
+  `ExecuteForecastEtsTerminal`, `ExecuteFourierTerminal`, or
+  `ExecuteSumXMY2Terminal`; the residual matrix work now lives in engine
+  runtime planners plus explicit host-backed matrix consumers rather than in
+  dedicated Calc wrapper terminals
 
 ## Canonical Dashboard
 
 Canonical dashboard metrics live in this file only. Static relocation-debt
 metrics on the current tree are:
 
-- `legacy_interpreter_subroutine_count=9`
+- `legacy_interpreter_subroutine_count=3`
 - `interp4_dispatch_legacy_lambda_count=0`
 - `interp4_dispatch_engine_backed_plan_engine_attempt_count=0`
 
@@ -74,10 +81,9 @@ when the runtime envelope changes:
 
 ## Current Priorities
 
-1. Close or explicitly classify the remaining matrix-projection and
-   adapter-tail terminals still owned by Calc.
-2. Contract the residual `ScInterpreter::Interpret()` shell once the remaining
-   terminals have explicit ownership.
+1. Close the remaining random adapter residue still owned by Calc.
+2. Contract the residual `ScInterpreter::Interpret()` shell once the random
+   wrappers are gone.
 3. Keep host-facing contracts explicit before widening new evaluator surface.
 4. Preserve replay parity and the known-regression baseline while relocation
    lands.

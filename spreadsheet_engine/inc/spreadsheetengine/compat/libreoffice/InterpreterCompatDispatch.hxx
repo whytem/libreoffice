@@ -150,6 +150,12 @@ using namespace formula;
     }
 }
 
+[[nodiscard]] inline const ScMatrix* getFormulaCellMatrix(ScFormulaCell& rFormulaCell)
+{
+    const auto pGetMatrix = &ScFormulaCell::GetMatrix;
+    return (rFormulaCell.*pGetMatrix)();
+}
+
 inline void putScalarIntoMatrix(
     const spreadsheetengine::api::CellValue& rValue, const ScMatrixRef& pMatrix,
     SCSIZE nColumn, SCSIZE nRow)
@@ -1710,6 +1716,10 @@ inline void putScalarIntoMatrix(
     static void sortByTerminal(ScInterpreter& rCalc);
     static void dbAreaTerminal(ScInterpreter& rCalc);
     static void colRowNameAutoTerminal(ScInterpreter& rCalc);
+    static void pushMatrixValueResult(
+        ScInterpreter& rCalc, const ScMatrix* pMatrix, SCSIZE nColumn, SCSIZE nRow);
+    static void matValueTerminal(ScInterpreter& rCalc);
+    static void matRefTerminal(ScInterpreter& rCalc);
     static void typeTerminal(ScInterpreter& rCalc);
     static void cellTerminal(ScInterpreter& rCalc);
     static void cellExternalTerminal(ScInterpreter& rCalc);
@@ -4350,6 +4360,174 @@ inline void Dispatcher::colRowNameAutoTerminal(ScInterpreter& rCalc)
 
     aRefData.SetRange(mrDoc.GetSheetLimits(), aAbsolute, SEIC.aPos);
     SEIC.PushTempToken(new ScDoubleRefToken(mrDoc.GetSheetLimits(), aRefData));
+}
+
+inline void Dispatcher::pushMatrixValueResult(
+    ScInterpreter& rCalc, const ScMatrix* pMatrix, SCSIZE nColumn, SCSIZE nRow)
+{
+    if (!pMatrix)
+    {
+        PushNoValue();
+        return;
+    }
+
+    SCSIZE nColumns = 0;
+    SCSIZE nRows = 0;
+    pMatrix->GetDimensions(nColumns, nRows);
+    if (nColumn >= nColumns || nRow >= nRows)
+    {
+        PushNoValue();
+        return;
+    }
+
+    const ScMatrixValue aValue = pMatrix->Get(nColumn, nRow);
+    if (ScMatrix::IsNonValueType(aValue.nType))
+        rCalc.PushString(aValue.GetString());
+    else
+        PushDouble(aValue.fVal);
+}
+
+inline void Dispatcher::matValueTerminal(ScInterpreter& rCalc)
+{
+    if (!MustHaveParamCount(GetByte(), 3))
+        return;
+
+    const SCSIZE nRow = static_cast<SCSIZE>(SEIC.GetUInt32());
+    const SCSIZE nColumn = static_cast<SCSIZE>(SEIC.GetUInt32());
+    if (nGlobalError != FormulaError::NONE)
+    {
+        PushError(nGlobalError);
+        return;
+    }
+
+    switch (GetStackType())
+    {
+        case svSingleRef:
+        {
+            ScAddress aAddress;
+            PopSingleRef(aAddress);
+            ScRefCellValue aCell(mrDoc, aAddress);
+            if (aCell.getType() != CELLTYPE_FORMULA)
+            {
+                PushIllegalParameter();
+                return;
+            }
+
+            const FormulaError nErrCode = aCell.getFormula()->GetErrCode();
+            if (nErrCode != FormulaError::NONE)
+            {
+                PushError(nErrCode);
+                return;
+            }
+
+            pushMatrixValueResult(rCalc, getFormulaCellMatrix(*aCell.getFormula()), nColumn, nRow);
+            return;
+        }
+        case svDoubleRef:
+        {
+            SCCOL nCol1 = 0;
+            SCROW nRow1 = 0;
+            SCTAB nTab1 = 0;
+            SCCOL nCol2 = 0;
+            SCROW nRow2 = 0;
+            SCTAB nTab2 = 0;
+            PopDoubleRef(nCol1, nRow1, nTab1, nCol2, nRow2, nTab2);
+            if (nCol2 - nCol1 < static_cast<SCCOL>(nRow)
+                || nRow2 - nRow1 < static_cast<SCROW>(nColumn) || nTab1 != nTab2)
+            {
+                PushNoValue();
+                return;
+            }
+
+            ScAddress aAddress(sal::static_int_cast<SCCOL>(nCol1 + nRow),
+                sal::static_int_cast<SCROW>(nRow1 + nColumn), nTab1);
+            ScRefCellValue aCell(mrDoc, aAddress);
+            if (aCell.hasNumeric())
+            {
+                PushDouble(GetCellValue(aAddress, aCell));
+                return;
+            }
+
+            svl::SharedString aString;
+            SEIC.GetCellString(aString, aCell);
+            SEIC.PushString(aString);
+            return;
+        }
+        case svMatrix:
+            pushMatrixValueResult(rCalc, SEIC.PopMatrix().get(), nColumn, nRow);
+            return;
+        default:
+            PopError();
+            PushIllegalParameter();
+            return;
+    }
+}
+
+inline void Dispatcher::matRefTerminal(ScInterpreter& rCalc)
+{
+    SEIC.Push(*SEIC.pCur);
+    ScAddress aAddress;
+    PopSingleRef(aAddress);
+
+    ScRefCellValue aCell(mrDoc, aAddress);
+    if (aCell.getType() != CELLTYPE_FORMULA)
+    {
+        PushError(FormulaError::NoRef);
+        return;
+    }
+
+    if (aCell.getFormula()->IsRunning())
+    {
+        PushError(FormulaError::RetryCircular);
+        return;
+    }
+
+    const ScMatrix* pMatrix = getFormulaCellMatrix(*aCell.getFormula());
+    if (!pMatrix)
+    {
+        mrDoc.GetNumberFormatInfo(mrContext, SEIC.nCurFmtType, SEIC.nCurFmtIndex, aAddress);
+        nFuncFmtType = SEIC.nCurFmtType;
+        nFuncFmtIndex = SEIC.nCurFmtIndex;
+        const FormulaError nErr = aCell.getFormula()->GetErrCode();
+        if (nErr != FormulaError::NONE)
+            PushError(nErr);
+        else if (aCell.getFormula()->IsValue())
+            PushDouble(aCell.getFormula()->GetValue());
+        else
+            SEIC.PushString(aCell.getFormula()->GetString());
+        return;
+    }
+
+    SCSIZE nColumns = 0;
+    SCSIZE nRows = 0;
+    pMatrix->GetDimensions(nColumns, nRows);
+    const SCSIZE nColumn = static_cast<SCSIZE>(SEIC.aPos.Col() - aAddress.Col());
+    const SCSIZE nRow = static_cast<SCSIZE>(SEIC.aPos.Row() - aAddress.Row());
+    if ((nColumns <= nColumn && nColumns != 1) || (nRows <= nRow && nRows != 1))
+    {
+        PushNA();
+        return;
+    }
+
+    const ScMatrixValue aValue = pMatrix->Get(nColumn, nRow);
+    if (ScMatrix::IsNonValueType(aValue.nType))
+    {
+        if (ScMatrix::IsEmptyPathType(aValue.nType))
+        {
+            nFuncFmtType = SvNumFormatType::LOGICAL;
+            SEIC.PushInt(0);
+        }
+        else if (ScMatrix::IsEmptyType(aValue.nType))
+            SEIC.PushTempToken(new ScEmptyCellToken(false, true));
+        else
+            SEIC.PushString(aValue.GetString());
+        return;
+    }
+
+    mrDoc.GetNumberFormatInfo(mrContext, SEIC.nCurFmtType, SEIC.nCurFmtIndex, aAddress);
+    nFuncFmtType = SEIC.nCurFmtType;
+    nFuncFmtIndex = SEIC.nCurFmtIndex;
+    PushDouble(aValue.fVal);
 }
 
 inline void Dispatcher::typeTerminal(ScInterpreter& rCalc)

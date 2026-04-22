@@ -302,13 +302,7 @@ std::vector<std::string> listLegacyInterpreterSubroutineNames()
     if (aText.empty())
         return {};
 
-    static constexpr std::array<std::string_view, 9> aTrackedNames = {
-        "ExecuteMatValueTerminal",
-        "ExecuteMatRefTerminal",
-        "ExecuteFrequencyTerminal",
-        "ExecuteForecastEtsTerminal",
-        "ExecuteFourierTerminal",
-        "ExecuteSumXMY2Terminal",
+    static constexpr std::array<std::string_view, 3> aTrackedNames = {
         "ExecuteRandomTerminal",
         "ExecuteRandbetweenTerminal",
         "ExecuteRandArrayTerminal",
