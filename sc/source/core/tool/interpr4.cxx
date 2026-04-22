@@ -11887,74 +11887,86 @@ StackVar ScInterpreter::Interpret()
                         CalculateAddSub(true);
                         break;
                     case ocMul              :
-                        ExecuteBinaryMathKernel(serpn::BinaryScalarOperator::Multiply);
+                        seinterpcompatdispatch::Dispatcher::binaryMathKernel(
+                            *this, serpn::BinaryScalarOperator::Multiply);
                         break;
                     case ocDiv              :
-                        ExecuteBinaryMathKernel(serpn::BinaryScalarOperator::Divide);
+                        seinterpcompatdispatch::Dispatcher::binaryMathKernel(
+                            *this, serpn::BinaryScalarOperator::Divide);
                         break;
                     case ocAmpersand        :
-                        ExecuteConcatKernel();
+                        seinterpcompatdispatch::Dispatcher::concatKernel(*this);
                         break;
                     case ocPow              :
-                        ExecuteBinaryMathKernel(serpn::BinaryScalarOperator::Power);
+                        seinterpcompatdispatch::Dispatcher::binaryMathKernel(
+                            *this, serpn::BinaryScalarOperator::Power);
                         break;
                     case ocEqual            :
                         warnIfLegacyScalarRootReached(u"EQUAL");
-                        ExecuteComparisonKernel(
+                        seinterpcompatdispatch::Dispatcher::comparisonKernel(
+                            *this,
                             spreadsheetengine::compat::libreoffice::interpreterdispatch::
                                 ComparisonMode::Equal,
                             SC_EQUAL);
                         break;
                     case ocNotEqual         :
                         warnIfLegacyScalarRootReached(u"NOT_EQUAL");
-                        ExecuteComparisonKernel(
+                        seinterpcompatdispatch::Dispatcher::comparisonKernel(
+                            *this,
                             spreadsheetengine::compat::libreoffice::interpreterdispatch::
                                 ComparisonMode::NotEqual,
                             SC_NOT_EQUAL);
                         break;
                     case ocLess             :
                         warnIfLegacyScalarRootReached(u"LESS");
-                        ExecuteComparisonKernel(
+                        seinterpcompatdispatch::Dispatcher::comparisonKernel(
+                            *this,
                             spreadsheetengine::compat::libreoffice::interpreterdispatch::
                                 ComparisonMode::Less,
                             SC_LESS);
                         break;
                     case ocGreater          :
                         warnIfLegacyScalarRootReached(u"GREATER");
-                        ExecuteComparisonKernel(
+                        seinterpcompatdispatch::Dispatcher::comparisonKernel(
+                            *this,
                             spreadsheetengine::compat::libreoffice::interpreterdispatch::
                                 ComparisonMode::Greater,
                             SC_GREATER);
                         break;
                     case ocLessEqual        :
                         warnIfLegacyScalarRootReached(u"LESS_EQUAL");
-                        ExecuteComparisonKernel(
+                        seinterpcompatdispatch::Dispatcher::comparisonKernel(
+                            *this,
                             spreadsheetengine::compat::libreoffice::interpreterdispatch::
                                 ComparisonMode::LessEqual,
                             SC_LESS_EQUAL);
                         break;
                     case ocGreaterEqual     :
                         warnIfLegacyScalarRootReached(u"GREATER_EQUAL");
-                        ExecuteComparisonKernel(
+                        seinterpcompatdispatch::Dispatcher::comparisonKernel(
+                            *this,
                             spreadsheetengine::compat::libreoffice::interpreterdispatch::
                                 ComparisonMode::GreaterEqual,
                             SC_GREATER_EQUAL);
                         break;
                     case ocAnd              :
                         warnLogicalDispatch(u"AND");
-                        ExecuteLogicalFoldKernel(
+                        seinterpcompatdispatch::Dispatcher::logicalFoldKernel(
+                            *this,
                             spreadsheetengine::compat::libreoffice::interpreterdispatch::
                                 LogicalFoldMode::And);
                         break;
                     case ocOr               :
                         warnLogicalDispatch(u"OR");
-                        ExecuteLogicalFoldKernel(
+                        seinterpcompatdispatch::Dispatcher::logicalFoldKernel(
+                            *this,
                             spreadsheetengine::compat::libreoffice::interpreterdispatch::
                                 LogicalFoldMode::Or);
                         break;
                     case ocXor              :
                         warnLogicalDispatch(u"XOR");
-                        ExecuteLogicalFoldKernel(
+                        seinterpcompatdispatch::Dispatcher::logicalFoldKernel(
+                            *this,
                             spreadsheetengine::compat::libreoffice::interpreterdispatch::
                                 LogicalFoldMode::Xor);
                         break;
@@ -11977,7 +11989,8 @@ StackVar ScInterpreter::Interpret()
                     case ocNot              :
                         warnLogicalDispatch(u"NOT");
                         nFuncFmtType = SvNumFormatType::LOGICAL;
-                        ExecuteUnaryMatrixOrScalarKernel(
+                        seinterpcompatdispatch::Dispatcher::unaryMatrixOrScalarKernel(
+                            *this,
                             spreadsheetengine::compat::libreoffice::interpreterdispatch::
                                 UnaryMatrixScalarMode::LogicalNot);
                         break;
@@ -11985,7 +11998,8 @@ StackVar ScInterpreter::Interpret()
                     case ocNeg              :
                         warnIfLegacyScalarRootReached(u"NEGATE");
                         nFuncFmtType = nCurFmtType;
-                        ExecuteUnaryMatrixOrScalarKernel(
+                        seinterpcompatdispatch::Dispatcher::unaryMatrixOrScalarKernel(
+                            *this,
                             spreadsheetengine::compat::libreoffice::interpreterdispatch::
                                 UnaryMatrixScalarMode::Negate);
                         break;
@@ -11993,7 +12007,8 @@ StackVar ScInterpreter::Interpret()
                         warnIfLegacyScalarRootReached(u"PERCENT");
                         nFuncFmtType = SvNumFormatType::PERCENT;
                         PushInt(100);
-                        ExecuteBinaryMathKernel(serpn::BinaryScalarOperator::Divide);
+                        seinterpcompatdispatch::Dispatcher::binaryMathKernel(
+                            *this, serpn::BinaryScalarOperator::Divide);
                         break;
                     case ocPi               :
                         warnIfLegacyDefaultOnReached(
@@ -12092,7 +12107,9 @@ StackVar ScInterpreter::Interpret()
                             PushIllegalParameter();
                         }
                         break;
-                    case ocLet              : ExecuteLetKernel();       break;
+                    case ocLet              :
+                        seinterpcompatdispatch::Dispatcher::letKernel(*this);
+                        break;
                     case ocWrapCols         :
                         if (!dispatchSpillWrapColsOrRowsTerminal(/*bCols*/ true))
                         {
@@ -12882,7 +12899,8 @@ StackVar ScInterpreter::Interpret()
                     break;
                     case ocPower            :
                         if (MustHaveParamCount(GetByte(), 2))
-                            ExecuteBinaryMathKernel(serpn::BinaryScalarOperator::Power);
+                            seinterpcompatdispatch::Dispatcher::binaryMathKernel(
+                                *this, serpn::BinaryScalarOperator::Power);
                         break;
                     case ocRound            :
                         warnIfLegacyDefaultOnReached(

@@ -35,7 +35,7 @@ contract gaps that previously blocked relocation are already landed:
 - `RuntimeEnvironment::sampleUniformReal()`
 - `SpillRangeAllocator`
 
-The work that remains is now one of three kinds:
+The work that remains is now one of two kinds:
 
 - semantic migration of still-live Calc terminals
 - retirement of Calc wrappers that are already engine-backed in substance
@@ -46,6 +46,16 @@ Phase 1 of the relocation backlog is now complete:
 - `ScTTT` and `ScDebugVar` are treated as retained debug utilities
 - canonical relocation-debt metrics now track the live `Execute*` /
   `ScMatchOp` closure set rather than a broad historical `Sc*` regex
+
+Phase 2 of the relocation backlog is now complete:
+
+- Calc no longer declares or dispatches `ExecuteComparisonKernel`,
+  `ExecuteLogicalFoldKernel`, `ExecuteUnaryMatrixOrScalarKernel`,
+  `ExecuteBinaryMathKernel`, `ExecuteConcatKernel`, or `ExecuteLetKernel`
+- engine-backed classic-entry dispatch attempts are already zero on the
+  current tree
+- canonical relocation-debt metrics now exclude the retired operator/control
+  wrapper surface
 
 ## Working Rules
 
@@ -68,12 +78,6 @@ Phase 1 of the relocation backlog is now complete:
 - classic stack/token machinery in `interpre.hxx` and `interpr4.cxx`,
   including `sp`, `maxsp`, `Push*`, `Pop*`, token iteration helpers, and
   dispatch bookkeeping
-- engine-backed classic-entry dispatch that still runs through `Interpret()`
-  for:
-  `IF`, `IFERROR`, `IFNA`, `CHOOSE`, `IFS`, `SWITCH`,
-  `CHOOSECOLS`, `CHOOSEROWS`, `FILTER`, `SORT`, `DROP`, `EXPAND`,
-  `HSTACK`, `VSTACK`, `TAKE`, `TEXTSPLIT`, `TOCOL`, `TOROW`, `UNIQUE`,
-  `WRAPCOLS`, `WRAPROWS`
 
 ### Reference / Lookup / Addressing
 
@@ -124,12 +128,6 @@ waves already landed upstream.
 These surfaces are already engine-owned in substance, but Calc still carries
 entrypoint or dispatch residue for them:
 
-- `ExecuteComparisonKernel`
-- `ExecuteLogicalFoldKernel`
-- `ExecuteUnaryMatrixOrScalarKernel`
-- `ExecuteBinaryMathKernel`
-- `ExecuteConcatKernel`
-- `ExecuteLetKernel`
 - `ExecuteFrequencyTerminal`
 - `ExecuteForecastEtsTerminal`
 - `ExecuteFourierTerminal`
@@ -139,38 +137,6 @@ entrypoint or dispatch residue for them:
 - `ExecuteRandArrayTerminal`
 
 ## Phased Implementation Plan
-
-### Phase 2: Engine-Backed Classic-Entry And Operator-Kernel Retirement
-
-Goal: remove the cases where the engine already owns execution semantics, but
-Calc still re-enters through classic-entry or kernel wrappers.
-
-Scope:
-
-- retire engine-backed classic-entry dispatch for:
-  `IF`, `IFERROR`, `IFNA`, `CHOOSE`, `IFS`, `SWITCH`,
-  `CHOOSECOLS`, `CHOOSEROWS`, `FILTER`, `SORT`, `DROP`, `EXPAND`,
-  `HSTACK`, `VSTACK`, `TAKE`, `TEXTSPLIT`, `TOCOL`, `TOROW`, `UNIQUE`,
-  `WRAPCOLS`, `WRAPROWS`
-- retire Calc execution ownership for:
-  `ExecuteComparisonKernel`, `ExecuteLogicalFoldKernel`,
-  `ExecuteUnaryMatrixOrScalarKernel`, `ExecuteBinaryMathKernel`,
-  `ExecuteConcatKernel`, `ExecuteLetKernel`
-- remove parity-only bridges whose only job is to feed already-engine-native
-  execution
-- keep control-flow and typed-stack state in engine runtime code rather than
-  reopening host-facade work
-
-Exit criteria:
-
-- the current engine-backed classic-entry set no longer uses `Interpret()` as
-  the execution owner
-- `interp4_dispatch_engine_backed_plan_engine_attempt_count` reflects only
-  intentionally retained host-owned residue, or reaches zero
-- the listed Calc kernels are deleted or reduced to trivial host-only stubs
-  with no evaluator logic
-- targeted parity coverage exists for scalar, matrix, spill, concatenation,
-  and control-flow shapes
 
 ### Phase 3: Reference / Lookup / Addressing Ownership Closure
 

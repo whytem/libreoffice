@@ -665,17 +665,6 @@ private:
     void ExecuteSubTotalTerminal();
 
 private:
-    void ExecuteComparisonKernel(
-        spreadsheetengine::compat::libreoffice::interpreterdispatch::ComparisonMode eMode,
-        ScQueryOp eOp);
-    void ExecuteLogicalFoldKernel(
-        spreadsheetengine::compat::libreoffice::interpreterdispatch::LogicalFoldMode eMode);
-    void ExecuteUnaryMatrixOrScalarKernel(
-        spreadsheetengine::compat::libreoffice::interpreterdispatch::UnaryMatrixScalarMode eMode);
-    void ExecuteBinaryMathKernel(
-        spreadsheetengine::core::rpn::BinaryScalarOperator eOperator);
-    void ExecuteConcatKernel();
-    void ExecuteLetKernel();
     void ScMatchOp(bool bExtended);
 
 public:

@@ -14,6 +14,8 @@
 #include <spreadsheetengine/compat/libreoffice/Date.hxx>
 #include <spreadsheetengine/compat/libreoffice/Error.hxx>
 #include <spreadsheetengine/compat/libreoffice/FormulaInspectionExecution.hxx>
+#include <spreadsheetengine/compat/libreoffice/InterpreterDispatch.hxx>
+#include <spreadsheetengine/compat/libreoffice/LetExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/LookupExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/String.hxx>
 #include <spreadsheetengine/compat/libreoffice/TextServices.hxx>
@@ -22,12 +24,15 @@
 #include <spreadsheetengine/runtime/ForecastEtsEngine.hxx>
 #include <spreadsheetengine/runtime/RpnMatrix.hxx>
 #include <spreadsheetengine/runtime/RpnRandom.hxx>
+#include <sfx2/linkmgr.hxx>
 
 namespace spreadsheetengine::compat::libreoffice::interpretercompatdispatch
 {
 
 namespace selibreoffice = spreadsheetengine::compat::libreoffice;
+namespace seinterpre = spreadsheetengine::compat::libreoffice::interpreterdispatch;
 namespace selookupexec = spreadsheetengine::compat::libreoffice::lookupexecution;
+namespace seletexec = spreadsheetengine::compat::libreoffice::letexecution;
 namespace semath = spreadsheetengine::core::math;
 namespace serpn = spreadsheetengine::core::rpn;
 using namespace formula;
@@ -153,6 +158,48 @@ inline void putScalarIntoMatrix(
     aOperand.meProvenance = serpn::MatrixProvenance::ComputedResult;
     aOperand.maValues.push_back(spreadsheetengine::api::CellValue::number(fValue));
     return aOperand;
+}
+
+[[nodiscard]] inline SCSIZE minBinaryMatrixExtent(SCSIZE nLeft, SCSIZE nRight)
+{
+    if (nLeft == 1)
+        return nRight;
+    if (nRight == 1)
+        return nLeft;
+    return std::min(nLeft, nRight);
+}
+
+[[nodiscard]] inline ScMatrixRef binaryMatrixCalculation(
+    const ScMatrix& rLeft, const ScMatrix& rRight, ScInterpreter& rCalc,
+    const ScMatrix::CalculateOpFunction& rOperation)
+{
+    SCSIZE nLeftColumns = 0;
+    SCSIZE nLeftRows = 0;
+    SCSIZE nRightColumns = 0;
+    SCSIZE nRightRows = 0;
+    rLeft.GetDimensions(nLeftColumns, nLeftRows);
+    rRight.GetDimensions(nRightColumns, nRightRows);
+    const SCSIZE nResultColumns = minBinaryMatrixExtent(nLeftColumns, nRightColumns);
+    const SCSIZE nResultRows = minBinaryMatrixExtent(nLeftRows, nRightRows);
+    ScMatrixRef xResult = GetNewMat(nResultColumns, nResultRows, /*bEmpty*/ true);
+    if (xResult)
+        xResult->ExecuteBinaryOp(nResultColumns, nResultRows, rLeft, rRight, &rCalc, rOperation);
+    return xResult;
+}
+
+[[nodiscard]] inline double compatMatrixMul(const double& fLeft, const double& fRight)
+{
+    return fLeft * fRight;
+}
+
+[[nodiscard]] inline double compatMatrixDiv(const double& fLeft, const double& fRight)
+{
+    return ScInterpreter::div(fLeft, fRight);
+}
+
+[[nodiscard]] inline double compatMatrixPow(const double& fLeft, const double& fRight)
+{
+    return sc::power(fLeft, fRight);
 }
 
     [[nodiscard]] constexpr serpn::ForecastEtsVariant toForecastEtsVariant(ScETSType eType)
@@ -1581,6 +1628,16 @@ inline void putScalarIntoMatrix(
     static void aggregateVarP(ScInterpreter& rCalc, bool bTextAsZero);
     static void aggregateStDev(ScInterpreter& rCalc, bool bTextAsZero);
     static void aggregateStDevP(ScInterpreter& rCalc, bool bTextAsZero);
+    static void comparisonKernel(
+        ScInterpreter& rCalc, seinterpre::ComparisonMode eMode, ScQueryOp eOp);
+    static void logicalFoldKernel(
+        ScInterpreter& rCalc, seinterpre::LogicalFoldMode eMode);
+    static void unaryMatrixOrScalarKernel(
+        ScInterpreter& rCalc, seinterpre::UnaryMatrixScalarMode eMode);
+    static void binaryMathKernel(
+        ScInterpreter& rCalc, spreadsheetengine::core::rpn::BinaryScalarOperator eOperator);
+    static void concatKernel(ScInterpreter& rCalc);
+    static void letKernel(ScInterpreter& rCalc);
     static void matrixDeterminant(ScInterpreter& rCalc);
     static void random(ScInterpreter& rCalc);
     static void randArray(ScInterpreter& rCalc);
@@ -1599,6 +1656,562 @@ inline void putScalarIntoMatrix(
     static void forecastEts(ScInterpreter& rCalc, ScETSType eETSType);
     static void growth(ScInterpreter& rCalc) { CalculateTrendGrowth(true); }
 };
+
+inline void Dispatcher::comparisonKernel(
+    ScInterpreter& rCalc, seinterpre::ComparisonMode eMode, ScQueryOp eOp)
+{
+    if (GetStackType(1) == svMatrix || GetStackType(2) == svMatrix)
+    {
+        sc::RangeMatrix aMatrix = SEIC.CompareMat(eOp);
+        if (!aMatrix.mpMat)
+        {
+            PushIllegalParameter();
+            return;
+        }
+
+        PushMatrix(aMatrix);
+        return;
+    }
+
+    SEIC.PushInt(int(seinterpre::matchesComparisonResult(SEIC.Compare(eOp), eMode)));
+}
+
+inline void Dispatcher::logicalFoldKernel(
+    ScInterpreter& rCalc, seinterpre::LogicalFoldMode eMode)
+{
+    nFuncFmtType = SvNumFormatType::LOGICAL;
+    short nParamCount = GetByte();
+    if (!MustHaveParamCountMin(nParamCount, 1))
+        return;
+
+    bool bHaveValue = false;
+    bool bResult = seinterpre::initialLogicalFoldValue(eMode);
+    size_t nRefInList = 0;
+
+    const auto foldValue = [&](bool bValue) {
+        bHaveValue = true;
+        bResult = seinterpre::foldLogicalValue(eMode, bResult, bValue);
+    };
+
+    while (nParamCount-- > 0)
+    {
+        if (nGlobalError == FormulaError::NONE)
+        {
+            switch (GetStackType())
+            {
+                case svDouble:
+                    foldValue(SEIC.PopDouble() != 0.0);
+                    break;
+                case svString:
+                    Pop();
+                    SetError(FormulaError::NoValue);
+                    break;
+                case svSingleRef:
+                {
+                    ScAddress aAddress;
+                    PopSingleRef(aAddress);
+                    if (nGlobalError == FormulaError::NONE)
+                    {
+                        ScRefCellValue aCell(mrDoc, aAddress);
+                        if (aCell.hasNumeric())
+                            foldValue(GetCellValue(aAddress, aCell) != 0.0);
+                    }
+                    break;
+                }
+                case svDoubleRef:
+                case svRefList:
+                {
+                    ScRange aRange;
+                    PopDoubleRef(aRange, nParamCount, nRefInList);
+                    if (nGlobalError == FormulaError::NONE)
+                    {
+                        double fValue = 0.0;
+                        FormulaError eError = FormulaError::NONE;
+                        ScValueIterator aValueIter(mrContext, aRange);
+                        if (aValueIter.GetFirst(fValue, eError))
+                        {
+                            do
+                            {
+                                foldValue(fValue != 0.0);
+                            } while (eError == FormulaError::NONE
+                                     && aValueIter.GetNext(fValue, eError));
+                        }
+                        SetError(eError);
+                    }
+                    break;
+                }
+                case svExternalSingleRef:
+                case svExternalDoubleRef:
+                case svMatrix:
+                {
+                    ScMatrixRef pMatrix = GetMatrix();
+                    if (pMatrix)
+                    {
+                        double fValue = 0.0;
+                        switch (eMode)
+                        {
+                            case seinterpre::LogicalFoldMode::And:
+                                fValue = pMatrix->And();
+                                break;
+                            case seinterpre::LogicalFoldMode::Or:
+                                fValue = pMatrix->Or();
+                                break;
+                            case seinterpre::LogicalFoldMode::Xor:
+                                fValue = pMatrix->Xor();
+                                break;
+                        }
+
+                        const FormulaError eError = GetDoubleErrorValue(fValue);
+                        if (eError != FormulaError::NONE)
+                        {
+                            SetError(eError);
+                            bResult = false;
+                        }
+                        else
+                            foldValue(fValue != 0.0);
+                    }
+                    break;
+                }
+                default:
+                    PopError();
+                    SetError(FormulaError::IllegalParameter);
+                    break;
+            }
+        }
+        else
+            Pop();
+    }
+
+    if (bHaveValue)
+        SEIC.PushInt(int(bResult));
+    else
+        PushNoValue();
+}
+
+inline void Dispatcher::unaryMatrixOrScalarKernel(
+    ScInterpreter& rCalc, seinterpre::UnaryMatrixScalarMode eMode)
+{
+    switch (GetStackType())
+    {
+        case svMatrix:
+        {
+            ScMatrixRef pMatrix = GetMatrix();
+            if (!pMatrix)
+                PushIllegalParameter();
+            else
+            {
+                SCSIZE nColumns = 0;
+                SCSIZE nRows = 0;
+                pMatrix->GetDimensions(nColumns, nRows);
+                ScMatrixRef pResultMatrix = GetNewMat(nColumns, nRows, /*bEmpty*/ true);
+                if (!pResultMatrix)
+                    PushIllegalArgument();
+                else
+                {
+                    if (eMode == seinterpre::UnaryMatrixScalarMode::Negate)
+                        pMatrix->NegOp(*pResultMatrix);
+                    else
+                        pMatrix->NotOp(*pResultMatrix);
+                    PushMatrix(pResultMatrix);
+                }
+            }
+            break;
+        }
+        default:
+            if (eMode == seinterpre::UnaryMatrixScalarMode::Negate)
+                PushDouble(-SEIC.GetDouble());
+            else
+                SEIC.PushInt(int(SEIC.GetDouble() == 0.0));
+            break;
+    }
+}
+
+inline void Dispatcher::binaryMathKernel(
+    ScInterpreter& rCalc, spreadsheetengine::core::rpn::BinaryScalarOperator eOperator)
+{
+    ScMatrixRef pMatrix1 = nullptr;
+    ScMatrixRef pMatrix2 = nullptr;
+    double fValue1 = 0.0;
+    double fValue2 = 0.0;
+    SvNumFormatType eCurrencyType = SEIC.nCurFmtType;
+    sal_uLong nCurrencyIndex = SEIC.nCurFmtIndex;
+    SvNumFormatType eCurrencyType2 = SvNumFormatType::UNDEFINED;
+
+    const auto pMatrixOperation = [&]() -> double (*)(const double&, const double&) {
+        switch (eOperator)
+        {
+            case spreadsheetengine::core::rpn::BinaryScalarOperator::Multiply:
+                return compatMatrixMul;
+            case spreadsheetengine::core::rpn::BinaryScalarOperator::Divide:
+                return compatMatrixDiv;
+            case spreadsheetengine::core::rpn::BinaryScalarOperator::Power:
+                return compatMatrixPow;
+            default:
+                return nullptr;
+        }
+    }();
+
+    if (GetStackType() == svMatrix)
+        pMatrix2 = GetMatrix();
+    else
+    {
+        fValue2 = SEIC.GetDouble();
+        if (eOperator == spreadsheetengine::core::rpn::BinaryScalarOperator::Multiply)
+        {
+            if (SEIC.nCurFmtType == SvNumFormatType::CURRENCY)
+            {
+                eCurrencyType = SEIC.nCurFmtType;
+                nCurrencyIndex = SEIC.nCurFmtIndex;
+            }
+        }
+        else if (eOperator == spreadsheetengine::core::rpn::BinaryScalarOperator::Divide)
+            eCurrencyType2 = SEIC.nCurFmtType;
+    }
+
+    if (GetStackType() == svMatrix)
+        pMatrix1 = GetMatrix();
+    else
+    {
+        fValue1 = SEIC.GetDouble();
+        if (eOperator == spreadsheetengine::core::rpn::BinaryScalarOperator::Multiply
+            || eOperator == spreadsheetengine::core::rpn::BinaryScalarOperator::Divide)
+        {
+            if (SEIC.nCurFmtType == SvNumFormatType::CURRENCY)
+            {
+                eCurrencyType = SEIC.nCurFmtType;
+                nCurrencyIndex = SEIC.nCurFmtIndex;
+            }
+        }
+    }
+
+    if (pMatrix1 && pMatrix2)
+    {
+        ScMatrixRef pResultMatrix = pMatrixOperation
+                                        ? binaryMatrixCalculation(
+                                              *pMatrix1, *pMatrix2, rCalc, pMatrixOperation)
+                                        : nullptr;
+        if (!pResultMatrix)
+            PushNoValue();
+        else
+            PushMatrix(pResultMatrix);
+    }
+    else if (pMatrix1 || pMatrix2)
+    {
+        double fScalar = 0.0;
+        bool bScalarOnLeft = false;
+        ScMatrixRef pMatrix = std::move(pMatrix1);
+        if (!pMatrix)
+        {
+            fScalar = fValue1;
+            pMatrix = std::move(pMatrix2);
+            bScalarOnLeft = true;
+        }
+        else
+            fScalar = fValue2;
+
+        SCSIZE nColumns = 0;
+        SCSIZE nRows = 0;
+        pMatrix->GetDimensions(nColumns, nRows);
+        ScMatrixRef pResultMatrix = GetNewMat(nColumns, nRows, /*bEmpty*/ true);
+        if (!pResultMatrix)
+        {
+            PushIllegalArgument();
+            return;
+        }
+
+        switch (eOperator)
+        {
+            case spreadsheetengine::core::rpn::BinaryScalarOperator::Multiply:
+                pMatrix->MulOp(fScalar, *pResultMatrix);
+                break;
+            case spreadsheetengine::core::rpn::BinaryScalarOperator::Divide:
+                pMatrix->DivOp(bScalarOnLeft, fScalar, *pResultMatrix);
+                break;
+            case spreadsheetengine::core::rpn::BinaryScalarOperator::Power:
+                pMatrix->PowOp(bScalarOnLeft, fScalar, *pResultMatrix);
+                break;
+            default:
+                PushIllegalArgument();
+                return;
+        }
+        PushMatrix(pResultMatrix);
+    }
+    else
+    {
+        switch (eOperator)
+        {
+            case spreadsheetengine::core::rpn::BinaryScalarOperator::Multiply:
+                if (eCurrencyType == SvNumFormatType::CURRENCY)
+                {
+                    nFuncFmtType = eCurrencyType;
+                    nFuncFmtIndex = nCurrencyIndex;
+                }
+                PushDouble(fValue1 * fValue2);
+                break;
+            case spreadsheetengine::core::rpn::BinaryScalarOperator::Divide:
+                if (eCurrencyType == SvNumFormatType::CURRENCY
+                    && eCurrencyType2 != SvNumFormatType::CURRENCY)
+                {
+                    nFuncFmtType = eCurrencyType;
+                    nFuncFmtIndex = nCurrencyIndex;
+                }
+                PushDouble(ScInterpreter::div(fValue1, fValue2));
+                break;
+            case spreadsheetengine::core::rpn::BinaryScalarOperator::Power:
+                PushDouble(sc::power(fValue1, fValue2));
+                break;
+            default:
+                PushIllegalArgument();
+                break;
+        }
+    }
+}
+
+inline void Dispatcher::concatKernel(ScInterpreter& rCalc)
+{
+    ScMatrixRef pMatrix1 = nullptr;
+    ScMatrixRef pMatrix2 = nullptr;
+    OUString aString1;
+    OUString aString2;
+    if (GetStackType() == svMatrix)
+        pMatrix2 = GetMatrix();
+    else
+        aString2 = SEIC.GetString().getString();
+    if (GetStackType() == svMatrix)
+        pMatrix1 = GetMatrix();
+    else
+        aString1 = SEIC.GetString().getString();
+
+    if (pMatrix1 && pMatrix2)
+    {
+        ScMatrixRef pResultMatrix = SEIC.MatConcat(pMatrix1, pMatrix2);
+        if (!pResultMatrix)
+            PushNoValue();
+        else
+            PushMatrix(pResultMatrix);
+    }
+    else if (pMatrix1 || pMatrix2)
+    {
+        OUString aScalarString;
+        bool bScalarOnLeft = false;
+        ScMatrixRef pMatrix = std::move(pMatrix1);
+        if (!pMatrix)
+        {
+            aScalarString = aString1;
+            pMatrix = std::move(pMatrix2);
+            bScalarOnLeft = true;
+        }
+        else
+            aScalarString = aString2;
+
+        SCSIZE nColumns = 0;
+        SCSIZE nRows = 0;
+        pMatrix->GetDimensions(nColumns, nRows);
+        ScMatrixRef pResultMatrix = GetNewMat(nColumns, nRows, /*bEmpty*/ true);
+        if (!pResultMatrix)
+        {
+            PushIllegalArgument();
+            return;
+        }
+
+        if (nGlobalError != FormulaError::NONE)
+        {
+            for (SCSIZE nColumn = 0; nColumn < nColumns; ++nColumn)
+                for (SCSIZE nRow = 0; nRow < nRows; ++nRow)
+                    pResultMatrix->PutError(nGlobalError, nColumn, nRow);
+        }
+        else if (bScalarOnLeft)
+        {
+            for (SCSIZE nColumn = 0; nColumn < nColumns; ++nColumn)
+            {
+                for (SCSIZE nRow = 0; nRow < nRows; ++nRow)
+                {
+                    const FormulaError eError = pMatrix->GetErrorIfNotString(nColumn, nRow);
+                    if (eError != FormulaError::NONE)
+                        pResultMatrix->PutError(eError, nColumn, nRow);
+                    else
+                    {
+                        const OUString aValue
+                            = aScalarString + pMatrix->GetString(mrContext, nColumn, nRow).getString();
+                        pResultMatrix->PutString(rCalc.mrStrPool.intern(aValue), nColumn, nRow);
+                    }
+                }
+            }
+        }
+        else
+        {
+            for (SCSIZE nColumn = 0; nColumn < nColumns; ++nColumn)
+            {
+                for (SCSIZE nRow = 0; nRow < nRows; ++nRow)
+                {
+                    const FormulaError eError = pMatrix->GetErrorIfNotString(nColumn, nRow);
+                    if (eError != FormulaError::NONE)
+                        pResultMatrix->PutError(eError, nColumn, nRow);
+                    else
+                    {
+                        const OUString aValue
+                            = pMatrix->GetString(mrContext, nColumn, nRow).getString() + aScalarString;
+                        pResultMatrix->PutString(rCalc.mrStrPool.intern(aValue), nColumn, nRow);
+                    }
+                }
+            }
+        }
+        PushMatrix(pResultMatrix);
+    }
+    else
+    {
+        if (SEIC.CheckStringResultLen(aString1, aString2.getLength()))
+            aString1 += aString2;
+        SEIC.PushString(aString1);
+    }
+}
+
+inline void Dispatcher::letKernel(ScInterpreter& rCalc)
+{
+    const short* pJump = SEIC.pCur->GetJump();
+    short nJumpCount = pJump[0];
+    const short nOriginalJumpCount = nJumpCount;
+
+    if (nJumpCount < 3 || (nJumpCount % 2 != 1))
+    {
+        PushError(FormulaError::ParameterExpected);
+        SEIC.aCode.Jump(pJump[nOriginalJumpCount], pJump[nOriginalJumpCount]);
+        return;
+    }
+
+    OUString aName;
+    std::unordered_map<OUString, formula::FormulaToken*> aResultIndexes;
+    formula::FormulaTokenArrayPlainIterator aIterator(*SEIC.pArr);
+    ScTokenArray aValueTokens = SEIC.pArr->CloneValue();
+
+    while (nJumpCount > 1)
+    {
+        if (nJumpCount == nOriginalJumpCount)
+            aName = SEIC.GetString().getString();
+        else if ((nOriginalJumpCount - nJumpCount + 1) % 2 == 1)
+        {
+            aIterator.Jump(pJump[static_cast<short>(nOriginalJumpCount - nJumpCount + 1)] - 1);
+            FormulaToken* pToken = aIterator.NextRPN();
+            aName = pToken->GetString().getString();
+        }
+        else
+        {
+            PushError(FormulaError::ParameterExpected);
+            SEIC.aCode.Jump(pJump[nOriginalJumpCount], pJump[nOriginalJumpCount]);
+            return;
+        }
+        --nJumpCount;
+
+        seletexec::replaceNamesToResult(
+            aResultIndexes, aValueTokens, pJump[nOriginalJumpCount - nJumpCount],
+            pJump[nOriginalJumpCount - nJumpCount + 1]);
+
+        ScTokenArray aTempTokens = seletexec::copyTokenSlice(
+            mrDoc, aValueTokens, pJump[nOriginalJumpCount - nJumpCount],
+            pJump[nOriginalJumpCount - nJumpCount + 1]);
+
+        if (aTempTokens.GetLen() == 0)
+        {
+            PushIllegalParameter();
+            SEIC.aCode.Jump(pJump[nOriginalJumpCount], pJump[nOriginalJumpCount]);
+            return;
+        }
+        else if (aTempTokens.GetLen() == 1 && aTempTokens.GetArray()[0]->GetOpCode() == ocPush)
+        {
+            if (!aResultIndexes
+                     .insert(std::make_pair(aName, aTempTokens.GetArray()[0]->Clone()))
+                     .second)
+            {
+                PushIllegalParameter();
+                SEIC.aCode.Jump(pJump[nOriginalJumpCount], pJump[nOriginalJumpCount]);
+                return;
+            }
+        }
+        else
+        {
+            ScInterpreter aNestedInterpreter(
+                mrDoc.GetFormulaCell(SEIC.aPos), mrDoc, mrContext, SEIC.aPos, aValueTokens);
+            aNestedInterpreter.aCode.Jump(
+                pJump[nOriginalJumpCount - nJumpCount],
+                pJump[nOriginalJumpCount - nJumpCount + 1],
+                pJump[nOriginalJumpCount - nJumpCount + 1]);
+            while (aNestedInterpreter.aCode.HasStacked())
+                aNestedInterpreter.aCode.FrontPop();
+            aNestedInterpreter.aCode.Lambda(true);
+
+            sfx2::LinkManager aLinkManager(mrDoc.GetDocumentShell());
+            aNestedInterpreter.SetLinkManager(&aLinkManager);
+
+            formula::StackVar aInterpreterType = aNestedInterpreter.Interpret();
+            if (aInterpreterType == formula::svMatrixCell)
+            {
+#undef GetMatrix
+                ScConstMatrixRef xMatrix(aNestedInterpreter.GetResultToken()->GetMatrix());
+#define GetMatrix(...) SEIC.GetMatrix(__VA_ARGS__)
+                if (!aResultIndexes
+                         .insert(std::make_pair(aName, new ScMatrixToken(xMatrix->Clone())))
+                         .second)
+                {
+                    PushIllegalParameter();
+                    SEIC.aCode.Jump(pJump[nOriginalJumpCount], pJump[nOriginalJumpCount]);
+                    return;
+                }
+            }
+            else
+            {
+                const FormulaConstTokenRef& xToken(aNestedInterpreter.GetResultToken());
+                if (!aResultIndexes.insert(std::make_pair(aName, xToken->Clone())).second)
+                {
+                    PushIllegalParameter();
+                    SEIC.aCode.Jump(pJump[nOriginalJumpCount], pJump[nOriginalJumpCount]);
+                    return;
+                }
+            }
+        }
+        --nJumpCount;
+    }
+
+    seletexec::replaceNamesToResult(
+        aResultIndexes, aValueTokens, pJump[nOriginalJumpCount - nJumpCount],
+        pJump[nOriginalJumpCount - nJumpCount + 1]);
+
+    ScInterpreter aNestedInterpreter(
+        mrDoc.GetFormulaCell(SEIC.aPos), mrDoc, mrContext, SEIC.aPos, aValueTokens);
+    aNestedInterpreter.aCode.Jump(
+        pJump[nOriginalJumpCount - nJumpCount],
+        pJump[nOriginalJumpCount - nJumpCount + 1],
+        pJump[nOriginalJumpCount - nJumpCount + 1]);
+    while (aNestedInterpreter.aCode.HasStacked())
+        aNestedInterpreter.aCode.FrontPop();
+    aNestedInterpreter.aCode.Lambda(true);
+
+    sfx2::LinkManager aLinkManager(mrDoc.GetDocumentShell());
+    aNestedInterpreter.SetLinkManager(&aLinkManager);
+    const formula::StackVar aInterpreterType = aNestedInterpreter.Interpret();
+
+    if (aInterpreterType == formula::svMatrixCell)
+    {
+#undef GetMatrix
+        ScConstMatrixRef xMatrix(aNestedInterpreter.GetResultToken()->GetMatrix());
+#define GetMatrix(...) SEIC.GetMatrix(__VA_ARGS__)
+        PushTokenRef(new ScMatrixToken(xMatrix->Clone()));
+    }
+    else
+    {
+        const formula::FormulaConstTokenRef& xLambdaResult(aNestedInterpreter.GetResultToken());
+        if (xLambdaResult)
+        {
+            nGlobalError = xLambdaResult->GetError();
+            if (nGlobalError == FormulaError::NONE)
+                PushTokenRef(xLambdaResult);
+            else
+                PushError(nGlobalError);
+        }
+    }
+
+    --nJumpCount;
+    SEIC.aCode.Jump(pJump[nOriginalJumpCount], pJump[nOriginalJumpCount]);
+}
 
 inline void Dispatcher::aggregateSumProduct(ScInterpreter& rCalc)
 {

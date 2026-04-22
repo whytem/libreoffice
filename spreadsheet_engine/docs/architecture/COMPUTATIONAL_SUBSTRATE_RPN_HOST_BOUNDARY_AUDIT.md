@@ -47,6 +47,11 @@ It includes:
 - the supporting stack and token-iteration machinery in
   [interpr4.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr4.cxx)
 
+Phase 2 of the relocation backlog retired the former operator/control
+`Execute*` kernels, so the remaining `HS11` debt is the structural
+`Interpret()` shell and typed-stack machinery rather than named Calc
+execution wrappers.
+
 This audit categorizes the host services those surfaces still depend on.
 
 ## Phase 2 Service Ledger
@@ -132,9 +137,9 @@ more service IDs from the ledger above.
 ### `Sc*` methods by primary host-service dependency
 
 - `HS11` evaluator state / control flow / typed stack:
-  `ExecuteComparisonKernel`, `ExecuteLogicalFoldKernel`,
-  `ExecuteUnaryMatrixOrScalarKernel`, `ExecuteBinaryMathKernel`,
-  `ExecuteConcatKernel`, `ExecuteLetKernel`
+  no live relocation-relevant `Execute*` wrappers remain after Phase 2; the
+  outstanding debt is the structural `Interpret()` shell plus classic
+  stack/token helpers
 - `HS4` symbolic range resolution with `HS3` / `HS5` follow-through:
   `ExecuteIntersectTerminal`, `ExecuteRangeReferenceTerminal`,
   `ExecuteUnionTerminal`, `ExecuteLookupTerminal`, `ExecuteXLookupTerminal`,
@@ -443,9 +448,12 @@ Phase 2 closes the audit from "next steps" into a usable contract baseline:
 
 1. every remaining legacy execution surface is now mapped to an explicit host
    service ledger entry
-2. the missing contracts are narrowed to a small set:
-   `HS4`, `HS6`, `HS8`, and `HS11`
-3. the intentionally host-terminal set is explicit:
-   `HS12`
-4. the next subsystem phases can now point at concrete missing contracts
-   instead of inventing new Host surfaces ad hoc
+2. the current tree no longer treats host-contract gaps as open blockers:
+   `HS1` through `HS10` are already exposed, while `HS11` and `HS12`
+   remain intentionally non-contract surfaces
+3. Phase 2 of the relocation backlog has already consumed the operator/control
+   `Execute*` wrapper inventory, leaving only structural shell debt under
+   `HS11`
+4. the next subsystem phases can focus on the remaining reference, query,
+   inspection, matrix, and random terminals instead of inventing new Host
+   surfaces ad hoc

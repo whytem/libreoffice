@@ -33,13 +33,19 @@ Historical slice writeups, phase plans, and retired ledgers now live under
 - Phase 1 ownership classification for the relocation backlog is complete:
   `ScTableOp`, `ScTTT`, and `ScDebugVar` are now treated as explicit
   host/debug utilities rather than active relocation debt
+- Phase 2 operator/control closure is complete: Calc no longer owns
+  `ExecuteComparisonKernel`, `ExecuteLogicalFoldKernel`,
+  `ExecuteUnaryMatrixOrScalarKernel`, `ExecuteBinaryMathKernel`,
+  `ExecuteConcatKernel`, or `ExecuteLetKernel`; that execution now routes
+  through compat dispatch on the engine side, and engine-backed classic-entry
+  attempts are already at zero on the current tree
 
 ## Canonical Dashboard
 
 Canonical dashboard metrics live in this file only. Static relocation-debt
 metrics on the current tree are:
 
-- `legacy_interpreter_subroutine_count=38`
+- `legacy_interpreter_subroutine_count=32`
 - `interp4_dispatch_legacy_lambda_count=0`
 - `interp4_dispatch_engine_backed_plan_engine_attempt_count=0`
 
@@ -52,10 +58,10 @@ when the runtime envelope changes:
 
 ## Current Priorities
 
-1. Retire adapter-only `Execute*` kernels and classic-entry dispatch once the
-   upper seam is authoritative for the same shapes.
-2. Close or explicitly classify the remaining reference, query, inspection,
+1. Close or explicitly classify the remaining reference, query, inspection,
    matrix-projection, and random terminals still owned by Calc.
+2. Contract the residual `ScInterpreter::Interpret()` shell once the remaining
+   terminals have explicit ownership.
 3. Keep host-facing contracts explicit before widening new evaluator surface.
 4. Preserve replay parity and the known-regression baseline while relocation
    lands.
