@@ -49,13 +49,19 @@ Historical slice writeups, phase plans, and retired ledgers now live under
   `ExecuteDBAreaTerminal`, `ExecuteSortByTerminal`, or
   `ExecuteColRowNameAutoTerminal`; query iteration now stays behind explicit
   host/runtime contracts rather than interpreter-local wrappers
+- Phase 5 inspection/metadata closure is complete: Calc no longer declares or
+  dispatches `ExecuteTypeTerminal`, `ExecuteCellTerminal`,
+  `ExecuteCellExternalTerminal`, `ExecuteCurrentTerminal`,
+  `ExecuteStyleTerminal`, `ExecuteInfoTerminal`, or `ExecuteNTerminal`;
+  inspection and metadata reads now route through explicit inspection/runtime
+  adapters or host-owned side-effect dispatch
 
 ## Canonical Dashboard
 
 Canonical dashboard metrics live in this file only. Static relocation-debt
 metrics on the current tree are:
 
-- `legacy_interpreter_subroutine_count=16`
+- `legacy_interpreter_subroutine_count=9`
 - `interp4_dispatch_legacy_lambda_count=0`
 - `interp4_dispatch_engine_backed_plan_engine_attempt_count=0`
 
@@ -68,8 +74,8 @@ when the runtime envelope changes:
 
 ## Current Priorities
 
-1. Close or explicitly classify the remaining inspection,
-   matrix-projection, and random terminals still owned by Calc.
+1. Close or explicitly classify the remaining matrix-projection and
+   adapter-tail terminals still owned by Calc.
 2. Contract the residual `ScInterpreter::Interpret()` shell once the remaining
    terminals have explicit ownership.
 3. Keep host-facing contracts explicit before widening new evaluator surface.

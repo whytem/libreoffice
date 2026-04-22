@@ -77,6 +77,17 @@ Phase 4 of the relocation backlog is now complete:
   Calc-local wrapper entrypoints
 - canonical relocation-debt metrics now exclude the closed query wave
 
+Phase 5 of the relocation backlog is now complete:
+
+- Calc no longer declares or dispatches `ExecuteTypeTerminal`,
+  `ExecuteCellTerminal`, `ExecuteCellExternalTerminal`,
+  `ExecuteCurrentTerminal`, `ExecuteStyleTerminal`,
+  `ExecuteInfoTerminal`, or `ExecuteNTerminal`
+- inspection and metadata reads now flow through explicit inspection/runtime
+  adapters or intentional host-owned side-effect dispatch rather than
+  Calc-local wrapper entrypoints
+- canonical relocation-debt metrics now exclude the closed inspection wave
+
 ## Working Rules
 
 1. Do not reopen closed contract-gap work unless the code proves a new gap.
@@ -98,16 +109,6 @@ Phase 4 of the relocation backlog is now complete:
 - classic stack/token machinery in `interpre.hxx` and `interpr4.cxx`,
   including `sp`, `maxsp`, `Push*`, `Pop*`, token iteration helpers, and
   dispatch bookkeeping
-
-### Cell / Metadata / Inspection
-
-- `ExecuteTypeTerminal`
-- `ExecuteCellTerminal`
-- `ExecuteCellExternalTerminal`
-- `ExecuteCurrentTerminal`
-- `ExecuteStyleTerminal`
-- `ExecuteInfoTerminal`
-- `ExecuteNTerminal`
 
 ### Matrix / Reference Projection
 
@@ -132,33 +133,6 @@ entrypoint or dispatch residue for them:
 - `ExecuteRandArrayTerminal`
 
 ## Phased Implementation Plan
-
-### Phase 5: Inspection / Metadata Closure
-
-Goal: remove the remaining inspection and metadata execution ownership from
-Calc now that formula and cell inspection contracts are already real.
-
-Scope:
-
-- retire Calc execution ownership for:
-  `ExecuteTypeTerminal`, `ExecuteCellTerminal`,
-  `ExecuteCellExternalTerminal`, `ExecuteCurrentTerminal`,
-  `ExecuteStyleTerminal`, `ExecuteInfoTerminal`, `ExecuteNTerminal`
-- ensure formula text, type, format, and metadata reads flow only through the
-  explicit inspection/runtime adapters
-- delete interpreter-local policy that still decides inspection semantics in
-  Calc
-- classify any remaining document-property reads that are intentionally
-  host-owned
-
-Exit criteria:
-
-- the listed inspection terminals no longer own evaluator semantics in Calc
-- all remaining inspection behavior is either upper-seam owned or explicitly
-  documented as host-owned
-- parity coverage exists for formula-text reads, external-cell inspection,
-  format-sensitive behavior, and `N()` coercion
-- no new host contract work is needed to close this phase
 
 ### Phase 6: Matrix Projection And Adapter-Tail Retirement
 

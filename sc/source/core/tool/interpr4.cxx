@@ -12522,8 +12522,12 @@ StackVar ScInterpreter::Interpret()
                         PushInt(int(bRes));
                     }
                     break;
-                    case ocType             : ExecuteTypeTerminal();    break;
-                    case ocCell             : ExecuteCellTerminal();    break;
+                    case ocType             :
+                        seinterpcompatdispatch::Dispatcher::typeTerminal(*this);
+                        break;
+                    case ocCell             :
+                        seinterpcompatdispatch::Dispatcher::cellTerminal(*this);
+                        break;
                     case ocIsRef            :
                     {
                         warnInformationPredicateDispatch(u"ISREF");
@@ -12620,7 +12624,9 @@ StackVar ScInterpreter::Interpret()
                         warnInformationPredicateDispatch(u"ISODD");
                         PushInt(int(!IsEven()));
                         break;
-                    case ocN                : ExecuteNTerminal();       break;
+                    case ocN                :
+                        seinterpcompatdispatch::Dispatcher::nTerminal(*this);
+                        break;
                     case ocGetDateValue     :
                         warnIfLegacyDispatchReached(
                             "literal-only hard-routed", u"DATEVALUE",
@@ -15152,8 +15158,12 @@ StackVar ScInterpreter::Interpret()
                             PushNA();
                     }
                     break;
-                    case ocCurrent          : ExecuteCurrentTerminal();      break;
-                    case ocStyle            : ExecuteStyleTerminal();        break;
+                    case ocCurrent          :
+                        seinterpcompatdispatch::Dispatcher::currentTerminal(*this);
+                        break;
+                    case ocStyle            :
+                        seinterpcompatdispatch::Dispatcher::styleTerminal(*this);
+                        break;
                     case ocDde              : ScDde();                      break;
                     case ocBase             :
                     {
@@ -15351,7 +15361,9 @@ StackVar ScInterpreter::Interpret()
                             PushIllegalArgument();
                     }
                     break;
-                    case ocInfo             : ExecuteInfoTerminal();    break;
+                    case ocInfo             :
+                        seinterpcompatdispatch::Dispatcher::infoTerminal(*this);
+                        break;
                     case ocHyperLink        : ScHyperLink();            break;
                     case ocBahtText         : dispatchBahtTextTerminal(); break;
                     case ocGetPivotData     : ScGetPivotData();             break;

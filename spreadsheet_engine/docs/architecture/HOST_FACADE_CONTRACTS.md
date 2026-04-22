@@ -56,8 +56,8 @@ quietly drift out of date.
 | Named / external / database / structured range resolution | compile-host lookup resolvers, `RangeResolver::resolveRange`, `DocumentRangeResolver` | `already exposed` | query-family range walking, structured-reference materialization follow-ups | One evaluation-time resolver now covers named, DB, external, and INDIRECT-driven range binding; structured references that cannot flatten still round-trip as `TokenBackedSymbol` |
 | Matrix materialization | `materializeHostRangeToMatrixOperand`, `CellValueView::matrixReference`, matrix operand bridges | `already exposed` | `ExecuteMatValueTerminal`, `ExecuteMatRefTerminal`, explicit matrix-reference projection glue | Phase 8 moved `ExecuteFrequencyTerminal`, `ExecuteForecastEtsTerminal`, `ExecuteFourierTerminal`, and `ExecuteSumXMY2Terminal` onto runtime-owned planners; the residual Calc surface is host projection glue rather than duplicated computation |
 | Criteria / range iteration | `RangeIterator`, `CriteriaAggregateMaterializer::iterate` | `already exposed` | DB-family tails, COUNTBLANK widening, future streaming criteria work | Phase 7 landed a standalone row-major walker on `EvaluationHost`; production query/countblank scans now route through it instead of baking iteration into Calc-local walkers |
-| Formula text / inspection | `runtime::formulainspection::Provider`, `DirectFormulaInspectionAdapter` | `already exposed` | `ExecuteCellTerminal`, `ExecuteCellExternalTerminal`, `ExecuteInfoTerminal`, formula inspection predicates | Formula-presence and formula-text reads now flow through an explicit inspection provider instead of ad hoc document peeks |
-| Format / type inspection | `runtime::cellinspection::*`, `DirectCellInspectionAdapter`, `DirectHostCellInspectionAdapter` | `already exposed` | `ExecuteTypeTerminal`, `ExecuteCellTerminal`, `ExecuteCellExternalTerminal`, `ExecuteCurrentTerminal`, `ExecuteStyleTerminal`, host-sensitive text terminals | The bounded/value vs. host-property split is now explicit, so remaining Calc ownership is terminal glue rather than hidden evaluator policy |
+| Formula text / inspection | `runtime::formulainspection::Provider`, `DirectFormulaInspectionAdapter` | `already exposed` | no Calc-owned inspection wrappers remain | Formula-presence and formula-text reads now flow through an explicit inspection provider instead of ad hoc document peeks |
+| Format / type inspection | `runtime::cellinspection::*`, `DirectCellInspectionAdapter`, `DirectHostCellInspectionAdapter` | `already exposed` | no Calc-owned inspection wrappers remain | The bounded/value vs. host-property split is now explicit, and Phase 5 retired the remaining `TYPE`, `CELL`, `INFO`, `CURRENT`, `STYLE`, and `N` Calc entrypoints |
 | Locale / calendar / date / search policy | `RuntimeEnvironment::getNullDate()`, `RuntimeEnvironment::getLocaleTag()`, `RuntimeEnvironment::getSearchType()`, `RuntimeEnvironment::sampleUniformReal()`, `TextCoercion` | `already exposed` | host-sensitive text/search terminals, date/time parsing tails | Locale, null-date, search-mode, and random-source policy now flow through explicit host contracts rather than Calc-local evaluator code |
 | Spill allocation | `SpillRangeAllocator` | `already exposed` | dynamic-array reshaping / spill-shaping tails | Contract is fixed; binding into `EvaluationHost` remains an adapter step, not a contract-definition gap |
 | Control-flow / interpreter state | engine substrates (`RpnValue`, `RpnControlFlow`), no host method by design | `intentionally unsupported` | `ScLet`, `ScIfJump*`, `ScChooseJump`, jump-matrix state | This state should live inside the engine evaluator, not inside the Host facade |
@@ -88,7 +88,6 @@ debt.
 
 | Legacy cluster | Representative surviving surface | Required host-service categories | Contract status summary |
 | --- | --- | --- | --- |
-| Cell / metadata / inspection | `ExecuteTypeTerminal`, `ExecuteCellTerminal`, `ExecuteCellExternalTerminal`, `ExecuteCurrentTerminal`, `ExecuteStyleTerminal`, `ExecuteInfoTerminal`, `ExecuteNTerminal` | scalar cell read, formula text/inspection, format/type inspection | Phase 6 moved the remaining inspection/text-search surface onto explicit runtime contracts plus host-owned terminals; the residual Calc logic is terminal glue rather than hidden evaluator policy |
 | Matrix / statistical tails | `ExecuteMatValueTerminal`, `ExecuteMatRefTerminal`, `ExecuteFrequencyTerminal`, `ExecuteForecastEtsTerminal`, `ExecuteFourierTerminal`, `ExecuteSumXMY2Terminal` | matrix materialization, scalar cell read, criteria/range iteration | Phase 8 retired the engine-worthy computation into runtime planners; only the explicit matrix-reference projection terminals remain Calc-owned |
 | Random / system-policy | `ExecuteRandomTerminal`, `ExecuteRandbetweenTerminal`, `ExecuteRandArrayTerminal` | runtime RNG state, locale/calendar/date mode | Phase 9 moved RAND / RANDBETWEEN.NV / RANDARRAY behind `RuntimeEnvironment::sampleUniformReal()` plus engine-native random planners; the remaining Calc surface is terminal glue for stack/matrix context only |
 | Host/debug utilities | `ScTableOp`, `ScTTT`, `ScDebugVar` | document mutation / repeated-operation state, debug-only projection | Phase 1 of the relocation backlog classified these as explicit host/debug utilities rather than active relocation debt |
@@ -748,6 +747,13 @@ green on the admission commit.
 
 ## Change log
 
+- 2026-04 — Phase 5 inspection/metadata closeout. Retired the
+  remaining Calc-owned `ExecuteTypeTerminal`,
+  `ExecuteCellTerminal`, `ExecuteCellExternalTerminal`,
+  `ExecuteCurrentTerminal`, `ExecuteStyleTerminal`,
+  `ExecuteInfoTerminal`, and `ExecuteNTerminal` wrappers so
+  inspection and metadata reads now route only through explicit
+  inspection/runtime adapters or intentional host-owned side effects.
 - 2026-04 — Phase 4 query/criteria/transform closeout. Retired the
   remaining Calc-owned `ExecuteSubTotalTerminal`,
   `ExecuteDBAreaTerminal`, `ExecuteSortByTerminal`, and

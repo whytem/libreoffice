@@ -143,10 +143,6 @@ more service IDs from the ledger above.
   no live relocation-relevant `Execute*` wrappers remain after Phase 2; the
   outstanding debt is the structural `Interpret()` shell plus classic
   stack/token helpers
-- `HS7` cell type / format inspection:
-  `ExecuteTypeTerminal`, `ExecuteCellTerminal`,
-  `ExecuteCellExternalTerminal`, `ExecuteCurrentTerminal`,
-  `ExecuteStyleTerminal`, `ExecuteInfoTerminal`, `ExecuteNTerminal`
 - `HS5` matrix materialization / matrix frame, often with `HS6`:
   `ExecuteMatValueTerminal`, `ExecuteMatRefTerminal`,
   `ExecuteSumXMY2Terminal`, `ExecuteFourierTerminal`,
@@ -444,9 +440,9 @@ Phase 2 closes the audit from "next steps" into a usable contract baseline:
 2. the current tree no longer treats host-contract gaps as open blockers:
    `HS1` through `HS10` are already exposed, while `HS11` and `HS12`
    remain intentionally non-contract surfaces
-3. Phases 2, 3, and 4 of the relocation backlog have already consumed the
-   operator/control, reference/lookup/addressing, and
-   query/criteria/transform `Execute*` wrapper inventories, leaving only
-   structural shell debt under `HS11`
-4. the next subsystem phases can focus on the remaining inspection,
-   matrix, and random terminals instead of inventing new Host surfaces ad hoc
+3. Phases 2, 3, 4, and 5 of the relocation backlog have already consumed the
+   operator/control, reference/lookup/addressing,
+   query/criteria/transform, and inspection/metadata `Execute*`
+   wrapper inventories, leaving only structural shell debt under `HS11`
+4. the next subsystem phases can focus on the remaining matrix and random
+   terminals instead of inventing new Host surfaces ad hoc

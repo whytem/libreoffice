@@ -8369,6 +8369,29 @@ CPPUNIT_TEST_FIXTURE(TestFormula2, testFuncINFO)
     m_pDoc->DeleteTab(0);
 }
 
+CPPUNIT_TEST_FIXTURE(TestFormula2, testFuncCurrentStyle)
+{
+    CPPUNIT_ASSERT_MESSAGE("failed to insert sheet", m_pDoc->InsertTab(0, u"foo"_ustr));
+
+    m_pDoc->SetString(0, 0, 0, u"=1+2+CURRENT()"_ustr);
+    m_pDoc->SetString(0, 1, 0, u"=\"choo\"&CURRENT()"_ustr);
+    m_pDoc->SetString(0, 2, 0, u"=1+2*CURRENT()"_ustr);
+    m_pDoc->SetString(0, 3, 0, u"=2*CURRENT()"_ustr);
+    m_pDoc->SetValue(0, 4, 0, 5.0);
+    m_pDoc->SetValue(1, 4, 0, 7.0);
+    m_pDoc->SetString(2, 4, 0,
+                      u"=A5+B5+STYLE(IF(CURRENT()>10;\"Default\";\"Default\"))"_ustr);
+    m_pDoc->CalcAll();
+
+    CPPUNIT_ASSERT_EQUAL(6.0, m_pDoc->GetValue(ScAddress(0, 0, 0)));
+    CPPUNIT_ASSERT_EQUAL(u"choochoo"_ustr, m_pDoc->GetString(ScAddress(0, 1, 0)));
+    CPPUNIT_ASSERT_EQUAL(5.0, m_pDoc->GetValue(ScAddress(0, 2, 0)));
+    CPPUNIT_ASSERT_EQUAL(4.0, m_pDoc->GetValue(ScAddress(0, 3, 0)));
+    CPPUNIT_ASSERT_EQUAL(12.0, m_pDoc->GetValue(ScAddress(2, 4, 0)));
+
+    m_pDoc->DeleteTab(0);
+}
+
 /** See also test case document fdo#44456 sheet cpearson */
 CPPUNIT_TEST_FIXTURE(TestFormula2, testFuncDATEDIF)
 {

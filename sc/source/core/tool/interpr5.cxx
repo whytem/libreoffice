@@ -35,22 +35,15 @@
 #include <document.hxx>
 #include <dociter.hxx>
 #include <scmatrix.hxx>
-#include <globstr.hrc>
-#include <scresid.hxx>
-#include <cellkeytranslator.hxx>
 #include <spreadsheetengine/compat/libreoffice/InterpreterCompatDispatch.hxx>
 #include <formulagroup.hxx>
 #include <vcl/svapp.hxx> //Application::
-#include <spreadsheetengine/compat/libreoffice/InfoInspectionExecution.hxx>
-#include <spreadsheetengine/compat/libreoffice/String.hxx>
 
 #include <vector>
 
 using namespace formula;
-namespace selibreoffice = spreadsheetengine::compat::libreoffice;
 namespace seinterpcompatdispatch
     = spreadsheetengine::compat::libreoffice::interpretercompatdispatch;
-namespace seinfoexec = spreadsheetengine::compat::libreoffice::infoinspectionexecution;
 
 namespace {
 
@@ -2203,39 +2196,6 @@ void ScInterpreter::ExecuteMatRefTerminal()
             PushString( aVal );
         }
     }
-}
-
-void ScInterpreter::ExecuteInfoTerminal()
-{
-    if( !MustHaveParamCount( GetByte(), 1 ) )
-        return;
-
-    OUString aStr = GetString().getString();
-    ScCellKeywordTranslator::transKeyword(aStr, ScGlobal::GetLocale(), ocInfo);
-    seinfoexec::DirectInfoInspectionRequest aRequest;
-    aRequest.mbAutoCalc = mrDoc.GetAutoCalc();
-    aRequest.maAutoRecalcLabel = selibreoffice::toApiString(ScResId(STR_RECALC_AUTO));
-    aRequest.maManualRecalcLabel = selibreoffice::toApiString(ScResId(STR_RECALC_MANUAL));
-
-    seinfoexec::DirectInfoInspectionAdapter aAdapter;
-    const auto aEvaluation = aAdapter.evaluateInfo(aStr, aRequest);
-    if (!aEvaluation.mbHandled)
-    {
-        PushIllegalArgument();
-        return;
-    }
-
-    if (!aEvaluation.maResult)
-    {
-        PushError(selibreoffice::toFormulaError(aEvaluation.maResult.meError));
-        return;
-    }
-
-    const auto& rValue = aEvaluation.maResult.maValue;
-    if (rValue.isText())
-        PushString(selibreoffice::toLibreOfficeString(rValue.maString));
-    else
-        PushDouble(rValue.mfNumber);
 }
 
 /* vim:set shiftwidth=4 softtabstop=4 expandtab: */

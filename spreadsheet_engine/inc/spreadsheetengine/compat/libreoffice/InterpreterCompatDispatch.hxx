@@ -10,10 +10,18 @@
 #pragma once
 
 #include <interpre.hxx>
+#include <cellkeytranslator.hxx>
+#include <globstr.hrc>
+#include <hints.hxx>
 #include <jumpmatrix.hxx>
+#include <scresid.hxx>
+#include <stlpool.hxx>
+#include <stlsheet.hxx>
+#include <spreadsheetengine/compat/libreoffice/CellInspectionExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/Date.hxx>
 #include <spreadsheetengine/compat/libreoffice/Error.hxx>
 #include <spreadsheetengine/compat/libreoffice/FormulaInspectionExecution.hxx>
+#include <spreadsheetengine/compat/libreoffice/InfoInspectionExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/IndirectExecution.hxx>
 #include <spreadsheetengine/compat/libreoffice/InterpreterDispatch.hxx>
 #include <spreadsheetengine/compat/libreoffice/LetExecution.hxx>
@@ -32,8 +40,10 @@
 namespace spreadsheetengine::compat::libreoffice::interpretercompatdispatch
 {
 
+namespace secellexec = spreadsheetengine::compat::libreoffice::cellinspectionexecution;
 namespace selibreoffice = spreadsheetengine::compat::libreoffice;
 namespace seindirectexec = spreadsheetengine::compat::libreoffice::indirectexecution;
+namespace seinfoexec = spreadsheetengine::compat::libreoffice::infoinspectionexecution;
 namespace seinterpre = spreadsheetengine::compat::libreoffice::interpreterdispatch;
 namespace selookup = spreadsheetengine::api::lookup;
 namespace selookupexec = spreadsheetengine::compat::libreoffice::lookupexecution;
@@ -123,6 +133,21 @@ using namespace formula;
                 pMatrix->Get(nColumn, nRow)));
     }
     return aOperand;
+}
+
+[[nodiscard]] inline FormulaGrammar::AddressConvention resolveCellInfoAddressConvention(
+    const ScCalcConfig& rConfig, const ScDocument& rDoc)
+{
+    FormulaGrammar::AddressConvention eConvention = rConfig.meStringRefAddressSyntax;
+    switch (eConvention)
+    {
+        default:
+            return rDoc.GetAddressConvention();
+        case FormulaGrammar::CONV_OOO:
+        case FormulaGrammar::CONV_XL_A1:
+        case FormulaGrammar::CONV_XL_R1C1:
+            return eConvention;
+    }
 }
 
 inline void putScalarIntoMatrix(
@@ -1685,6 +1710,13 @@ inline void putScalarIntoMatrix(
     static void sortByTerminal(ScInterpreter& rCalc);
     static void dbAreaTerminal(ScInterpreter& rCalc);
     static void colRowNameAutoTerminal(ScInterpreter& rCalc);
+    static void typeTerminal(ScInterpreter& rCalc);
+    static void cellTerminal(ScInterpreter& rCalc);
+    static void cellExternalTerminal(ScInterpreter& rCalc);
+    static void currentTerminal(ScInterpreter& rCalc);
+    static void styleTerminal(ScInterpreter& rCalc);
+    static void infoTerminal(ScInterpreter& rCalc);
+    static void nTerminal(ScInterpreter& rCalc);
     static void probability(ScInterpreter& rCalc);
     static void zTest(ScInterpreter& rCalc);
     static void tTest(ScInterpreter& rCalc);
@@ -4318,6 +4350,400 @@ inline void Dispatcher::colRowNameAutoTerminal(ScInterpreter& rCalc)
 
     aRefData.SetRange(mrDoc.GetSheetLimits(), aAbsolute, SEIC.aPos);
     SEIC.PushTempToken(new ScDoubleRefToken(mrDoc.GetSheetLimits(), aRefData));
+}
+
+inline void Dispatcher::typeTerminal(ScInterpreter& rCalc)
+{
+    short nType = 0;
+    switch (GetStackType())
+    {
+        case svDoubleRef:
+        case svSingleRef:
+        {
+            ScAddress aAddress;
+            if (!SEIC.PopDoubleRefOrSingleRef(aAddress))
+                break;
+
+            ScRefCellValue aCell(mrDoc, aAddress);
+            if (GetCellErrCode(aCell) == FormulaError::NONE)
+            {
+                switch (aCell.getType())
+                {
+                    case CELLTYPE_STRING:
+                    case CELLTYPE_EDIT:
+                        nType = 2;
+                        break;
+                    case CELLTYPE_VALUE:
+                    {
+                        const sal_uInt32 nFormat = SEIC.GetCellNumberFormat(aAddress, aCell);
+                        if (mrContext.NFGetType(nFormat) == SvNumFormatType::LOGICAL)
+                            nType = 4;
+                        else
+                            nType = 1;
+                        break;
+                    }
+                    case CELLTYPE_NONE:
+                        nType = 1;
+                        break;
+                    case CELLTYPE_FORMULA:
+                        nType = 8;
+                        break;
+                    default:
+                        PushIllegalArgument();
+                        break;
+                }
+            }
+            else
+                nType = 16;
+            break;
+        }
+        case svString:
+            PopError();
+            if (nGlobalError != FormulaError::NONE)
+            {
+                nType = 16;
+                nGlobalError = FormulaError::NONE;
+            }
+            else
+                nType = 2;
+            break;
+        case svMatrix:
+            SEIC.PopMatrix();
+            if (nGlobalError != FormulaError::NONE)
+            {
+                nType = 16;
+                nGlobalError = FormulaError::NONE;
+            }
+            else
+                nType = 64;
+            break;
+        default:
+            PopError();
+            if (nGlobalError != FormulaError::NONE)
+            {
+                nType = 16;
+                nGlobalError = FormulaError::NONE;
+            }
+            else
+                nType = 1;
+            break;
+    }
+
+    SEIC.PushInt(nType);
+}
+
+inline void Dispatcher::cellTerminal(ScInterpreter& rCalc)
+{
+    const sal_uInt8 nParamCount = GetByte();
+    if (!MustHaveParamCount(nParamCount, 1, 2))
+        return;
+
+    ScAddress aCellPos(SEIC.aPos);
+    if (nParamCount == 2)
+    {
+        switch (GetStackType())
+        {
+            case svExternalSingleRef:
+            case svExternalDoubleRef:
+                cellExternalTerminal(rCalc);
+                return;
+            case svDoubleRef:
+            {
+                ScRange aRange;
+                PopDoubleRef(aRange);
+                aCellPos = aRange.aStart;
+                break;
+            }
+            case svSingleRef:
+                PopSingleRef(aCellPos);
+                break;
+            default:
+                PopError();
+                SetError(FormulaError::NoRef);
+                break;
+        }
+    }
+
+    OUString aInfoType = SEIC.GetString().getString();
+    if (nGlobalError != FormulaError::NONE)
+    {
+        PushIllegalParameter();
+        return;
+    }
+
+    ScRefCellValue aCell(mrDoc, aCellPos);
+    ScCellKeywordTranslator::transKeyword(aInfoType, ScGlobal::GetLocale(), ocCell);
+    const auto pushApiCellValue = [&](const spreadsheetengine::api::CellValue& rValue) {
+        if (rValue.isError())
+        {
+            PushError(selibreoffice::toFormulaError(rValue.meError));
+            return;
+        }
+        if (rValue.isText())
+        {
+            SEIC.PushString(selibreoffice::toLibreOfficeString(rValue.maString));
+            return;
+        }
+        PushDouble(rValue.mfNumber);
+    };
+
+    const FormulaGrammar::AddressConvention eAddressConvention
+        = resolveCellInfoAddressConvention(SEIC.maCalcConfig, mrDoc);
+    secellexec::DirectCellInspectionAdapter aDirectCellAdapter(
+        mrDoc, SEIC.aPos, eAddressConvention);
+    const auto aDirectEvaluation = aDirectCellAdapter.evaluateLocalInfo(
+        aInfoType, aCellPos,
+        selibreoffice::readHostDocumentCellValue(
+            mrDoc, aCellPos, aCell, selibreoffice::HostCellStringKind::Display));
+    const auto eBoundedInfoKind = aDirectEvaluation.meKind;
+    if (aDirectEvaluation.mbHandled)
+    {
+        if (!aDirectEvaluation.maResult)
+            PushError(selibreoffice::toFormulaError(aDirectEvaluation.maResult.meError));
+        else
+            pushApiCellValue(aDirectEvaluation.maResult.maValue);
+        return;
+    }
+
+    secellexec::DirectHostCellInspectionAdapter aHostCellAdapter(mrDoc, mrContext);
+    secellexec::LocalHostCellInfoRequest aHostRequest;
+    aHostRequest.maCellPos = aCellPos;
+    aHostRequest.mbHasString = aCell.hasString();
+    aHostRequest.meConvention = eAddressConvention;
+    aHostRequest.mnFormat = mrDoc.GetNumberFormat(ScRange(aCellPos));
+    const auto aHostEvaluation = aHostCellAdapter.evaluateLocalInfo(aInfoType, aHostRequest);
+    if (aHostEvaluation.mbHandled)
+    {
+        pushApiCellValue(aHostEvaluation.maValue);
+        return;
+    }
+
+    switch (eBoundedInfoKind)
+    {
+        case secellexec::InfoKind::Unsupported:
+        case secellexec::InfoKind::Column:
+        case secellexec::InfoKind::Row:
+        case secellexec::InfoKind::Sheet:
+        case secellexec::InfoKind::Address:
+        case secellexec::InfoKind::Contents:
+        case secellexec::InfoKind::Type:
+        case secellexec::InfoKind::Filename:
+        case secellexec::InfoKind::Coord:
+        case secellexec::InfoKind::Width:
+        case secellexec::InfoKind::Prefix:
+        case secellexec::InfoKind::Protect:
+        case secellexec::InfoKind::Format:
+        case secellexec::InfoKind::Color:
+        case secellexec::InfoKind::Parentheses:
+            PushIllegalArgument();
+            break;
+    }
+}
+
+inline void Dispatcher::cellExternalTerminal(ScInterpreter& rCalc)
+{
+    sal_uInt16 nFileId = 0;
+    OUString aTabName;
+    ScSingleRefData aRef;
+    ScExternalRefCache::TokenRef xToken;
+    ScExternalRefCache::CellFormat aFormat;
+    SEIC.PopExternalSingleRef(nFileId, aTabName, aRef, xToken, &aFormat);
+    if (nGlobalError != FormulaError::NONE)
+    {
+        PushError(nGlobalError);
+        return;
+    }
+
+    OUString aInfoType = SEIC.GetString().getString();
+    if (nGlobalError != FormulaError::NONE)
+    {
+        PushError(nGlobalError);
+        return;
+    }
+
+    SCCOL nCol = 0;
+    SCROW nRow = 0;
+    SCTAB nTab = 0;
+    aRef.SetAbsTab(0);
+    SEIC.SingleRefToVars(aRef, nCol, nRow, nTab);
+    if (nGlobalError != FormulaError::NONE)
+    {
+        PushIllegalParameter();
+        return;
+    }
+    aRef.SetAbsTab(-1);
+
+    ScCellKeywordTranslator::transKeyword(aInfoType, ScGlobal::GetLocale(), ocCell);
+    const auto pushApiCellValue = [&](const spreadsheetengine::api::CellValue& rValue) {
+        if (rValue.isError())
+        {
+            PushError(selibreoffice::toFormulaError(rValue.meError));
+            return;
+        }
+        if (rValue.isText())
+        {
+            SEIC.PushString(selibreoffice::toLibreOfficeString(rValue.maString));
+            return;
+        }
+        PushDouble(rValue.mfNumber);
+    };
+
+    const FormulaGrammar::AddressConvention eAddressConvention
+        = resolveCellInfoAddressConvention(SEIC.maCalcConfig, mrDoc);
+    secellexec::DirectExternalCellInspectionAdapter aDirectExternalAdapter(mrDoc, SEIC.aPos);
+    secellexec::ExternalCellInfoRequest aExternalRequest;
+    aExternalRequest.maAddress = { 0, nCol, nRow };
+    aExternalRequest.mnFileId = nFileId;
+    aExternalRequest.maTabName = aTabName;
+    aExternalRequest.maReference = aRef;
+    aExternalRequest.mxToken = xToken;
+    aExternalRequest.maFormat = aFormat;
+    aExternalRequest.meConvention = eAddressConvention;
+    const auto aDirectEvaluation
+        = aDirectExternalAdapter.evaluateInfo(aInfoType, aExternalRequest);
+    if (aDirectEvaluation.mbHandled)
+    {
+        if (aDirectEvaluation.meError != FormulaError::NONE)
+        {
+            PushError(aDirectEvaluation.meError);
+            return;
+        }
+        pushApiCellValue(aDirectEvaluation.maValue);
+        return;
+    }
+
+    secellexec::DirectExternalHostCellInspectionAdapter aHostExternalAdapter(mrContext);
+    secellexec::ExternalHostCellInfoRequest aHostExternalRequest;
+    aHostExternalRequest.mnFormat = aFormat.mbIsSet ? aFormat.mnIndex : 0;
+    const auto aHostEvaluation
+        = aHostExternalAdapter.evaluateInfo(aInfoType, aHostExternalRequest);
+    if (aHostEvaluation.mbHandled)
+    {
+        pushApiCellValue(aHostEvaluation.maValue);
+        return;
+    }
+
+    PushIllegalParameter();
+}
+
+inline void Dispatcher::currentTerminal(ScInterpreter& rCalc)
+{
+    FormulaConstTokenRef xToken(PopToken());
+    if (!xToken)
+    {
+        PushError(FormulaError::UnknownStackVariable);
+        return;
+    }
+
+    PushTokenRef(xToken);
+    PushTokenRef(xToken);
+}
+
+inline void Dispatcher::styleTerminal(ScInterpreter& rCalc)
+{
+    const sal_uInt8 nParamCount = GetByte();
+    if (!MustHaveParamCount(nParamCount, 1, 3))
+        return;
+
+    OUString aStyleAfterTimeout;
+    if (nParamCount >= 3)
+        aStyleAfterTimeout = SEIC.GetString().getString();
+    tools::Long nTimeout = 0;
+    if (nParamCount >= 2)
+        nTimeout = static_cast<tools::Long>(SEIC.GetDouble() * 1000.0);
+    OUString aImmediateStyle = SEIC.GetString().getString();
+
+    if (nTimeout < 0)
+        nTimeout = 0;
+
+    if (!mrDoc.IsClipOrUndo())
+    {
+        ScDocShell* pShell = mrDoc.GetDocumentShell();
+        if (pShell)
+        {
+            auto* pPool = mrDoc.GetStyleSheetPool();
+            if (!aImmediateStyle.isEmpty())
+            {
+                if (auto pNewStyle = pPool->FindAutoStyle(aImmediateStyle))
+                    aImmediateStyle = pNewStyle->GetName();
+                else
+                    aImmediateStyle.clear();
+            }
+            if (!aStyleAfterTimeout.isEmpty())
+            {
+                if (auto pNewStyle = pPool->FindAutoStyle(aStyleAfterTimeout))
+                    aStyleAfterTimeout = pNewStyle->GetName();
+                else
+                    aStyleAfterTimeout.clear();
+            }
+            if (!aImmediateStyle.isEmpty() || !aStyleAfterTimeout.isEmpty())
+            {
+                const ScStyleSheet* pStyle
+                    = mrDoc.GetStyle(SEIC.aPos.Col(), SEIC.aPos.Row(), SEIC.aPos.Tab());
+                const bool bNotify = !pStyle
+                    || (!aImmediateStyle.isEmpty() && pStyle->GetName() != aImmediateStyle)
+                    || (!aStyleAfterTimeout.isEmpty()
+                        && pStyle->GetName() != aStyleAfterTimeout);
+                if (bNotify)
+                {
+                    ScRange aRange(SEIC.aPos);
+                    ScAutoStyleHint aHint(
+                        aRange, aImmediateStyle, nTimeout, aStyleAfterTimeout);
+                    pShell->Broadcast(aHint);
+                }
+            }
+        }
+    }
+
+    PushDouble(0.0);
+}
+
+inline void Dispatcher::infoTerminal(ScInterpreter& rCalc)
+{
+    if (!MustHaveParamCount(GetByte(), 1))
+        return;
+
+    OUString aInfoType = SEIC.GetString().getString();
+    ScCellKeywordTranslator::transKeyword(aInfoType, ScGlobal::GetLocale(), ocInfo);
+    seinfoexec::DirectInfoInspectionRequest aRequest;
+    aRequest.mbAutoCalc = mrDoc.GetAutoCalc();
+    aRequest.maAutoRecalcLabel = selibreoffice::toApiString(ScResId(STR_RECALC_AUTO));
+    aRequest.maManualRecalcLabel = selibreoffice::toApiString(ScResId(STR_RECALC_MANUAL));
+
+    seinfoexec::DirectInfoInspectionAdapter aAdapter;
+    const auto aEvaluation = aAdapter.evaluateInfo(aInfoType, aRequest);
+    if (!aEvaluation.mbHandled)
+    {
+        PushIllegalArgument();
+        return;
+    }
+
+    if (!aEvaluation.maResult)
+    {
+        PushError(selibreoffice::toFormulaError(aEvaluation.maResult.meError));
+        return;
+    }
+
+    const auto& rValue = aEvaluation.maResult.maValue;
+    if (rValue.isText())
+        SEIC.PushString(selibreoffice::toLibreOfficeString(rValue.maString));
+    else
+        PushDouble(rValue.mfNumber);
+}
+
+inline void Dispatcher::nTerminal(ScInterpreter& rCalc)
+{
+    const FormulaError nPriorError = nGlobalError;
+    nGlobalError = FormulaError::NONE;
+    const FormulaError nStringNoValueError = SEIC.mnStringNoValueError;
+    SEIC.mnStringNoValueError = FormulaError::CellNoValue;
+    const double fValue = SEIC.GetDouble();
+    SEIC.mnStringNoValueError = nStringNoValueError;
+    if (nPriorError != FormulaError::NONE)
+        nGlobalError = nPriorError;
+    else if (nGlobalError == FormulaError::CellNoValue)
+        nGlobalError = FormulaError::NONE;
+    PushDouble(fValue);
 }
 
 inline void Dispatcher::probability(ScInterpreter& rCalc)
