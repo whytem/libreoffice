@@ -1,34 +1,26 @@
 # Engine RPN Evaluator Initiative
 
-Status: active next-phase initiative
+Status: active follow-on initiative after relocation backlog closure
 
-Detailed execution of the current strategic pivot is tracked in
-[COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md](COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md).
+The completed strategic pivot is tracked in
+[COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md](COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md),
+and the relocation closeout record lives in
+[STACK_MACHINE_RELOCATION_BACKLOG.md](STACK_MACHINE_RELOCATION_BACKLOG.md).
 
 ## Purpose
 
-The remaining Calc migration work is no longer well-described as "the next
-hundred functions."
+The next deliberate Calc evaluator-expansion work is no longer well-described
+as "the next hundred functions."
 
 After the current honest baseline in
-[../PROJECT_STATUS.md](../PROJECT_STATUS.md) — especially the combination of
-strong replay parity, zero live lower-seam runtime attempts, and non-zero
-forced-legacy audit traffic — the hard part is the RPN evaluator subsystem
-itself:
+[../PROJECT_STATUS.md](../PROJECT_STATUS.md) — especially strong replay
+parity, a closed relocation backlog, and a deliberately retained Calc shell —
+the hard part is the RPN evaluator subsystem itself:
 
 - operator semantics over polymorphic stack values
 - control-flow opcodes and jump execution
 - reference-shaped operands
 - matrix broadcast and array-formula state
-
-The latest classic-tail follow-through proved an important planning point:
-before widening more opcode pilots, we needed to make the unseen unknown-root
-tail legible. The new per-root samples showed the old `operator:+` bucket was
-really imported `TODAY() + n` date-offset formulas, not a broad arithmetic
-contract gap. That band is now closed by materializing `TODAY()` as a scalar
-child inside promoted scalar-root expressions, which cuts unseen live cells
-from `49` to `21` without pretending root `TODAY()` has already migrated as its
-own delegated family.
 - criteria/database iteration
 - stack and format/error propagation state
 
@@ -48,17 +40,18 @@ without truly advancing engine authority:
    but still depends on Calc evaluator state rather than an engine-native
    execution model
 
-The remaining work should therefore be framed as one subsystem initiative:
+The follow-on work should therefore be framed as one subsystem initiative:
 
 - build `RpnEvaluator` inside `spreadsheet_engine/`
 - keep the host boundary explicit and narrow
-- measure progress by shrinking the relocated legacy dispatch surface, not
-  only by shrinking `interpre.hxx`
+- measure progress by expanding evaluator-owned authority while keeping the
+  retained Calc surface explicit, not only by shrinking `interpre.hxx`
 
 ## Initiative Scope
 
 The `RpnEvaluator` initiative is the engine-native execution core for the
-remaining Calc evaluator surface.
+surviving host-owned / retained Calc evaluator surface we may choose to widen
+deliberately over time.
 
 It is composed of six milestones:
 
@@ -75,53 +68,38 @@ For this initiative, the project should use the following working rules:
 
 - wrapper deletion is not counted as engine migration unless the authoritative
   path is engine-owned and the relocated legacy surface also falls
-- no new `pushLegacy*` lambdas should be added for families the engine does
-  not already own at the root
-- no new lower-seam `tryPushEngine*` admission should land in
-  `ScInterpreter::Interpret()` unless it is explicitly deletion-backed,
-  required as an RPN subsystem primitive, or closes a measured parity gap
+- do not reintroduce `pushLegacy*`-style wrapper debt or anonymous compat
+  shells for families the evaluator does not already own
+- no new lower-seam `ScInterpreter::Interpret()` admission should land unless
+  it is explicitly deletion-backed, documented in the architecture docs, and
+  clearly temporary
 - if a family is not yet engine-authoritative, leaving it as
   `ScInterpreter::ScXxx()` is preferable to growing `Interpret()`
-- every surviving `pushLegacy*` path must remain quarantine-warned
-- a static rise in `interp4_dispatch_engine_attempt_count` is not by itself
-  migration progress unless the live or full-legacy runtime counters move
-- every surviving lower-seam `tryPushEngine*` admission site must carry an
-  explicit pivot rationale marker in source so review and CI can distinguish
-  deletion-backed work from new scaffolding
-- the next success metric is meaningful reduction in
-  `interp4_dispatch_legacy_lambda_count`, not just another drop in
-  `legacy_interpreter_subroutine_count`
-- the next retirement wave should preferentially target the densest remaining
-  interpreter clusters that already lean on engine/shared helpers; the pure
-  text/info and parsing/inspection subset tracked in
-  [../archive/authority_transfer/COMPUTATIONAL_SUBSTRATE_TEXT_INFO_RETIREMENT_PLAN.md](../archive/authority_transfer/COMPUTATIONAL_SUBSTRATE_TEXT_INFO_RETIREMENT_PLAN.md)
-  is now complete on the current tree, so the remaining follow-on target is
-  the host-sensitive text tail rather than another broad pure-text sweep
+- progress is measured by evaluator-owned execution plus preserved parity, not
+  by reviving lower-seam attempt counters after the relocation backlog has
+  already reached zero debt
+- every retained Calc shell must stay classified in
+  [HOST_FACADE_CONTRACTS.md](HOST_FACADE_CONTRACTS.md) and out of the closed
+  relocation backlog
+- every widened family must land with explicit host/runtime contract coverage
+  before the Calc-side overlap is removed
 
 ### Retirement Template
 
-A batch member can retire its legacy `ScInterpreter::Sc*` body or
-`pushLegacy*` lambda fallback only when all of the following hold:
+A future evaluator-authoritative retirement is only complete when all of the
+following hold:
 
-- `interp4_dispatch_engine_attempted_total_core_forced_full_legacy` is
-  non-zero for the opcode across the standing corpus, i.e. the engine-first
-  path has been exercised under real workload (not only unit tests)
-- acceptance rate is `100%`, or every decline path has a documented legacy
-  counterpart that produces the same observable result as the deleted
-  `Sc*`/`pushLegacy*` implementation would have
-- a deliberate-decline test exists for at least one operand shape the engine
-  intentionally does not own, so the decline instrumentation is known to fire
-- the retirement commit deletes the method declaration from
-  [interpre.hxx](/home/ubuntu/repos/libreoffice/sc/source/core/inc/interpre.hxx),
-  the body from `interpr*.cxx`, and any corresponding `pushLegacy*` lambda
-  from [interpr4.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr4.cxx)
-- the fallback path is replaced with `OSL_FAIL(...)` + an engine-consistent
-  error push (`FormulaError::UnknownState` or batch-appropriate), never with
-  a silent `PushError(FormulaError::NONE)` or an unchecked fall-through
-
-The reference implementation of this template is
-`532b10392 computational: retire ocBad legacy fallback`. Every future
-engine-authoritative retirement should match its shape.
+- the authoritative path runs through a documented engine-owned seam rather
+  than through ad hoc Calc-local wrapper motion
+- engine unit tests, Calc parity tests, and corpus/replay guardrails all stay
+  green on the retirement commit
+- the retirement commit deletes the redundant Calc implementation or
+  reclassifies the behavior as intentionally host-owned in the same change
+- [PROJECT_STATUS.md](../PROJECT_STATUS.md),
+  [HOST_FACADE_CONTRACTS.md](HOST_FACADE_CONTRACTS.md), and any affected
+  initiative/backlog doc are updated in the same commit
+- any temporary lower-seam bridge is either removed in the same wave or
+  documented as an explicit transitional exception with a clear removal gate
 
 ## Milestone Plan
 
@@ -133,199 +111,107 @@ gates are tracked in:
 
 ### 1. Host-Boundary Audit
 
-Produce the minimal host contract required by a full engine-side RPN loop.
-
-This audit is tracked in:
+Current baseline:
 
 - [COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md](COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md)
+  and [HOST_FACADE_CONTRACTS.md](HOST_FACADE_CONTRACTS.md) already define the
+  current host-service categories and retained host-owned non-goals
+- the closed relocation backlog has already consumed the missing-contract wave
 
-Output:
+Exit condition for future work:
 
-- fixed categories of host service
-- representative surviving Calc surfaces per category
-- explicit non-goals that should stay host-owned
+- any newly widened family lands only after its required host surface is
+  explicitly documented, tested, and classified in those two documents
 
 ### 2. Engine Stack-Value Model
 
-Introduce an engine-native tagged value model for:
+Current baseline:
 
-- scalar numbers
-- strings
-- booleans
-- errors
-- references
-- matrices
+- `spreadsheetengine/runtime/RpnValue.hxx` already models scalar, reference,
+  matrix, and error-bearing operand shapes
+- typed coercion can already defer explicitly through
+  `NeedsReferenceResolution` and `NeedsMatrixMaterialization`
 
-This replaces implicit `PushDouble()` / `PopType()`-style control with typed
-operations and explicit coercion rules.
+Exit condition:
 
-Checkpoint:
-
-- the initial substrate now exists in
-  `spreadsheetengine/runtime/RpnValue.hxx`
-- the first contract is intentionally narrow:
-  - scalar kinds are fully modeled
-  - reference and matrix operands are explicit value kinds
-  - typed coercion returns `NeedsReferenceResolution` or
-    `NeedsMatrixMaterialization` instead of silently pretending those cases are
-    scalar-ready
-- this substrate is now actively consumed by the operator, control-flow,
-  reference, criteria, database, and matrix planners; the remaining work is to
-  widen admitted shapes and retire Calc-host fallbacks rather than to
-  introduce the value model itself
+- newly widened evaluator-owned families run on engine-native value/state
+  objects instead of `PushDouble()` / `PopType()` plumbing or raw
+  `FormulaToken` boundary types
 
 ### 3. Engine Operator Dispatch
 
-Admit the hot operator opcodes into the engine:
+Current baseline:
 
-- arithmetic
-- concatenation
-- comparisons
-- unary numeric operators
+- `spreadsheetengine/runtime/RpnOperators.hxx` already carries the scalar
+  arithmetic / concat / comparison substrate
+- the relocation backlog has already retired the Calc-owned operator wrapper
+  wave, so this milestone is now about evaluator-native execution rather than
+  wrapper cleanup
 
-This is expected to be the first large, honest drop in
-`interp4_dispatch_legacy_lambda_count`.
+Exit condition:
 
-Checkpoint:
-
-- the initial scalar operator contract now exists in
-  `spreadsheetengine/runtime/RpnOperators.hxx`
-- Calc now has a first engine-opcode pilot for scalar binary operators in
-  `ScInterpreter::Interpret()`, but the broad replay corpus still reports
-  zero live lower-seam runtime attempts in
-  [../PROJECT_STATUS.md](../PROJECT_STATUS.md)
-- the new core-forced full-legacy replay lane now proves that classic
-  `ScInterpreter::Interpret()` is reachable again and reports non-zero
-  forced-legacy engine-first traffic in
-  [../PROJECT_STATUS.md](../PROJECT_STATUS.md), so engine-first dispatch is
-  carrying real load inside the residual classic tail but still has a narrow
-  decline pocket to close before broad retirement claims are justified
-- that movement now comes from both the `ocBad` root-error-literal slice and
-  the follow-up `ocRange` audit/fix; the classic opcode census still shows
-  `Bad=506` and `Range=96` because it records opcode entry before the switch
-  decides whether engine or legacy computes the result
-- the `ocRange` audit proved that the standing corpus’s `96` apparent `Range`
-  rows were really bracketed ODF error-literal syntax like `=[.OF:.ERR]:502`,
-  not true reference-range work, so they now reroute through the bad-literal
-  engine path
-- the focused `OFFSET(...):OFFSET(...)` proof still shows valid dynamic range
-  construction already succeeds through the dedicated range path
-- the next real engine-admission value is therefore the broader real reference
-  substrate and the control/matrix work beyond it, not more error-literal work
-- it covers:
-  - unary numeric `Plus` / `Minus`
-  - binary scalar `Add`, `Subtract`, `Multiply`, `Divide`, `Power`
-  - concatenation
-  - scalar comparisons
-- reference and matrix operands still defer explicitly through
-  `NeedsReferenceResolution` / `NeedsMatrixMaterialization`
-- the current bridge is intentionally transitional:
-  `FormulaToken` is still the operand boundary type for the pilot, and that
-  debt should shrink as the engine-native RPN loop takes shape
-- the next operator slice should be measured by moving the runtime attempt /
-  success / decline totals inside the full-legacy audit lane, not just by
-  increasing the static attempt-case count
+- the engine-native evaluator owns arithmetic, concat, comparison, and unary
+  numeric semantics for its admitted operand shapes
+- admitted operator paths no longer depend on lower-seam `Interpret()`
+  pilots or long-lived `FormulaToken` operand boundaries
 
 ### 4. Engine Control Flow
 
-Move jump and lazy-evaluation semantics into engine code:
+Current baseline:
 
-- `IF`
-- `CHOOSE`
-- `LET`
-- matrix-aware jump variants
+- `spreadsheetengine/runtime/RpnControlFlow.hxx` already provides pure
+  branch-planning primitives and `LET` scope helpers
+- the remaining work is evaluator-state ownership, not discovering another
+  control-flow contract surface
 
-Checkpoint:
+Exit condition:
 
-- the initial control-flow substrate now exists in
-  `spreadsheetengine/runtime/RpnControlFlow.hxx`
-- it covers:
-  - `planIfBranch(RpnValue, then-slot?, else-slot?)` → `BranchPlan`
-  - `planChooseBranch(RpnValue, branch-count)` → `BranchPlan`
-  - `planIfsBranch(RpnValue, condition-index, remaining-params)` → `BranchPlan`
-  - `planSwitchBranch(RpnValue, case-labels, default-slot?)` → `BranchPlan`
-  - `planIfErrorBranch(error, bNAOnly, alternate-slot)` → `BranchPlan`
-  - `LetScope` with `bind()` / `lookup()` for scalar name binding
-- planners are *pure*: they never mutate PC state, never read Calc state,
-  never touch `FormulaToken`
-- matrix and reference conditions defer explicitly through
-  `NeedsMatrixMaterialization` / `NeedsReferenceResolution`
-- limited Calc opcode routing now exists through this layer:
-  scalar `ocIf`, `ocChoose`, `ocIfError` / `ocIfNA`, `ocIfs_MS`, and
-  `ocSwitch_MS` each use the corresponding planner when their operands stay
-  within the admitted scalar contract
-- matrix-condition and nested-interpreter `ocLet` paths still defer to legacy
+- `IF`, `CHOOSE`, `LET`, and adjacent lazy-branch families execute through
+  evaluator-owned state and branch planning rather than Calc token-iterator
+  state
 
-### 4b. Criteria and Database (Batch 3)
+### 5. Engine Reference, Query, and Matrix Frame
 
-The criteria / database family shares a single predicate machinery across
-nine criteria functions (COUNTIF / SUMIF / AVERAGEIF / COUNTIFS / SUMIFS
-/ AVERAGEIFS / MINIFS_MS / MAXIFS_MS / COUNTEMPTY) and twelve database
-functions (DSUM / DCOUNT / DCOUNT2 / DAVERAGE / DGET / DMAX / DMIN /
-DPRODUCT / DSTDEV(P) / DVAR(P)).
+Current baseline:
 
-Checkpoint:
+- `RangeResolver`, `RangeIterator`, matrix materialization helpers, search
+  policy, random policy, and spill allocation contracts are already exposed
+- the relocation backlog has already retired the wrapper terminals that used
+  those contracts
 
-- the criteria and database substrate now exists in
-  `spreadsheetengine/runtime/RpnCriteria.hxx` and
-  `spreadsheetengine/runtime/RpnDatabase.hxx`
-- it covers:
-  - `buildCriteriaPredicate(RpnValue, parsers)` returning a
-    `core::query::CriteriaPredicate` with explicit reference / matrix
-    deferral
-  - `SingleCriterionAggregateRequest` + `planSingleCriterionAggregate`
-    for the IF family (one criteria range, one predicate, optional
-    aggregation range)
-  - `MultiCriterionAggregateRequest` + `planMultiCriterionAggregate`
-    for the IFS family (N parallel (range, predicate) pairs)
-  - `countEmptyCells` for COUNTBLANK-style scalar iteration
-  - `DatabaseQueryDescriptor` with a 1-based-column-index or
-    header-name field selector and the three canonical references
-    (data range with header, criteria range with header, optional
-    field)
-  - `applyFieldSelector` to bridge RpnValue arguments into the
-    descriptor
-  - `bridgeAggregation` mapping `DatabaseAggregation` to
-    `core::query::CriteriaAggregateKind` for the simple reductions
-    plus flags for variance / stddev / product / get which need their
-    own variant-specific iteration
-- reference and matrix operands defer explicitly through
-  `NeedsReferenceResolution` / `NeedsMatrixMaterialization`
-- Calc now routes COUNTIF / SUMIF / AVERAGEIF, the IFS aggregate family,
-  COUNTEMPTY, and the first DB aggregate/variance/get members through this
-  layer when their arguments stay within the admitted single-sheet scalarized
-  contract
+Exit condition:
 
-### 5. Engine Reference & Matrix Frame
+- evaluator-native execution can carry reference-shaped operands, criteria and
+  database walks, matrix frame state, and spill/matrix planning without
+  rebuilding `ScInterpreter` stack semantics inside Calc
 
-Complete the hard substrate for:
+### 6. Long-Tail Families
 
-- reference-shaped operands
-- array broadcast
-- matrix frame state
-- spill/matrix materialization semantics needed by promoted opcodes
+Current baseline:
 
-This is likely the longest phase and should be treated as such.
+- the remaining Calc shell is now explicit host-owned / retained behavior, not
+  anonymous relocation debt
 
-### 6. Long-Tail Functions
+Exit condition:
 
-After the engine stack, operators, control flow, and reference/matrix
-contracts exist, the remaining leaf functions can port against those engine
-signatures rather than against Calc's stack machine.
+- any additional family that moves into engine ownership ports against the
+  evaluator contracts above, with same-commit parity coverage and doc updates,
+  instead of opening a fresh wrapper-debt queue
 
 ## Success Criteria
 
 The initiative is making real progress when:
 
-- `interp4_dispatch_legacy_lambda_count` falls materially
-- `interp4_dispatch_engine_attempted_total` or
-  `interp4_dispatch_engine_attempted_total_core_forced_full_legacy` move for real
-  workload lanes rather than staying flat while static attempt sites grow
-- `legacy_interpreter_subroutine_count` also falls, but no longer leads the
-  story by itself
+- retained host-owned overlap shrinks only where evaluator-owned authority
+  actually grows
+- `legacy_interpreter_subroutine_count` stays at `0`
+- `interp4_dispatch_legacy_lambda_count` stays at `0`
 - `interpret_tail_live_unique_fallback_formula_cells` stays `0`
 - `interpret_tail_live_unique_unsupported_function_formula_cells` stays `0`
 - `interpret_tail_live_unique_unseen_formula_cells` does not regress
+- widened families arrive with explicit host/runtime contracts plus engine
+  unit tests, Calc parity tests, and corpus validation
 
 The initiative is not making real progress if wrapper count falls while the
-relocated legacy dispatch surface stays flat.
+authoritative evaluator surface does not actually expand, or if new work grows
+`ScInterpreter::Interpret()` instead of shrinking the need for it.

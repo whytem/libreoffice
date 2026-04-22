@@ -1,22 +1,32 @@
 # RPN Evaluator: Five-Batch Execution Plan
 
-Status: active working plan for the RPN Evaluator Initiative
+Status: prospective follow-on planning reference for the RPN Evaluator
+Initiative
 
-This document consolidates the current-state audit across the five remaining
-subsystem batches and sequences their execution. It extends the scope policy
-in [COMPUTATIONAL_SUBSTRATE_RPN_EVALUATOR_INITIATIVE.md](COMPUTATIONAL_SUBSTRATE_RPN_EVALUATOR_INITIATIVE.md)
+This document consolidates the subsystem-batch planning snapshot that fed the
+RPN evaluator initiative. It extends the scope policy in
+[COMPUTATIONAL_SUBSTRATE_RPN_EVALUATOR_INITIATIVE.md](COMPUTATIONAL_SUBSTRATE_RPN_EVALUATOR_INITIATIVE.md)
 with concrete per-batch member lists, substrate dependencies, and retirement
 gates.
 
+The batch member counts and wrapper inventories below are retained planning
+context, not the canonical current-state inventory. Use
+[../PROJECT_STATUS.md](../PROJECT_STATUS.md),
+[STACK_MACHINE_RELOCATION_BACKLOG.md](STACK_MACHINE_RELOCATION_BACKLOG.md),
+and [HOST_FACADE_CONTRACTS.md](HOST_FACADE_CONTRACTS.md) for the live state
+of the current tree.
+
 ## Framing
 
-Piece-by-piece migration continues to work for leaf functions whose engine
+Piece-by-piece migration continued to work for leaf functions whose engine
 bodies already live in `semath::` / `sefinance::` / `sestat::`. It no longer
-works for the remaining ~51 `Sc*` methods + ~25 `pushLegacy*` lambdas,
+worked for the remaining ~51 `Sc*` methods + ~25 `pushLegacy*` lambdas in the
+planning snapshot this document was built from,
 because they share machinery — porting them one at a time means rebuilding
 that machinery five or more times.
 
-The remaining work splits into five subsystem batches plus one parallel
+That planning snapshot split the follow-on work into five subsystem batches
+plus one parallel
 wrapper-cleanup lane. Each batch owns a single substrate header under
 `spreadsheetengine/runtime/` and lands in four phases:
 

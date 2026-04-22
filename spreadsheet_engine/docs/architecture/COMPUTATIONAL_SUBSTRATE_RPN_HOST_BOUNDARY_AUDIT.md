@@ -41,9 +41,10 @@ is complete on the current tree:
 
 ## Audit Scope
 
-The remaining work is not a flat list of `ScXxx()` wrappers.
+The remaining work identified by the audit was not a flat list of
+`ScXxx()` wrappers.
 
-It includes:
+It included:
 
 - surviving `Sc*` methods in [interpre.hxx](/home/ubuntu/repos/libreoffice/sc/source/core/inc/interpre.hxx)
 - surviving `pushLegacy*` lambdas in [interpr4.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr4.cxx)
@@ -55,7 +56,7 @@ Phase 2 of the relocation backlog retired the former operator/control
 `Interpret()` shell and typed-stack machinery rather than named Calc
 execution wrappers.
 
-This audit categorizes the host services those surfaces still depend on.
+This audit categorizes the host services those surfaces depended on.
 
 ## Phase 2 Service Ledger
 
@@ -167,6 +168,11 @@ These inventories are intentionally exhaustive for the current tree. When the
 remaining legacy surface changes, this document must be updated in the same
 commit.
 
+The category sections below preserve the audit-time representative surfaces
+that motivated each host-service family. Many of those wrappers are already
+retired on the current tree; use the inventory above, not the category
+examples below, as the live current-state list.
+
 ## Category 1: Reference Resolution
 
 Required host services:
@@ -176,7 +182,7 @@ Required host services:
 - preserve reference-shaped operands as references, not only as scalars
 - materialize references to matrices when a consumer requires matrix form
 
-Representative surviving Calc surfaces:
+Representative Calc surfaces at audit time:
 
 - `ScIndirect`
 - `ScOffset`
@@ -194,7 +200,7 @@ Representative surviving Calc surfaces:
 - `PopExternalSingleRef`
 - `PopExternalDoubleRef`
 
-Immediate implication:
+Immediate implication at audit time:
 
 - the engine needs a first-class reference operand model, not just scalar and
   matrix materialization helpers
@@ -207,7 +213,7 @@ Required host services:
 - inspect or propagate number format / expression format
 - preserve formatting decisions that affect function semantics
 
-Representative surviving Calc surfaces:
+Representative Calc surfaces at audit time:
 
 - `ScType`
 - `ScCell`
@@ -219,7 +225,7 @@ Representative surviving Calc surfaces:
 - `pushLegacyCurrency`
 - `pushLegacyFixed`
 
-Immediate implication:
+Immediate implication at audit time:
 
 - the host contract needs an explicit cell-inspection service, separate from
   plain value reads
@@ -233,7 +239,7 @@ Required host services:
 - evaluate criteria and database query entries
 - preserve database-range and subtotal semantics
 
-Representative surviving Calc surfaces:
+Representative Calc surfaces at audit time:
 
 - `ScCountIf`
 - `ScSubTotal`
@@ -257,7 +263,7 @@ Representative surviving Calc surfaces:
 - `ScExpand`
 - `ScTextSplit`
 
-Immediate implication:
+Immediate implication at audit time:
 
 - the engine needs a dedicated range-walk / criteria service rather than
   one-off ad hoc host calls per function
@@ -272,7 +278,7 @@ Required host services:
 - `LET` binding context
 - array-aware jump behavior
 
-Representative surviving Calc surfaces:
+Representative Calc surfaces at audit time:
 
 - `ScIfJump`
 - `ScIfJumpNotMatrix`
@@ -282,7 +288,7 @@ Representative surviving Calc surfaces:
 - `MatrixJumpConditionToMatrix`
 - `ConvertMatrixJumpConditionToMatrix`
 
-Immediate implication:
+Immediate implication at audit time:
 
 - control-flow opcodes must move as part of an engine RPN loop, not as
   isolated leaf functions
@@ -297,7 +303,7 @@ Required host services:
 - reference/scalar coercion
 - format propagation through operator results
 
-Representative surviving Calc surfaces:
+Representative Calc surfaces at audit time:
 
 - `ScAmpersand`
 - `ScMul`
@@ -308,7 +314,7 @@ Representative surviving Calc surfaces:
 - `ScUnaryMatrixOrScalarOp`
 - the remaining unseen `operator:+` tail on the corpus
 
-Immediate implication:
+Immediate implication at audit time:
 
 - the next meaningful engine step is a typed operator subsystem, not another
   sequence of leaf-function migrations
@@ -330,7 +336,7 @@ Required host services:
 - matrix-reference propagation
 - spill-shaped result semantics
 
-Representative surviving Calc surfaces:
+Representative Calc surfaces at audit time:
 
 - `ScMatInv`
 - `ScMatMult`
@@ -346,7 +352,7 @@ Representative surviving Calc surfaces:
 - `ScTakeOrDrop`
 - `ScHorizontalOrVerticalStack`
 
-Immediate implication:
+Immediate implication at audit time:
 
 - the engine needs explicit matrix-frame state rather than relying on
   `ScInterpreter` instance state
@@ -360,12 +366,12 @@ Required host services:
 - deterministic random source policy via `RuntimeEnvironment::sampleUniformReal()`
 - regex/text-search runtime behavior
 
-Representative surviving Calc surfaces:
+Representative Calc surfaces at audit time:
 
 - no dedicated relocation-relevant wrapper surface remains; system-state
   policy is consumed through explicit compat terminals and runtime contracts
 
-Immediate implication:
+Immediate implication at audit time:
 
 - the engine contract now separates deterministic system services from
   document services explicitly: random draws come from
@@ -382,7 +388,7 @@ Required host services:
 - pivot-table lookups
 - hyperlink-specific behavior
 
-Representative surviving Calc surfaces:
+Representative Calc surfaces at audit time:
 
 - `ScMacro`
 - `ScDde`
@@ -391,7 +397,7 @@ Representative surviving Calc surfaces:
 - `ScGetPivotData`
 - `ScHyperLink`
 
-Immediate implication:
+Immediate implication at audit time:
 
 - these should be treated as explicit host terminals unless we intentionally
   decide they belong inside the engine contract
@@ -405,7 +411,7 @@ Required host services:
 - number-format side channel
 - token stack reversal and temporary token handling
 
-Representative surviving Calc surfaces:
+Representative Calc surfaces at audit time:
 
 - `PushDouble`
 - `PushString`
@@ -416,7 +422,7 @@ Representative surviving Calc surfaces:
 - `ReverseStack`
 - temporary-token push helpers in `interpr4.cxx`
 
-Immediate implication:
+Immediate implication at audit time:
 
 - the engine needs its own stack-value model and evaluator state object before
   the remaining operator and control-flow migration can be honest

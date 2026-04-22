@@ -1,24 +1,27 @@
 # Computational Substrate Authority Transfer Pivot Plan
 
 Status: closed on the current tree; retained as the authority-transfer
-completion record and relocation handoff
+completion record. The relocation handoff recorded here is also complete.
 
 ## Purpose
 
-This document now records the completed authority-transfer pivot and hands the
-remaining work to the relocation backlog.
+This document now records the completed authority-transfer pivot and the
+historical handoff that fed the relocation backlog.
 
 The project now has two different kinds of success:
 
 - shared-engine extraction: materially achieved
 - live authority transfer inside Calc: complete on the current tree
 
-The active dependency-ordered relocation queue for the remaining work is
-[STACK_MACHINE_RELOCATION_BACKLOG.md](STACK_MACHINE_RELOCATION_BACKLOG.md).
+The relocation closeout record now lives in
+[STACK_MACHINE_RELOCATION_BACKLOG.md](STACK_MACHINE_RELOCATION_BACKLOG.md),
+while current follow-on priorities live in
+[../PROJECT_STATUS.md](../PROJECT_STATUS.md).
 
 The pivot result is that one engine-native execution path can now carry real
-Calc traffic under `ScFormulaCell::InterpretTail()`, and remaining work is
-ordinary relocation rather than authority-transfer bookkeeping.
+Calc traffic under `ScFormulaCell::InterpretTail()`. The follow-on relocation
+work that remained at the time of this handoff is now also closed on the
+current tree.
 
 ## Architectural Decision
 
@@ -55,7 +58,7 @@ The existing metrics already show the boundary clearly:
 - the core-forced full-legacy audit lane proves the lower seam is real and
   useful, but it is not the same thing as ambient production traffic
 
-So the next phase must optimize for:
+At the time of the pivot handoff, the next phase had to optimize for:
 
 - upstream exercised authority
 - one reconciled seam story

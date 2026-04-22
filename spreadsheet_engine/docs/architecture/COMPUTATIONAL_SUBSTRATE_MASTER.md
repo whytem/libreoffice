@@ -1,18 +1,23 @@
 # Computational Substrate Master
 
-Status: broader narrative, scope, and relocation-context reference
+Status: broader narrative, scope, and forward-looking evaluator-context
+reference
 
 Canonical current state now lives in
 [../PROJECT_STATUS.md](../PROJECT_STATUS.md) and
 [STACK_MACHINE_RELOCATION_BACKLOG.md](STACK_MACHINE_RELOCATION_BACKLOG.md).
 This document is the broader program narrative and may intentionally lag the
-status snapshot when work is being regrouped.
+status snapshot when work is being regrouped. Treat the figures and queue
+language below as historical context unless a section explicitly says it is
+describing current policy.
 
 ## Executive Summary
 
 The first-stage extraction objective is materially achieved.
 The authority-transfer pivot is closed on the current tree.
-Active work is now the stack-machine relocation backlog.
+The stack-machine relocation backlog is closed on the current tree.
+The next active frontier is deliberate evaluator expansion, not backlog
+cleanup.
 
 Today:
 
@@ -20,19 +25,21 @@ Today:
   standalone evaluation and Calc-backed execution paths
 - the intended long-term production path is
   `ScFormulaCell::InterpretTail() -> tryEvaluateFormula() -> FormulaEvaluator -> RpnEvaluator`
-- the authority-transfer question is now settled for the current tree; the
-  remaining work is ordinary relocation of residual Calc-owned execution
-  surface
-- the active implementation order lives in
+- the authority-transfer and relocation-closeout questions are now settled
+  for the current tree; follow-on work is deliberate evaluator widening over
+  retained host-owned surface
+- the relocation closeout record lives in
   [STACK_MACHINE_RELOCATION_BACKLOG.md](STACK_MACHINE_RELOCATION_BACKLOG.md)
 - the current host-boundary inventory lives in
   [HOST_FACADE_CONTRACTS.md](HOST_FACADE_CONTRACTS.md)
+- the forward-looking evaluator initiative lives in
+  [COMPUTATIONAL_SUBSTRATE_RPN_EVALUATOR_INITIATIVE.md](COMPUTATIONAL_SUBSTRATE_RPN_EVALUATOR_INITIATIVE.md)
 - closed migration-era plans, ledgers, and slice reports now live under
   [../archive/authority_transfer/](../archive/authority_transfer/)
 
 The active program is no longer “prove more substrate slices.”
-The active program is “relocate the remaining stack-machine ownership into the
-engine while preserving parity.”
+The active program is “widen engine ownership deliberately while preserving
+parity and keeping retained Calc shells intentional.”
 
 ## Historical Transition Dashboard
 
@@ -272,7 +279,7 @@ The strategy reset that produced the pivot is recorded in
 [../archive/authority_transfer/COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md](../archive/authority_transfer/COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_STRATEGY_MEMO.md).
 The completed authority-transfer handoff is recorded in
 [COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md](COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md).
-The active implementation queue now lives in
+The relocation closeout record now lives in
 [STACK_MACHINE_RELOCATION_BACKLOG.md](STACK_MACHINE_RELOCATION_BACKLOG.md).
 
 ## Next Initiative: Engine RPN Evaluator
@@ -296,8 +303,9 @@ That initiative is now tracked in:
 - [COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md](COMPUTATIONAL_SUBSTRATE_RPN_HOST_BOUNDARY_AUDIT.md)
 
 The key policy change is that wrapper deletion alone is no longer treated as
-equivalent to engine migration. The leading metric for the next phase is
-reduction in `interp4_dispatch_legacy_lambda_count`.
+equivalent to engine migration. With the relocation backlog closed, the next
+forward-looking metric is deliberate reduction of retained host-owned overlap,
+not another wrapper-only cleanup wave.
 
 ## Engine-Owned Today
 

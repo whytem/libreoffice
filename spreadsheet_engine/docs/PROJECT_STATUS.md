@@ -9,11 +9,13 @@ Historical slice writeups, phase plans, and retired ledgers now live under
 ## Start Here
 
 - [architecture/STACK_MACHINE_RELOCATION_BACKLOG.md](architecture/STACK_MACHINE_RELOCATION_BACKLOG.md):
-  active implementation queue
+  relocation closeout record
 - [architecture/COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md](architecture/COMPUTATIONAL_SUBSTRATE_AUTHORITY_TRANSFER_PIVOT_PLAN.md):
   completion record for the authority-transfer pivot
+- [architecture/COMPUTATIONAL_SUBSTRATE_RPN_EVALUATOR_INITIATIVE.md](architecture/COMPUTATIONAL_SUBSTRATE_RPN_EVALUATOR_INITIATIVE.md):
+  forward-looking evaluator-expansion initiative reference
 - [architecture/HOST_FACADE_CONTRACTS.md](architecture/HOST_FACADE_CONTRACTS.md):
-  current host-contract inventory for remaining Calc-owned execution surface
+  current host-contract inventory for surviving Calc-owned / retained execution surface
 - [architecture/COMPUTATIONAL_SUBSTRATE_MASTER.md](architecture/COMPUTATIONAL_SUBSTRATE_MASTER.md):
   broader program context and narrative reference
 - [architecture/CALC_TEST_KNOWN_REGRESSIONS.md](architecture/CALC_TEST_KNOWN_REGRESSIONS.md):

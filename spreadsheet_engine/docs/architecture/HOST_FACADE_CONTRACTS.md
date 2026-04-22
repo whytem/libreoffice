@@ -14,8 +14,8 @@ absorbed into the standalone engine.
   engine side and the `libreoffice` compat adapter. Each entry lists
   signature, semantics, preconditions, error modes, thread safety,
   and representative callers.
-- **Pending contracts** — surfaces that were previously implicit or
-  fragmented, with the shape we expected while they were being formalized.
+- **Transition notes** — formerly pending surfaces and still-unbound
+  adapter steps retained for current-state context.
 - **Principles** — policy for when to add a new primitive vs.
   extend one, how contracts are versioned, and what level of tests
   an admission needs before it is marked stable.
@@ -41,9 +41,9 @@ quietly drift out of date.
   migration work.
 - `exposed but too broad`: the engine can reach the service today, but the
   surface is fragmented, stopgap, or too tied to Calc internals to treat as
-  the final contract.
-- `missing`: the remaining legacy surface still depends on behavior that has
-  not yet been formalized as a stable host contract.
+  the final contract. This label is retained for transition-era context.
+- `missing`: a transition-era label for behavior that had not yet been
+  formalized as a stable host contract. No live row currently uses it.
 - `intentionally unsupported`: the capability should remain an explicit
   host-owned terminal and is not part of the engine-native evaluator contract.
 
@@ -55,7 +55,7 @@ quietly drift out of date.
 | Basic reference resolution | `RangeResolver::resolveRange`, `ReferenceResolver::resolveReference`, external-ref fetch helpers | `already exposed` | host-only union/intersection/range terminals, external add-in terminals | Compile-time and evaluation-time reference resolution now share one contract; the remaining Calc sites are explicit host terminals rather than duplicate evaluator logic |
 | Named / external / database / structured range resolution | compile-host lookup resolvers, `RangeResolver::resolveRange`, `DocumentRangeResolver` | `already exposed` | query-family range walking, structured-reference materialization follow-ups | One evaluation-time resolver now covers named, DB, external, and INDIRECT-driven range binding; structured references that cannot flatten still round-trip as `TokenBackedSymbol` |
 | Matrix materialization | `materializeHostRangeToMatrixOperand`, `CellValueView::matrixReference`, matrix operand bridges | `already exposed` | matrix-form admissions in surviving `ScMat*` / regression-family consumers | Phase 6 retired `ExecuteMatValueTerminal`, `ExecuteMatRefTerminal`, `ExecuteFrequencyTerminal`, `ExecuteForecastEtsTerminal`, `ExecuteFourierTerminal`, and `ExecuteSumXMY2Terminal`; the remaining Calc matrix surface is direct host-backed matrix consumption rather than dedicated wrapper terminals |
-| Criteria / range iteration | `RangeIterator`, `CriteriaAggregateMaterializer::iterate` | `already exposed` | DB-family tails, COUNTBLANK widening, future streaming criteria work | Phase 7 landed a standalone row-major walker on `EvaluationHost`; production query/countblank scans now route through it instead of baking iteration into Calc-local walkers |
+| Criteria / range iteration | `RangeIterator`, `CriteriaAggregateMaterializer::iterate` | `already exposed` | DB-family tails, COUNTBLANK widening, future streaming criteria work | A standalone row-major walker now lives on `EvaluationHost`; production query/countblank scans route through it instead of baking iteration into Calc-local walkers |
 | Formula text / inspection | `runtime::formulainspection::Provider`, `DirectFormulaInspectionAdapter` | `already exposed` | no Calc-owned inspection wrappers remain | Formula-presence and formula-text reads now flow through an explicit inspection provider instead of ad hoc document peeks |
 | Format / type inspection | `runtime::cellinspection::*`, `DirectCellInspectionAdapter`, `DirectHostCellInspectionAdapter` | `already exposed` | no Calc-owned inspection wrappers remain | The bounded/value vs. host-property split is now explicit, and Phase 5 retired the remaining `TYPE`, `CELL`, `INFO`, `CURRENT`, `STYLE`, and `N` Calc entrypoints |
 | Locale / calendar / date / search policy | `RuntimeEnvironment::getNullDate()`, `RuntimeEnvironment::getLocaleTag()`, `RuntimeEnvironment::getSearchType()`, `RuntimeEnvironment::sampleUniformReal()`, `TextCoercion` | `already exposed` | host-sensitive text/search terminals, date/time parsing tails | Locale, null-date, search-mode, and random-source policy now flow through explicit host contracts rather than Calc-local evaluator code |
@@ -95,7 +95,7 @@ rows below are intentionally retained host-owned utilities.
 | Host/debug utilities | `ScTableOp`, `ScTTT`, `ScDebugVar` | document mutation / repeated-operation state, debug-only projection | Phase 1 of the relocation backlog classified these as explicit host/debug utilities rather than active relocation debt |
 | External computation terminals | `ExecuteExternalTerminal`, `ScMacro`, `ScDde`, `ScWebservice`, `ScFilterXML`, `ScGetPivotData`, `ScHyperLink` | external computation | Intentionally host-owned and outside the engine-native evaluator contract |
 
-### Missing or fragmented contracts that later slices depend on
+### Formerly missing or fragmented contracts now closed
 
 | Contract | Current status | Why it mattered |
 | --- | --- | --- |
@@ -371,7 +371,7 @@ addressing formulas no longer need duplicate Calc-side resolver logic.
 
 ### Matrix materialization
 
-#### `materializeHostRangeToMatrixOperand` (Phase D)
+#### `materializeHostRangeToMatrixOperand`
 
 Declared in
 [`InterpretTailEngineEvaluator.hxx`](../../inc/spreadsheetengine/compat/libreoffice/InterpretTailEngineEvaluator.hxx)
@@ -420,7 +420,7 @@ materializeHostRangeToMatrixOperand(
 **Caller contract.**
 
 - Caller owns stack-type pre-validation (`svSingleRef` /
-  `svDoubleRef`; Phase D admissions only admit these two) and
+  `svDoubleRef`; the current compat admissions only admit these two) and
   absolute-range conversion via `ScSingleRefData::toAbs` /
   `ScComplexRefData::toAbs`.
 - Caller owns any scope fencing (determinant squareness, TRANSPOSE
@@ -434,16 +434,18 @@ cell walks `readMaterializedHostCellValue`, which can invoke a
 bounded referenced-formula materialization on dirty cells. Avoid
 re-calling on overlapping ranges in the same dispatch pass.
 
-**Consumers (Phase D landing):** `tryPlanEngineTranspose`,
-`tryPlanEngineMatrixDeterminant`.
+**Current production consumers:** `tryPlanEngineTranspose`,
+`tryPlanEngineMatrixDeterminant`, plus the compat matrix-reference
+materialization bridge in
+[interpr4.cxx](/home/ubuntu/repos/libreoffice/sc/source/core/tool/interpr4.cxx).
 
 **Current pairing:** lower-seam matrix admissions now pair this local-range
 helper with `fetchExternalSingleRef` / `fetchExternalDoubleRef` when the
 source token is external, so one MatrixOperand bridge spans both local and
 external reference-backed inputs.
 
-**Future consumers:** `tryPlanEngineSumProduct` family (Phase E); INDEX
-matrix-return form (Phase D follow-up).
+**Potential future consumers:** `tryPlanEngineSumProduct` family; INDEX
+matrix-return form.
 
 #### `readMaterializedHostCellValue` — canonical single-cell read
 
@@ -565,17 +567,17 @@ Inline helpers in `spreadsheetengine::compat::libreoffice::spillallocation`:
   collision probe, and returns either the committed `CellRange` or
   a `SpillAllocationError`.
 - `markArrayFormulaBounds(ScDocument&, const CellRange&)` — stub.
-  Phase 5A admissions inherit the existing array-formula bounds
-  handling through `PushMatrix`; Phase 5B will fill this in.
+  Current spill-shaped admissions still inherit the existing
+  array-formula bounds handling through `PushMatrix`; no
+  `EvaluationHost` implementation currently subclasses
+  `SpillRangeAllocator`.
 
-**Phase status.** Phase 5A (FILTER / SORT / SORTBY / UNIQUE / TAKE /
-DROP) does not yet reach the allocator — those planners emit matrix
-operands directly through the existing
-`convertMatrixOperandToMatrixRef → PushMatrix` bridge and inherit
-legacy bounds handling. Phase 5B (HSTACK / VSTACK / CHOOSECOLS /
-CHOOSEROWS / EXPAND / TOCOL / TOROW / WRAPCOLS / WRAPROWS /
-TEXTSPLIT) is expected to bind the adapter as a
-`SpillRangeAllocator` subclass on an `EvaluationHost`.
+**Current state.** The allocator contract is real, but it is still
+not bound as a `SpillRangeAllocator` subclass on any
+`EvaluationHost` implementation. Existing spill-shaped planners
+continue to emit matrix operands through the
+`convertMatrixOperandToMatrixRef -> PushMatrix` bridge and inherit
+legacy bounds handling.
 
 ### Cell read
 
@@ -590,9 +592,9 @@ for every engine admission that needs a cell's visible value.
 
 ---
 
-## Contracts still pending
+## Transition Notes
 
-### Range iteration primitive (landed in Phase 7)
+### Range iteration primitive (now landed)
 
 **Needed for:**
 
@@ -604,7 +606,7 @@ for every engine admission that needs a cell's visible value.
 - Future streaming aggregates that cannot afford
   materialize-then-fold.
 
-**Current state.** Phase 7 formalized `RangeIterator` on
+**Current state.** `RangeIterator` is now formalized on
 `EvaluationHost`, and production query/countblank admissions now
 route their reference scans through
 `CriteriaAggregateMaterializer::iterate` (see
@@ -640,7 +642,7 @@ standalone in-memory host both implement the contract, and the
 query runtime now uses it in production instead of embedding its own
 document walker.
 
-### Regex / wildcard mode (landed in Phase 6)
+### Regex / wildcard mode (now landed)
 
 **Current state.** `RuntimeEnvironment` now exposes
 `getSearchType()`, and both the LibreOffice
@@ -675,15 +677,13 @@ more explicitly than `ResolvedRangeBindingKind::TokenBackedSymbol`,
 the contract may grow a finer-grained discriminator. That is an
 evolution concern, not an open migration blocker.
 
-### Spill allocation host implementation (Phase 5B)
+### Spill allocation host implementation (still unbound on current tree)
 
-The abstract contract (`SpillRangeAllocator`) and the libreoffice
-inline helpers are in place, but the adapter has not yet been bound
-as a `SpillRangeAllocator` subclass registered on an
-`EvaluationHost` implementation. The binding lands with Phase 5B
-when the first shape-reshaping spill admission (HSTACK / VSTACK /
-…) reaches the allocator. `markArrayFormulaBounds` is a no-op stub
-until then.
+The abstract contract (`SpillRangeAllocator`) and the LibreOffice
+inline helpers are in place, but the adapter is still not bound as a
+`SpillRangeAllocator` subclass registered on an `EvaluationHost`
+implementation. `markArrayFormulaBounds` therefore remains a no-op
+stub on the current tree.
 
 ---
 
